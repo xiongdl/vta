@@ -34,3 +34,46 @@ class Test(implicit p: Parameters) extends Module {
   sim_shell.mem <> vta_shell.io.mem
   vta_shell.io.host <> sim_shell.host
 }
+
+/** APB-host simulation testbench. The generated top name remains Test so the
+ * existing C++ Verilator/DPI harness is reused without modification. */
+class TestAPB(implicit p: Parameters) extends Module {
+  override def desiredName = "Test"
+
+  val sim_clock = IO(Input(Clock()))
+  val sim_wait = IO(Output(Bool()))
+  val sim_shell = Module(new SimShellAPB)
+  val vta_shell = Module(new VTAShellAPB)
+  sim_shell.sim_clock := sim_clock
+  sim_wait := sim_shell.sim_wait
+  sim_shell.mem <> vta_shell.io.mem
+  vta_shell.io.host <> sim_shell.host
+}
+
+/** AXI-host/AHB-memory simulation testbench. */
+class TestAHB(implicit p: Parameters) extends Module {
+  override def desiredName = "Test"
+
+  val sim_clock = IO(Input(Clock()))
+  val sim_wait = IO(Output(Bool()))
+  val sim_shell = Module(new SimShellAHB)
+  val vta_shell = Module(new VTAShellAHB)
+  sim_shell.sim_clock := sim_clock
+  sim_wait := sim_shell.sim_wait
+  sim_shell.mem <> vta_shell.io.mem
+  vta_shell.io.host <> sim_shell.host
+}
+
+/** APB-host/AHB-memory simulation testbench. */
+class TestAPBAHB(implicit p: Parameters) extends Module {
+  override def desiredName = "Test"
+
+  val sim_clock = IO(Input(Clock()))
+  val sim_wait = IO(Output(Bool()))
+  val sim_shell = Module(new SimShellAPBAHB)
+  val vta_shell = Module(new VTAShellAPBAHB)
+  sim_shell.sim_clock := sim_clock
+  sim_wait := sim_shell.sim_wait
+  sim_shell.mem <> vta_shell.io.mem
+  vta_shell.io.host <> sim_shell.host
+}

@@ -64,3 +64,37 @@ object TestDefaultDe10Config extends App {
   implicit val p: Parameters = new DefaultDe10Config
   (new chisel3.stage.ChiselStage).emitSystemVerilog(new Test, args)
 }
+
+/** Generate a VTA shell with native APB4 host and AXI4 memory interfaces. */
+object APBHostDefaultDe10Config extends App {
+  implicit val p: Parameters = new DefaultDe10Config
+  (new chisel3.stage.ChiselStage).emitSystemVerilog(new VTAShellAPB, args)
+}
+
+/** Generate the APB-host TSIM testbench with the unchanged AXI DPI ABI. */
+object TestAPBDefaultDe10Config extends App {
+  implicit val p: Parameters = new DefaultDe10Config
+  (new chisel3.stage.ChiselStage).emitSystemVerilog(new TestAPB, args)
+}
+
+/** Generate a native AXI4-Lite-host/AHB-Lite-memory VTA shell. */
+object AHBMemoryDefaultDe10Config extends App {
+  implicit val p: Parameters = new DefaultDe10Config
+  (new chisel3.stage.ChiselStage).emitSystemVerilog(new VTAShellAHB, args)
+}
+
+/** Generate a native APB4-host/AHB-Lite-memory VTA shell. */
+object APBAHBDefaultDe10Config extends App {
+  implicit val p: Parameters = new DefaultDe10Config
+  (new chisel3.stage.ChiselStage).emitSystemVerilog(new VTAShellAPBAHB, args)
+}
+
+object TestAHBDefaultDe10Config extends App {
+  implicit val p: Parameters = new DefaultDe10Config
+  (new chisel3.stage.ChiselStage).emitSystemVerilog(new TestAHB, args)
+}
+
+object TestAPBAHBDefaultDe10Config extends App {
+  implicit val p: Parameters = new DefaultDe10Config
+  (new chisel3.stage.ChiselStage).emitSystemVerilog(new TestAPBAHB, args)
+}

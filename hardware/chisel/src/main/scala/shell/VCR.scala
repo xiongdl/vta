@@ -24,6 +24,7 @@ import chisel3.util._
 import vta.util.config._
 import vta.util.genericbundle._
 import vta.interface.axi._
+import vta.interface.apb._
 
 /** VCR parameters.
  *
@@ -73,33 +74,24 @@ class VCRClient(implicit p: Parameters) extends VCRBase {
   val ucnt = Vec(vp.nUCnt, ValidIO(UInt(vp.regBits.W)))
 }
 
-/** VTA Control Registers (VCR).
- *
- * This unit provides control registers (32 and 64 bits) to be used by a control'
- * unit, typically a host processor. These registers are read-only by the core
- * at the moment but this will likely change once we add support to general purpose
- * registers that could be used as event counters by the Core unit.
- */
-class VCR(implicit p: Parameters) extends Module {
+/** Protocol-independent request issued by a native VCR bus front-end. */
+class VCRWriteRequest(implicit p: Parameters) extends VCRBase {
+  val addr = UInt(p(ShellKey).hostParams.addrBits.W)
+  val data = UInt(p(ShellKey).vcrParams.regBits.W)
+  val strb = UInt((p(ShellKey).vcrParams.regBits / 8).W)
+}
+
+/** VTA control-register storage and core-facing behavior. */
+class VCRRegisters(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
-    val host = new AXILiteClient(p(ShellKey).hostParams)
+    val write = Flipped(ValidIO(new VCRWriteRequest))
+    val readAddr = Input(UInt(p(ShellKey).hostParams.addrBits.W))
+    val readData = Output(UInt(p(ShellKey).vcrParams.regBits.W))
     val vcr = new VCRMaster
   })
 
   val vp = p(ShellKey).vcrParams
   val mp = p(ShellKey).memParams
-  val hp = p(ShellKey).hostParams
-
-  // Write control (AW, W, B)
-  val waddr = RegInit("h_ffff".U(hp.addrBits.W)) // init with invalid address
-  val wdata = io.host.w.bits.data
-  val sWriteAddress :: sWriteData :: sWriteResponse :: Nil = Enum(3)
-  val wstate = RegInit(sWriteAddress)
-
-  // read control (AR, R)
-  val sReadAddress :: sReadData :: Nil = Enum(2)
-  val rstate = RegInit(sReadAddress)
-  val rdata = RegInit(0.U(vp.regBits.W))
 
   // registers
   val nPtrs = if (mp.addrBits == 32) vp.nPtrs else 2 * vp.nPtrs
@@ -108,77 +100,35 @@ class VCR(implicit p: Parameters) extends Module {
   val reg = Seq.fill(nTotal)(RegInit(0.U(vp.regBits.W)))
   val addr = Seq.tabulate(nTotal)(_ * 4)
   val reg_map = (addr zip reg) map { case (a, r) => a.U -> r }
+  val writeMask = FillInterleaved(8, io.write.bits.strb)
+  def mergedWrite(old: UInt): UInt =
+    (old & ~writeMask) | (io.write.bits.data & writeMask)
   val eo = vp.nCtrl
   val vo = eo + vp.nECnt
   val po = vo + vp.nVals
   val uo = po + nPtrs
 
-  switch(wstate) {
-    is(sWriteAddress) {
-      when(io.host.aw.valid) {
-        wstate := sWriteData
-      }
-    }
-    is(sWriteData) {
-      when(io.host.w.valid) {
-        wstate := sWriteResponse
-      }
-    }
-    is(sWriteResponse) {
-      when(io.host.b.ready) {
-        wstate := sWriteAddress
-      }
-    }
-  }
-
-  when(io.host.aw.fire) { waddr := io.host.aw.bits.addr }
-
-  io.host.aw.ready := wstate === sWriteAddress
-  io.host.w.ready := wstate === sWriteData
-  io.host.b.valid := wstate === sWriteResponse
-  io.host.b.bits.resp := 0.U
-
-  switch(rstate) {
-    is(sReadAddress) {
-      when(io.host.ar.valid) {
-        rstate := sReadData
-      }
-    }
-    is(sReadData) {
-      when(io.host.r.ready) {
-        rstate := sReadAddress
-      }
-    }
-  }
-
-  io.host.ar.ready := rstate === sReadAddress
-  io.host.r.valid := rstate === sReadData
-  io.host.r.bits.data := rdata
-  io.host.r.bits.resp := 0.U
-
   when(io.vcr.finish) {
     reg(0) := "b_10".U
-  }.elsewhen(io.host.w.fire && addr(0).U === waddr) {
-    reg(0) := wdata
+  }.elsewhen(io.write.valid && addr(0).U === io.write.bits.addr) {
+    reg(0) := mergedWrite(reg(0))
   }
 
   for (i <- 0 until vp.nECnt) {
     when(io.vcr.ecnt(i).valid) {
       reg(eo + i) := io.vcr.ecnt(i).bits
-    }.elsewhen(io.host.w.fire && addr(eo + i).U === waddr) {
-      reg(eo + i) := wdata
+    }.elsewhen(io.write.valid && addr(eo + i).U === io.write.bits.addr) {
+      reg(eo + i) := mergedWrite(reg(eo + i))
     }
   }
 
   for (i <- 0 until (vp.nVals + nPtrs)) {
-    when(io.host.w.fire && addr(vo + i).U === waddr) {
-      reg(vo + i) := wdata
+    when(io.write.valid && addr(vo + i).U === io.write.bits.addr) {
+      reg(vo + i) := mergedWrite(reg(vo + i))
     }
   }
 
-  when(io.host.ar.fire) {
-    rdata := MuxLookup(io.host.ar.bits.addr, 0.U, reg_map)
-  }
+  io.readData := MuxLookup(io.readAddr, 0.U, reg_map)
 
   io.vcr.launch := reg(0)(0)
 
@@ -199,8 +149,78 @@ class VCR(implicit p: Parameters) extends Module {
   for (i <- 0 until vp.nUCnt) {
     when(io.vcr.ucnt(i).valid) {
       reg(uo + i) := io.vcr.ucnt(i).bits
-    }.elsewhen(io.host.w.fire && addr(uo + i).U === waddr) {
-      reg(uo + i) := wdata
+    }.elsewhen(io.write.valid && addr(uo + i).U === io.write.bits.addr) {
+      reg(uo + i) := mergedWrite(reg(uo + i))
     }
   }
+}
+
+/** Native AXI4-Lite VTA control-register front-end. */
+class VCR(implicit p: Parameters) extends Module {
+  val io = IO(new Bundle {
+    val host = new AXILiteClient(p(ShellKey).hostParams)
+    val vcr = new VCRMaster
+  })
+
+  val hp = p(ShellKey).hostParams
+  val registers = Module(new VCRRegisters)
+  val waddr = RegInit("h_ffff".U(hp.addrBits.W))
+  val rdata = RegInit(0.U(p(ShellKey).vcrParams.regBits.W))
+
+  val sWriteAddress :: sWriteData :: sWriteResponse :: Nil = Enum(3)
+  val wstate = RegInit(sWriteAddress)
+  switch(wstate) {
+    is(sWriteAddress) { when(io.host.aw.valid) { wstate := sWriteData } }
+    is(sWriteData) { when(io.host.w.valid) { wstate := sWriteResponse } }
+    is(sWriteResponse) { when(io.host.b.ready) { wstate := sWriteAddress } }
+  }
+  when(io.host.aw.fire) { waddr := io.host.aw.bits.addr }
+  io.host.aw.ready := wstate === sWriteAddress
+  io.host.w.ready := wstate === sWriteData
+  io.host.b.valid := wstate === sWriteResponse
+  io.host.b.bits.resp := 0.U
+
+  val sReadAddress :: sReadData :: Nil = Enum(2)
+  val rstate = RegInit(sReadAddress)
+  switch(rstate) {
+    is(sReadAddress) { when(io.host.ar.valid) { rstate := sReadData } }
+    is(sReadData) { when(io.host.r.ready) { rstate := sReadAddress } }
+  }
+  io.host.ar.ready := rstate === sReadAddress
+  io.host.r.valid := rstate === sReadData
+  io.host.r.bits.data := rdata
+  io.host.r.bits.resp := 0.U
+
+  registers.io.write.valid := io.host.w.fire
+  registers.io.write.bits.addr := waddr
+  registers.io.write.bits.data := io.host.w.bits.data
+  registers.io.write.bits.strb := io.host.w.bits.strb
+  registers.io.readAddr := io.host.ar.bits.addr
+  when(io.host.ar.fire) { rdata := registers.io.readData }
+  io.vcr <> registers.io.vcr
+}
+
+/** Native APB4 VTA control-register front-end. */
+class VCRAPB(implicit p: Parameters) extends Module {
+  private val hp = p(ShellKey).hostParams
+  private val ap = APBParams(addrBits = hp.addrBits, dataBits = hp.dataBits)
+
+  val io = IO(new Bundle {
+    val host = new APBSlave(ap)
+    val vcr = new VCRMaster
+  })
+
+  val registers = Module(new VCRRegisters)
+  val access = io.host.psel && io.host.penable
+
+  registers.io.write.valid := access && io.host.pwrite
+  registers.io.write.bits.addr := io.host.paddr
+  registers.io.write.bits.data := io.host.pwdata
+  registers.io.write.bits.strb := io.host.pstrb
+  registers.io.readAddr := io.host.paddr
+
+  io.host.prdata := registers.io.readData
+  io.host.pready := access
+  io.host.pslverr := false.B
+  io.vcr <> registers.io.vcr
 }

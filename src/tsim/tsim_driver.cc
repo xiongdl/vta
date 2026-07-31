@@ -98,8 +98,16 @@ class DPILoader {
   }
 
   static DPILoader* Global() {
+#if defined(__APPLE__)
+    // Avoid running the TSIM thread during cross-DSO static destruction.
+    // macOS may destroy TVM/VTA runtime state before this singleton, which
+    // makes the final DPI callbacks unsafe while joining the simulator thread.
+    static DPILoader* inst = new DPILoader();
+    return inst;
+#else
     static DPILoader inst;
     return &inst;
+#endif
   }
 
   // TVM module

@@ -41,39 +41,39 @@ static VTASimDPIFunc _sim_dpi = nullptr;
 static VTAHostDPIFunc _host_dpi = nullptr;
 static VTAMemDPIFunc _mem_dpi = nullptr;
 
-void VTASimDPI(dpi8_t* wait,
-               dpi8_t* exit) {
+extern "C" void VTASimDPI(dpi8_t* wait,
+                            dpi8_t* exit) {
   assert(_sim_dpi != nullptr);
   (*_sim_dpi)(_ctx, wait, exit);
 }
 
-void VTAHostDPI(dpi8_t* req_valid,
-                dpi8_t* req_opcode,
-                dpi8_t* req_addr,
-                dpi32_t* req_value,
-                dpi8_t req_deq,
-                dpi8_t resp_valid,
-                dpi32_t resp_value) {
+extern "C" void VTAHostDPI(dpi8_t* req_valid,
+                             dpi8_t* req_opcode,
+                             dpi8_t* req_addr,
+                             dpi32_t* req_value,
+                             dpi8_t req_deq,
+                             dpi8_t resp_valid,
+                             dpi32_t resp_value) {
   assert(_host_dpi != nullptr);
   (*_host_dpi)(_ctx, req_valid, req_opcode,
                req_addr, req_value, req_deq,
                resp_valid, resp_value);
 }
 
-void VTAMemDPI(dpi8_t rd_req_valid,
-               dpi8_t rd_req_len,
-               dpi8_t rd_req_id,
-               dpi64_t rd_req_addr,
-               dpi8_t wr_req_valid,
-               dpi8_t wr_req_len,
-               dpi64_t wr_req_addr,
-               dpi8_t wr_valid,
-               const svOpenArrayHandle wr_value,
-               dpi64_t wr_strb,
-               dpi8_t* rd_valid,
-               dpi8_t* rd_id,
-               const svOpenArrayHandle  rd_value,
-               dpi8_t rd_ready) {
+extern "C" void VTAMemDPI(dpi8_t rd_req_valid,
+                            dpi8_t rd_req_len,
+                            dpi8_t rd_req_id,
+                            dpi64_t rd_req_addr,
+                            dpi8_t wr_req_valid,
+                            dpi8_t wr_req_len,
+                            dpi64_t wr_req_addr,
+                            dpi8_t wr_valid,
+                            const svOpenArrayHandle wr_value,
+                            dpi64_t wr_strb,
+                            dpi8_t* rd_valid,
+                            dpi8_t* rd_id,
+                            const svOpenArrayHandle rd_value,
+                            dpi8_t rd_ready) {
   assert(_mem_dpi != nullptr);
   (*_mem_dpi)(_ctx, rd_req_valid, rd_req_len, rd_req_id,
               rd_req_addr, wr_req_valid, wr_req_len, wr_req_addr, 

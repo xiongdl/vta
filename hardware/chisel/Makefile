@@ -51,7 +51,9 @@ USE_TRACE_FST = 0
 USE_TRACE_DETAILED = 0
 USE_THREADS = 0
 VTA_LIBNAME = libvta_hw
-CXX = g++
+ifeq ($(origin CXX), default)
+	CXX := c++
+endif
 # A debug build with DEBUG = 1 is useful to trace the simulation with a
 # debugger.
 DEBUG = 0
@@ -75,6 +77,15 @@ endif
 
 verilator_build_dir = $(VTA_HW_PATH)/$(BUILD_NAME)/verilator
 chisel_build_dir = $(VTA_HW_PATH)/$(BUILD_NAME)/chisel
+
+# Keep all SBT, Ivy, and Coursier downloads local to the Chisel project.
+CHISEL_DEP_DIR ?= $(CURDIR)/dep
+export COURSIER_CACHE := $(CHISEL_DEP_DIR)/coursier
+SBT_OPTS += -Dsbt.global.base=$(CHISEL_DEP_DIR)/sbt-global
+SBT_OPTS += -Dsbt.boot.directory=$(CHISEL_DEP_DIR)/sbt-boot
+SBT_OPTS += -Dsbt.ivy.home=$(CHISEL_DEP_DIR)/ivy
+SBT_OPTS += -Dsbt.coursier.home=$(CHISEL_DEP_DIR)/coursier
+export SBT_OPTS
 
 verilator_opt = --cc
 verilator_opt += +define+RANDOMIZE_GARBAGE_ASSIGN
@@ -155,14 +166,23 @@ VPATH = $(VERILATOR_INC_DIR):$(verilator_build_dir):$(VTA_HW_PATH)/hardware/dpi
 # The following is to be consistent with cmake
 ifeq ($(shell uname), Darwin)
 	lib_path = $(VTA_HW_PATH)/$(BUILD_NAME)/$(VTA_LIBNAME).dylib
-	cxx_flags += -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+	ld_flags += -Wl,-undefined,dynamic_lookup
+	MACOS_SDKROOT ?= $(shell xcrun --sdk macosx --show-sdk-path 2>/dev/null)
+	ifneq ($(MACOS_SDKROOT),)
+		cxx_flags += -isysroot $(MACOS_SDKROOT)
+	endif
 else
 	lib_path = $(VTA_HW_PATH)/$(BUILD_NAME)/$(VTA_LIBNAME).so
 endif
 
 default: lint lib
 
-lint:
+.PHONY: chisel_dep_dirs
+chisel_dep_dirs:
+	mkdir -p $(CHISEL_DEP_DIR)/coursier $(CHISEL_DEP_DIR)/ivy \
+		$(CHISEL_DEP_DIR)/sbt-boot $(CHISEL_DEP_DIR)/sbt-global
+
+lint: chisel_dep_dirs
 	sbt scalastyle
 	sbt test:scalastyle
 
@@ -185,14 +205,14 @@ $(verilator_build_dir)/V$(TOP_TEST).cpp: $(chisel_build_dir)/$(TOP_TEST).$(CONFI
 	verilator $(verilator_opt) $<
 
 verilog: $(chisel_build_dir)/$(TOP).$(CONFIG).sv
-$(chisel_build_dir)/$(TOP).$(CONFIG).sv:
+$(chisel_build_dir)/$(TOP).$(CONFIG).sv: | chisel_dep_dirs
 	sbt 'runMain vta.$(CONFIG) --target-dir $(chisel_build_dir) -o $(TOP).$(CONFIG)'
 
 verilog_test: $(chisel_build_dir)/$(TOP_TEST).$(CONFIG).sv
-$(chisel_build_dir)/$(TOP_TEST).$(CONFIG).sv:
+$(chisel_build_dir)/$(TOP_TEST).$(CONFIG).sv: | chisel_dep_dirs
 	sbt 'runMain vta.$(CONFIG_TEST) --target-dir $(chisel_build_dir) -o $(TOP_TEST).$(CONFIG)'
 
-unittest:
+unittest: chisel_dep_dirs
 	sbt test
 
 clean:

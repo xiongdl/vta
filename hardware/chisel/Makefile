@@ -133,6 +133,12 @@ endif
 
 cxx_objs = $(verilator_build_dir)/verilated.o $(verilator_build_dir)/verilated_dpi.o $(verilator_build_dir)/tsim_device.o
 
+# Verilator 5 requires the thread-pool runtime even for a single-threaded
+# model.  The source is absent from older installations where it is not needed.
+ifneq ($(wildcard $(VERILATOR_INC_DIR)/verilated_threads.cpp),)
+	cxx_objs += $(verilator_build_dir)/verilated_threads.o
+endif
+
 ifneq ($(USE_TRACE), 0)
 	cxx_flags += -DVM_TRACE=1
 	ifeq ($(USE_TRACE_FST), 1)
@@ -158,7 +164,6 @@ endif
 ifneq ($(USE_THREADS), 0)
 	verilator_opt += --threads $(USE_THREADS)
 	cxx_flags += -DVL_THREADED
-	cxx_objs += $(verilator_build_dir)/verilated_threads.o
 endif
 
 VPATH = $(VERILATOR_INC_DIR):$(verilator_build_dir):$(VTA_HW_PATH)/hardware/dpi

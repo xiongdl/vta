@@ -36,6 +36,32 @@ case class VTAMemDPIParams(
     dpiTagBits: Int
 ) {}
 case object DpiKey extends Field[VTAMemDPIParams]
+case object TSIMMemReadDelayKey extends Field[Int](
+  sys.env.get("VTA_TSIM_MEM_READ_LATENCY").map(_.toInt).getOrElse(0))
+
+/** Common delay applied before issuing a TSIM DPI memory read request. */
+class VTAMemDPIReadDelay(delay: Int) extends Module {
+  require(delay >= 0, "TSIM memory read delay must be non-negative")
+  val io = IO(new Bundle {
+    val start = Input(Bool())
+    val issue = Output(Bool())
+  })
+  private val countBits = math.max(1, log2Ceil(delay + 1))
+  val count = RegInit(0.U(countBits.W))
+  val active = RegInit(false.B)
+  if (delay > 0) {
+    when(io.start) {
+      count := delay.U
+      active := true.B
+    }.elsewhen(active && count === 1.U) {
+      count := 0.U
+      active := false.B
+    }.elsewhen(active) {
+      count := count - 1.U
+    }
+  }
+  io.issue := (if (delay == 0) io.start else active && count === 1.U)
+}
 
 /** Memory master interface.
  *
@@ -114,6 +140,7 @@ class VTAMemDPIToAXI(debug: Boolean = true)(implicit val p: Parameters) extends 
     val dpi = new VTAMemDPIMaster
     val axi = new AXIClient(p(ShellKey).memParams)
   })
+  val readDelay = Module(new VTAMemDPIReadDelay(p(TSIMMemReadDelayKey)))
   //Read request interface for sw memory manager
   val ar_valid = RegInit(false.B)
   val ar_len = RegInit(0.U.asTypeOf(chiselTypeOf(io.dpi.req.ar_len)))
@@ -129,36 +156,26 @@ class VTAMemDPIToAXI(debug: Boolean = true)(implicit val p: Parameters) extends 
   val wIdle :: writeAddress :: writeData :: writeResponse :: Nil = Enum(4)
   val wstate = RegInit(wIdle)
   //Read Interface to Memory Manager
-  val counter = RegInit(0.U(32.W))
-  val dpiDelay = 16.U
   val dpiReqQueue = Module(new Queue(new MemRequest, 256))
-  dpiReqQueue.io.enq.valid     := io.axi.ar.valid  & dpiReqQueue.io.enq.ready
+  dpiReqQueue.io.enq.valid     := io.axi.ar.valid
   dpiReqQueue.io.enq.bits.addr := io.axi.ar.bits.addr
   dpiReqQueue.io.enq.bits.len  := io.axi.ar.bits.len
   dpiReqQueue.io.enq.bits.id   := io.axi.ar.bits.id
 
-  when(dpiReqQueue.io.deq.valid && counter < dpiDelay){
-    counter := counter + 1.U
-  }.elsewhen(dpiReqQueue.io.deq.valid && counter === dpiDelay){
-    counter := counter
-  }.otherwise{
-    counter := 0.U
-  }
-
   switch(rstate){
     is(rIdle){
-      when(dpiReqQueue.io.deq.valid && dpiReqQueue.io.deq.bits.len =/=0.U && counter === dpiDelay){
+      when(dpiReqQueue.io.deq.fire) {
         rstate := readData
       }
     }
     is(readData) {
-      when(io.axi.r.ready && io.dpi.rd.valid && ar_len === 1.U) {
+      when(io.axi.r.ready && io.dpi.rd.valid && ar_len === 0.U) {
         rstate := rIdle
       }
     }
   }
   when(rstate === rIdle) {
-    when(dpiReqQueue.io.deq.ready){
+    when(dpiReqQueue.io.deq.fire) {
       ar_len :=  dpiReqQueue.io.deq.bits.len
       ar_addr := dpiReqQueue.io.deq.bits.addr
       ar_id   := dpiReqQueue.io.deq.bits.id
@@ -169,17 +186,17 @@ class VTAMemDPIToAXI(debug: Boolean = true)(implicit val p: Parameters) extends 
       ar_len := ar_len - 1.U
     }
   }
-dpiReqQueue.io.deq.ready :=  ((dpiReqQueue.io.deq.valid && (rstate === rIdle)) && (counter === dpiDelay))
-when(rstate === rIdle && dpiReqQueue.io.deq.valid){
+dpiReqQueue.io.deq.ready := rstate === rIdle
+when(dpiReqQueue.io.deq.fire) {
   io.dpi.req.ar_len  := dpiReqQueue.io.deq.bits.len
   io.dpi.req.ar_addr := dpiReqQueue.io.deq.bits.addr
   io.dpi.req.ar_id   := dpiReqQueue.io.deq.bits.id
-  io.dpi.req.ar_valid := dpiReqQueue.io.deq.ready
+  io.dpi.req.ar_valid := readDelay.io.issue
   }.otherwise{
     io.dpi.req.ar_len  := ar_len
     io.dpi.req.ar_addr := ar_addr
     io.dpi.req.ar_id   := ar_id
-    io.dpi.req.ar_valid  := (dpiReqQueue.io.deq.ready)
+    io.dpi.req.ar_valid := readDelay.io.issue
   }
   io.axi.ar.ready := dpiReqQueue.io.enq.ready
   io.axi.r.valid := io.dpi.rd.valid
@@ -188,7 +205,8 @@ when(rstate === rIdle && dpiReqQueue.io.deq.valid){
   io.axi.r.bits.resp := 0.U
   io.axi.r.bits.user := 0.U
   io.axi.r.bits.id := io.dpi.rd.bits.id
-  io.dpi.rd.ready  := io.axi.r.ready
+  io.dpi.rd.ready := io.axi.r.ready
+  readDelay.io.start := dpiReqQueue.io.deq.fire
 
   //Write Request
   switch(wstate){
@@ -243,6 +261,7 @@ class VTAMemDPIToAHB(debug: Boolean = false)(implicit val p: Parameters) extends
     val dpi = new VTAMemDPIMaster
     val ahb = new AHBSlave(ap)
   })
+  val readDelay = Module(new VTAMemDPIReadDelay(p(TSIMMemReadDelayKey)))
 
   val idle :: readData :: writeData :: writeWait :: Nil = Enum(4)
   val state = RegInit(idle)
@@ -251,18 +270,30 @@ class VTAMemDPIToAHB(debug: Boolean = false)(implicit val p: Parameters) extends
   val writeSetup = state === idle && transfer && io.ahb.hwrite
   val burstLen = RegInit(0.U(4.W))
   val burstBeat = RegInit(0.U(4.W))
+  val readAddr = Reg(UInt(mp.addrBits.W))
+  val readRequestLen = RegInit(0.U(4.W))
+  val undefinedBurst = RegInit(false.B)
 
   val requestLen = MuxLookup(io.ahb.hburst, 0.U, Seq(
     AHBBurst.incr4 -> 3.U,
     AHBBurst.incr8 -> 7.U,
     AHBBurst.incr16 -> 15.U))
+  val readContinue = state === readData && undefinedBurst && io.dpi.rd.fire &&
+    io.ahb.htrans === AHBTransfer.seq && !io.ahb.hwrite
+  val readStart = readSetup || readContinue
+  val writeContinue = state === writeData && undefinedBurst &&
+    io.ahb.htrans === AHBTransfer.seq && io.ahb.hwrite
+  val writeResume = state === writeWait && undefinedBurst &&
+    io.ahb.htrans === AHBTransfer.seq && io.ahb.hwrite
+  val writeStart = writeSetup || writeContinue || writeResume
 
-  // Each fixed-length AHB burst maps to one DPI burst request.
-  io.dpi.req.ar_valid := readSetup
-  io.dpi.req.ar_len := requestLen
-  io.dpi.req.ar_addr := io.ahb.haddr
+  // Fixed-length bursts map to one DPI burst request.  Each beat of an
+  // undefined-length INCR maps to a DPI SINGLE because AHB carries no length.
+  io.dpi.req.ar_valid := readDelay.io.issue
+  io.dpi.req.ar_len := Mux(readStart, requestLen, readRequestLen)
+  io.dpi.req.ar_addr := Mux(readStart, io.ahb.haddr, readAddr)
   io.dpi.req.ar_id := 0.U
-  io.dpi.req.aw_valid := writeSetup
+  io.dpi.req.aw_valid := writeStart
   io.dpi.req.aw_len := requestLen
   io.dpi.req.aw_addr := io.ahb.haddr
 
@@ -271,6 +302,7 @@ class VTAMemDPIToAHB(debug: Boolean = false)(implicit val p: Parameters) extends
   io.dpi.wr.bits.strb := Fill(mp.strbBits, true.B)
   // VTAMemDPI registers the C++ response.  Advancing the DPI memory on the
   // request cycle prepares the first beat for the following AHB data phase.
+  readDelay.io.start := readStart
   io.dpi.rd.ready := state === readData || readSetup
 
   io.ahb.hrdata := io.dpi.rd.bits.data
@@ -278,32 +310,57 @@ class VTAMemDPIToAHB(debug: Boolean = false)(implicit val p: Parameters) extends
     (state === readData && io.dpi.rd.valid)
   io.ahb.hresp := false.B
 
+  when(readStart) {
+    readAddr := io.ahb.haddr
+    readRequestLen := requestLen
+  }
+
   when(readSetup) {
     burstLen := requestLen
     burstBeat := 0.U
+    undefinedBurst := io.ahb.hburst === AHBBurst.incr
     state := readData
   }.elsewhen(writeSetup) {
     burstLen := requestLen
     burstBeat := 0.U
+    undefinedBurst := io.ahb.hburst === AHBBurst.incr
     state := writeData
   }.elsewhen(state === readData && io.dpi.rd.fire) {
-    when(burstBeat === burstLen) {
-      state := idle
+    when(undefinedBurst) {
+      when(readContinue) {
+        burstBeat := burstBeat + 1.U
+      }.otherwise {
+        state := idle
+      }
     }.otherwise {
-      assert(io.ahb.htrans === AHBTransfer.seq && !io.ahb.hwrite,
-        "AHB read burst requires a sequential read transfer")
-      burstBeat := burstBeat + 1.U
+      when(burstBeat === burstLen) {
+        state := idle
+      }.otherwise {
+        assert(io.ahb.htrans === AHBTransfer.seq && !io.ahb.hwrite,
+          "AHB read burst requires a sequential read transfer")
+        burstBeat := burstBeat + 1.U
+      }
     }
   }.elsewhen(state === writeData) {
-    when(burstBeat === burstLen) {
-      state := idle
-    }.otherwise {
-      burstBeat := burstBeat + 1.U
+    when(undefinedBurst) {
       when(io.ahb.htrans === AHBTransfer.busy) {
         state := writeWait
+      }.elsewhen(writeContinue) {
+        burstBeat := burstBeat + 1.U
       }.otherwise {
-        assert(io.ahb.htrans === AHBTransfer.seq && io.ahb.hwrite,
-          "AHB write burst requires a sequential or busy transfer")
+        state := idle
+      }
+    }.otherwise {
+      when(burstBeat === burstLen) {
+        state := idle
+      }.otherwise {
+        burstBeat := burstBeat + 1.U
+        when(io.ahb.htrans === AHBTransfer.busy) {
+          state := writeWait
+        }.otherwise {
+          assert(io.ahb.htrans === AHBTransfer.seq && io.ahb.hwrite,
+            "AHB write burst requires a sequential or busy transfer")
+        }
       }
     }
   }.elsewhen(state === writeWait) {

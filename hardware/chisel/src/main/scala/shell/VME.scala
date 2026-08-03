@@ -167,6 +167,30 @@ class VMEClient(implicit p: Parameters) extends Bundle {
   val wr = Vec(nWr, new VMEWriteClient)
 }
 
+/** Memory-engine performance counter layout exported through VCR user counters. */
+object VMEPerf {
+  val readRequests = 0
+  val readBeats = 1
+  val writeRequests = 2
+  val writeBeats = 3
+  val waitCycles = 4
+  val singleBursts = 5
+  val incr4Bursts = 6
+  val incr8Bursts = 7
+  val incr16Bursts = 8
+  val otherBursts = 9
+  val boundarySplits = 10
+  val readClientStallBase = 11
+  val writeCmdStalls = 16
+  val writeDataStalls = 17
+  val incrBursts = 18
+  val nCounters = 19
+}
+
+class VMEPerfEvents extends Bundle {
+  val counters = Vec(VMEPerf.nCounters, UInt(32.W))
+}
+
 /** VTA Memory Engine (VME).
  *
  * This unit multiplexes the memory controller interface for the Core. Currently,
@@ -176,6 +200,8 @@ class VME(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
     val mem = new AXIMaster(p(ShellKey).memParams)
     val vme = new VMEClient
+    val launch = Input(Bool())
+    val perf = Output(new VMEPerfEvents)
   })
   val clientCmdQueueDepth = p(ShellKey).vmeParams.clientCmdQueueDepth
   val clientDataQueueDepth = p(ShellKey).vmeParams.clientDataQueueDepth
@@ -186,6 +212,8 @@ class VME(implicit p: Parameters) extends Module {
   val addrBits = p(ShellKey).memParams.addrBits
   val lenBits = p(ShellKey).memParams.lenBits
   val idBits = p(ShellKey).memParams.idBits
+  val perf = RegInit(VecInit(Seq.fill(VMEPerf.nCounters)(0.U(32.W))))
+  io.perf.counters := perf
   val vmeTag_array = SyncReadMem(RequestQueueDepth,(new(clientTag)))
   val vmeTag_array_wr_data = Wire(new(clientTag))
   val vmeTag_array_wr_addr = Wire(UInt(RequestQueueAddrWidth.W))
@@ -354,6 +382,54 @@ class VME(implicit p: Parameters) extends Module {
       }
     }
   }
+
+  val readRequest = io.mem.ar.fire
+  val readBeat = io.mem.r.fire
+  val writeRequest = io.mem.aw.fire
+  val writeBeat = io.mem.w.fire
+  val waitEvents = (io.mem.ar.valid && !io.mem.ar.ready).asUInt +&
+    (io.mem.r.valid && !io.mem.r.ready).asUInt +&
+    (io.mem.aw.valid && !io.mem.aw.ready).asUInt +&
+    (io.mem.w.valid && !io.mem.w.ready).asUInt +&
+    (io.mem.b.valid && !io.mem.b.ready).asUInt
+  def burstMatches(valid: Bool, len: UInt, expected: Int): UInt =
+    (valid && len === expected.U).asUInt
+
+  when(!io.launch) {
+    for (i <- 0 until VMEPerf.nCounters) { perf(i) := 0.U }
+  }.otherwise {
+    perf(VMEPerf.readRequests) := perf(VMEPerf.readRequests) + readRequest.asUInt
+    perf(VMEPerf.readBeats) := perf(VMEPerf.readBeats) + readBeat.asUInt
+    perf(VMEPerf.writeRequests) := perf(VMEPerf.writeRequests) + writeRequest.asUInt
+    perf(VMEPerf.writeBeats) := perf(VMEPerf.writeBeats) + writeBeat.asUInt
+    perf(VMEPerf.waitCycles) := perf(VMEPerf.waitCycles) + waitEvents
+    perf(VMEPerf.singleBursts) := perf(VMEPerf.singleBursts) +
+      burstMatches(readRequest, io.mem.ar.bits.len, 0) +&
+      burstMatches(writeRequest, io.mem.aw.bits.len, 0)
+    perf(VMEPerf.incr4Bursts) := perf(VMEPerf.incr4Bursts) +
+      burstMatches(readRequest, io.mem.ar.bits.len, 3) +&
+      burstMatches(writeRequest, io.mem.aw.bits.len, 3)
+    perf(VMEPerf.incr8Bursts) := perf(VMEPerf.incr8Bursts) +
+      burstMatches(readRequest, io.mem.ar.bits.len, 7) +&
+      burstMatches(writeRequest, io.mem.aw.bits.len, 7)
+    perf(VMEPerf.incr16Bursts) := perf(VMEPerf.incr16Bursts) +
+      burstMatches(readRequest, io.mem.ar.bits.len, 15) +&
+      burstMatches(writeRequest, io.mem.aw.bits.len, 15)
+    perf(VMEPerf.otherBursts) := perf(VMEPerf.otherBursts) +
+      (readRequest && io.mem.ar.bits.len =/= 0.U && io.mem.ar.bits.len =/= 3.U &&
+        io.mem.ar.bits.len =/= 7.U && io.mem.ar.bits.len =/= 15.U).asUInt +&
+      (writeRequest && io.mem.aw.bits.len =/= 0.U && io.mem.aw.bits.len =/= 3.U &&
+        io.mem.aw.bits.len =/= 7.U && io.mem.aw.bits.len =/= 15.U).asUInt
+    for (i <- 0 until nReadClients) {
+      perf(VMEPerf.readClientStallBase + i) :=
+        perf(VMEPerf.readClientStallBase + i) +
+          (io.vme.rd(i).cmd.valid && !io.vme.rd(i).cmd.ready).asUInt
+    }
+    perf(VMEPerf.writeCmdStalls) := perf(VMEPerf.writeCmdStalls) +
+      (io.vme.wr(0).cmd.valid && !io.vme.wr(0).cmd.ready).asUInt
+    perf(VMEPerf.writeDataStalls) := perf(VMEPerf.writeDataStalls) +
+      (io.vme.wr(0).data.valid && !io.vme.wr(0).data.ready).asUInt
+  }
   // AXI constants - statically define
   io.mem.setConst()
 }
@@ -367,15 +443,22 @@ class VMETop(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
     val mem = new AXIMaster(p(ShellKey).memParams)
     val vme = new VMEClient
+    val launch = Input(Bool())
+    val perf = Output(new VMEPerfEvents)
   })
 
   val forceSimpleVME = false // force simple vme for simple tensor load/uop/fetch
 
   if (forceSimpleVME) {
     val vme = Module(new VMESimple)
-    io <> vme.io
+    io.mem <> vme.io.mem
+    io.vme <> vme.io.vme
+    io.perf.counters.foreach(_ := 0.U)
   } else {
     val vme = Module(new VME)
-    io <> vme.io
+    io.mem <> vme.io.mem
+    io.vme <> vme.io.vme
+    vme.io.launch := io.launch
+    io.perf := vme.io.perf
   }
 }

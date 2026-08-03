@@ -95,6 +95,67 @@ class MemAHBTester(c: VTAMemDPIToAHB) extends PeekPokeTester(c) {
     step(1)
   }
 
+  // An undefined-length INCR maps each AHB beat to a DPI SINGLE request.
+  poke(c.io.dpi.rd.valid, 0)
+  poke(c.io.ahb.haddr, 0x3800)
+  poke(c.io.ahb.hburst, 1)
+  poke(c.io.ahb.htrans, 2)
+  expect(c.io.dpi.req.ar_valid, 1)
+  expect(c.io.dpi.req.ar_len, 0)
+  step(1)
+
+  for (beat <- 0 until 3) {
+    poke(c.io.ahb.haddr, 0x3808 + beat * 8)
+    poke(c.io.ahb.htrans, if (beat == 2) 0 else 3)
+    poke(c.io.dpi.rd.valid, 1)
+    poke(c.io.dpi.rd.bits.data, 0x70 + beat)
+    expect(c.io.ahb.hready, 1)
+    expect(c.io.dpi.req.ar_valid, if (beat == 2) 0 else 1)
+    if (beat != 2) {
+      expect(c.io.dpi.req.ar_addr, 0x3808 + beat * 8)
+      expect(c.io.dpi.req.ar_len, 0)
+    }
+    step(1)
+  }
+
+  // BUSY pauses an undefined write burst; the following SEQ issues the next
+  // DPI SINGLE without consuming write data during the gap.
+  poke(c.io.dpi.rd.valid, 0)
+  poke(c.io.ahb.haddr, 0x3c00)
+  poke(c.io.ahb.hburst, 1)
+  poke(c.io.ahb.htrans, 2)
+  poke(c.io.ahb.hwrite, 1)
+  expect(c.io.dpi.req.aw_valid, 1)
+  expect(c.io.dpi.req.aw_len, 0)
+  step(1)
+
+  poke(c.io.ahb.hwdata, 0x80)
+  poke(c.io.ahb.htrans, 1)
+  expect(c.io.dpi.wr.valid, 1)
+  expect(c.io.dpi.req.aw_valid, 0)
+  step(1)
+
+  poke(c.io.ahb.haddr, 0x3c08)
+  poke(c.io.ahb.htrans, 3)
+  expect(c.io.dpi.wr.valid, 0)
+  expect(c.io.dpi.req.aw_valid, 1)
+  expect(c.io.dpi.req.aw_addr, 0x3c08)
+  step(1)
+
+  poke(c.io.ahb.hwdata, 0x81)
+  poke(c.io.ahb.haddr, 0x3c10)
+  poke(c.io.ahb.htrans, 3)
+  expect(c.io.dpi.wr.valid, 1)
+  expect(c.io.dpi.req.aw_valid, 1)
+  expect(c.io.dpi.req.aw_addr, 0x3c10)
+  step(1)
+
+  poke(c.io.ahb.hwdata, 0x82)
+  poke(c.io.ahb.htrans, 0)
+  expect(c.io.dpi.wr.valid, 1)
+  expect(c.io.dpi.req.aw_valid, 0)
+  step(1)
+
   // BUSY can be inserted between write beats without consuming DPI data.
   poke(c.io.dpi.rd.valid, 0)
   poke(c.io.ahb.haddr, 0x4000)

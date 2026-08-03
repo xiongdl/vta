@@ -35,7 +35,7 @@ case class VCRParams() {
   val nECnt = 1
   val nVals = 1
   val nPtrs = 6
-  val nUCnt = 1
+  val nUCnt = 1 + VMEPerf.nCounters
   val regBits = 32
 }
 

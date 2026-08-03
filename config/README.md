@@ -23,3 +23,7 @@ before you type make.
 
 The config is going to affect the behavior of python package as well as
 the hardware runtime build.
+
+For TSIM builds, `VTA_TSIM_MEM_READ_LATENCY` selects a non-negative number of
+additional RTL read-response cycles. The same delay module is used by the AXI
+and AHB memory shells, and the default is zero.

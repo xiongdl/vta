@@ -46,6 +46,7 @@ class EventCounters(debug: Boolean = false)(implicit p: Parameters) extends Modu
     val ecnt = Vec(vp.nECnt, ValidIO(UInt(vp.regBits.W)))
     val ucnt = Vec(vp.nUCnt, ValidIO(UInt(vp.regBits.W)))
     val acc_wr_event = Input(Bool())
+    val vme_perf = Input(Vec(VMEPerf.nCounters, UInt(vp.regBits.W)))
   })
   val cycle_cnt = RegInit(0.U(vp.regBits.W))
   when(io.launch && !io.finish) {
@@ -64,4 +65,8 @@ class EventCounters(debug: Boolean = false)(implicit p: Parameters) extends Modu
   }
   io.ucnt(0).valid := io.finish
   io.ucnt(0).bits := acc_wr_count
+  for (i <- 0 until VMEPerf.nCounters) {
+    io.ucnt(i + 1).valid := io.finish
+    io.ucnt(i + 1).bits := io.vme_perf(i)
+  }
 }

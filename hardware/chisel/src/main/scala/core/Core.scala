@@ -63,6 +63,7 @@ class Core(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
     val vcr = new VCRClient
     val vme = new VMEMaster
+    val vmePerf = Input(new VMEPerfEvents)
   })
   val fetch = Module(new Fetch)
   val load = Module(new Load)
@@ -114,6 +115,7 @@ class Core(implicit p: Parameters) extends Module {
   io.vcr.ecnt <> ecounters.io.ecnt
   io.vcr.ucnt <> ecounters.io.ucnt
   ecounters.io.acc_wr_event := compute.io.acc_wr_event
+  ecounters.io.vme_perf := io.vmePerf.counters
 
   // Finish instruction is executed and asserts the VCR finish flag
   val finish = RegNext(compute.io.finish)

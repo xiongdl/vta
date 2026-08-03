@@ -45,12 +45,14 @@ class VTAShellInternal(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
     val vcr = Flipped(new VCRMaster)
     val vme = new VMEMaster
+    val vmePerf = Input(new VMEPerfEvents)
   })
 
   val core = Module(new Core)
 
   core.io.vcr <> io.vcr
   core.io.vme <> io.vme
+  core.io.vmePerf := io.vmePerf
 }
 
 /** VTAShell.
@@ -72,6 +74,8 @@ class VTAShell(implicit p: Parameters) extends Module {
   vcr.io.host <> io.host
   shell.io.vcr <> vcr.io.vcr
   shell.io.vme <> vme.io.vme
+  vme.io.launch := vcr.io.vcr.launch
+  shell.io.vmePerf := vme.io.perf
   io.mem <> vme.io.mem
 }
 
@@ -92,6 +96,8 @@ class VTAShellAPB(implicit p: Parameters) extends Module {
   vcr.io.host <> io.host
   shell.io.vcr <> vcr.io.vcr
   shell.io.vme <> vme.io.vme
+  vme.io.launch := vcr.io.vcr.launch
+  shell.io.vmePerf := vme.io.perf
   io.mem <> vme.io.mem
 }
 
@@ -112,6 +118,8 @@ class VTAShellAHB(implicit p: Parameters) extends Module {
   vcr.io.host <> io.host
   shell.io.vcr <> vcr.io.vcr
   shell.io.vme <> vme.io.vme
+  vme.io.launch := vcr.io.vcr.launch
+  shell.io.vmePerf := vme.io.perf
   io.mem <> vme.io.mem
 }
 
@@ -134,5 +142,7 @@ class VTAShellAPBAHB(implicit p: Parameters) extends Module {
   vcr.io.host <> io.host
   shell.io.vcr <> vcr.io.vcr
   shell.io.vme <> vme.io.vme
+  vme.io.launch := vcr.io.vcr.launch
+  shell.io.vmePerf := vme.io.perf
   io.mem <> vme.io.mem
 }

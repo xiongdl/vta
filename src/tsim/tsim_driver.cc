@@ -33,7 +33,7 @@ using vta::dpi::DPIModuleNode;
 class Profiler {
  public:
   Profiler() {
-    counters_ = new int[num_counters_];
+    counters_ = new uint64_t[num_counters_];
     this->ClearAll();
   }
 
@@ -62,7 +62,26 @@ class Profiler {
   std::string AsJSON() {
     std::ostringstream os;
     os << "{\n"
-       << " \"cycle_count\":" << counters_[0] << "\n"
+       << " \"cycle_count\":" << counters_[0] << ",\n"
+       << " \"mem_read_requests\":" << counters_[1] << ",\n"
+       << " \"mem_read_beats\":" << counters_[2] << ",\n"
+       << " \"mem_write_requests\":" << counters_[3] << ",\n"
+       << " \"mem_write_beats\":" << counters_[4] << ",\n"
+       << " \"mem_wait_cycles\":" << counters_[5] << ",\n"
+       << " \"mem_single_bursts\":" << counters_[6] << ",\n"
+       << " \"mem_incr4_bursts\":" << counters_[7] << ",\n"
+       << " \"mem_incr8_bursts\":" << counters_[8] << ",\n"
+       << " \"mem_incr16_bursts\":" << counters_[9] << ",\n"
+       << " \"mem_other_bursts\":" << counters_[10] << ",\n"
+       << " \"mem_1kb_boundary_splits\":" << counters_[11] << ",\n"
+       << " \"mem_read_client_0_stalls\":" << counters_[12] << ",\n"
+       << " \"mem_read_client_1_stalls\":" << counters_[13] << ",\n"
+       << " \"mem_read_client_2_stalls\":" << counters_[14] << ",\n"
+       << " \"mem_read_client_3_stalls\":" << counters_[15] << ",\n"
+       << " \"mem_read_client_4_stalls\":" << counters_[16] << ",\n"
+       << " \"mem_write_cmd_stalls\":" << counters_[17] << ",\n"
+       << " \"mem_write_data_stalls\":" << counters_[18] << ",\n"
+       << " \"mem_incr_bursts\":" << counters_[19] << "\n"
        <<"}\n";
     return os.str();
   }
@@ -74,9 +93,9 @@ class Profiler {
 
  private:
   /*! \brief total number of event counters */
-  uint32_t num_counters_{1};
+  uint32_t num_counters_{20};
   /*! \brief event counters */
-  int* counters_{nullptr};
+  uint64_t* counters_{nullptr};
 };
 
 class DPILoader {
@@ -162,6 +181,9 @@ class Device {
       if (val == 0x2) break;  // finish
     }
     prof_->Update(0, dpi_->ReadReg(0x04));
+    for (uint32_t i = 0; i < 19; ++i) {
+      prof_->Update(i + 1, dpi_->ReadReg(0x28 + 4 * i));
+    }
     dpi_->SimWait();
   }
 

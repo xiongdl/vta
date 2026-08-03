@@ -41,6 +41,8 @@ class IntelShell(implicit p: Parameters) extends Module {
 
   core.io.vcr <> vcr.io.vcr
   vme.io.vme <> core.io.vme
+  vme.io.launch := vcr.io.vcr.launch
+  core.io.vmePerf := vme.io.perf
 
   // vcr.io.host <> io.host
   io.host.aw.ready := vcr.io.host.aw.ready

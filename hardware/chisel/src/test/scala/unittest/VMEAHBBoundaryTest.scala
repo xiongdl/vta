@@ -32,6 +32,7 @@ class VMEAHBBoundaryTester(c: VMEAHB) extends PeekPokeTester(c) {
   poke(c.io.mem.hrdata, 0)
   poke(c.io.mem.hready, 1)
   poke(c.io.mem.hresp, 0)
+  poke(c.io.launch, 1)
   for (i <- 0 until nReadClients) {
     poke(c.io.vme.rd(i).cmd.valid, 0)
     poke(c.io.vme.rd(i).cmd.bits.addr, 0)
@@ -52,6 +53,8 @@ class VMEAHBBoundaryTester(c: VMEAHB) extends PeekPokeTester(c) {
     case 16 => 7
     case 8 => 5
     case 4 => 3
+    case 3 => 1
+    case 2 => 1
     case 1 => 0
   }
 
@@ -93,10 +96,19 @@ class VMEAHBBoundaryTester(c: VMEAHB) extends PeekPokeTester(c) {
   runRead(0x3a0, Seq(8, 4, 4))
 
   // Only one beat remains before 0x400, so the first transfer must be SINGLE.
-  runRead(0x3f8, Seq(1, 1, 1, 1))
+  runRead(0x3f8, Seq(1, 3))
 
   // An INCR16 ending at 0x3f8 stays entirely inside the 1KB region.
   runRead(0x380, Seq(16))
+
+  expect(c.io.perf.counters(VMEPerf.readRequests), 3)
+  expect(c.io.perf.counters(VMEPerf.readBeats), 36)
+  expect(c.io.perf.counters(VMEPerf.singleBursts), 1)
+  expect(c.io.perf.counters(VMEPerf.incr4Bursts), 2)
+  expect(c.io.perf.counters(VMEPerf.incr8Bursts), 1)
+  expect(c.io.perf.counters(VMEPerf.incr16Bursts), 1)
+  expect(c.io.perf.counters(VMEPerf.incrBursts), 1)
+  expect(c.io.perf.counters(VMEPerf.boundarySplits), 2)
 }
 
 class VMEAHBBoundaryTest extends AnyFlatSpec with ChiselScalatestTester {

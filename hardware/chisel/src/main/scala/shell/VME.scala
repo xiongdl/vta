@@ -212,8 +212,11 @@ class VME(implicit p: Parameters) extends Module {
   val addrBits = p(ShellKey).memParams.addrBits
   val lenBits = p(ShellKey).memParams.lenBits
   val idBits = p(ShellKey).memParams.idBits
-  val perf = RegInit(VecInit(Seq.fill(VMEPerf.nCounters)(0.U(32.W))))
-  io.perf.counters := perf
+  val perfEnabled = p(ShellKey).vcrParams.enableVMEPerfCounters
+  val perf = if (perfEnabled) Some(RegInit(
+    VecInit(Seq.fill(VMEPerf.nCounters)(0.U(32.W))))) else None
+  io.perf.counters.foreach(_ := 0.U)
+  perf.foreach(io.perf.counters := _)
   val vmeTag_array = SyncReadMem(RequestQueueDepth,(new(clientTag)))
   val vmeTag_array_wr_data = Wire(new(clientTag))
   val vmeTag_array_wr_addr = Wire(UInt(RequestQueueAddrWidth.W))
@@ -395,41 +398,41 @@ class VME(implicit p: Parameters) extends Module {
   def burstMatches(valid: Bool, len: UInt, expected: Int): UInt =
     (valid && len === expected.U).asUInt
 
-  when(!io.launch) {
-    for (i <- 0 until VMEPerf.nCounters) { perf(i) := 0.U }
+  perf.foreach { counters => when(!io.launch) {
+    for (i <- 0 until VMEPerf.nCounters) { counters(i) := 0.U }
   }.otherwise {
-    perf(VMEPerf.readRequests) := perf(VMEPerf.readRequests) + readRequest.asUInt
-    perf(VMEPerf.readBeats) := perf(VMEPerf.readBeats) + readBeat.asUInt
-    perf(VMEPerf.writeRequests) := perf(VMEPerf.writeRequests) + writeRequest.asUInt
-    perf(VMEPerf.writeBeats) := perf(VMEPerf.writeBeats) + writeBeat.asUInt
-    perf(VMEPerf.waitCycles) := perf(VMEPerf.waitCycles) + waitEvents
-    perf(VMEPerf.singleBursts) := perf(VMEPerf.singleBursts) +
+    counters(VMEPerf.readRequests) := counters(VMEPerf.readRequests) + readRequest.asUInt
+    counters(VMEPerf.readBeats) := counters(VMEPerf.readBeats) + readBeat.asUInt
+    counters(VMEPerf.writeRequests) := counters(VMEPerf.writeRequests) + writeRequest.asUInt
+    counters(VMEPerf.writeBeats) := counters(VMEPerf.writeBeats) + writeBeat.asUInt
+    counters(VMEPerf.waitCycles) := counters(VMEPerf.waitCycles) + waitEvents
+    counters(VMEPerf.singleBursts) := counters(VMEPerf.singleBursts) +
       burstMatches(readRequest, io.mem.ar.bits.len, 0) +&
       burstMatches(writeRequest, io.mem.aw.bits.len, 0)
-    perf(VMEPerf.incr4Bursts) := perf(VMEPerf.incr4Bursts) +
+    counters(VMEPerf.incr4Bursts) := counters(VMEPerf.incr4Bursts) +
       burstMatches(readRequest, io.mem.ar.bits.len, 3) +&
       burstMatches(writeRequest, io.mem.aw.bits.len, 3)
-    perf(VMEPerf.incr8Bursts) := perf(VMEPerf.incr8Bursts) +
+    counters(VMEPerf.incr8Bursts) := counters(VMEPerf.incr8Bursts) +
       burstMatches(readRequest, io.mem.ar.bits.len, 7) +&
       burstMatches(writeRequest, io.mem.aw.bits.len, 7)
-    perf(VMEPerf.incr16Bursts) := perf(VMEPerf.incr16Bursts) +
+    counters(VMEPerf.incr16Bursts) := counters(VMEPerf.incr16Bursts) +
       burstMatches(readRequest, io.mem.ar.bits.len, 15) +&
       burstMatches(writeRequest, io.mem.aw.bits.len, 15)
-    perf(VMEPerf.otherBursts) := perf(VMEPerf.otherBursts) +
+    counters(VMEPerf.otherBursts) := counters(VMEPerf.otherBursts) +
       (readRequest && io.mem.ar.bits.len =/= 0.U && io.mem.ar.bits.len =/= 3.U &&
         io.mem.ar.bits.len =/= 7.U && io.mem.ar.bits.len =/= 15.U).asUInt +&
       (writeRequest && io.mem.aw.bits.len =/= 0.U && io.mem.aw.bits.len =/= 3.U &&
         io.mem.aw.bits.len =/= 7.U && io.mem.aw.bits.len =/= 15.U).asUInt
     for (i <- 0 until nReadClients) {
-      perf(VMEPerf.readClientStallBase + i) :=
-        perf(VMEPerf.readClientStallBase + i) +
+      counters(VMEPerf.readClientStallBase + i) :=
+        counters(VMEPerf.readClientStallBase + i) +
           (io.vme.rd(i).cmd.valid && !io.vme.rd(i).cmd.ready).asUInt
     }
-    perf(VMEPerf.writeCmdStalls) := perf(VMEPerf.writeCmdStalls) +
+    counters(VMEPerf.writeCmdStalls) := counters(VMEPerf.writeCmdStalls) +
       (io.vme.wr(0).cmd.valid && !io.vme.wr(0).cmd.ready).asUInt
-    perf(VMEPerf.writeDataStalls) := perf(VMEPerf.writeDataStalls) +
+    counters(VMEPerf.writeDataStalls) := counters(VMEPerf.writeDataStalls) +
       (io.vme.wr(0).data.valid && !io.vme.wr(0).data.ready).asUInt
-  }
+  }}
   // AXI constants - statically define
   io.mem.setConst()
 }

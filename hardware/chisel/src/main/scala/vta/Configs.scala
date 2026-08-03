@@ -35,6 +35,17 @@ class DefaultPynqConfig extends Config(new CoreConfig ++ new PynqConfig)
 class DefaultF1Config extends Config(new CoreConfig ++ new F1Config)
 class DefaultDe10Config extends Config(new CoreConfig ++ new De10Config)
 
+/** Enable detailed VME counters for simulation and performance analysis. */
+class VMEPerfConfig extends Config((site, here, up) => {
+  case ShellKey =>
+    val shell = up(ShellKey)
+    shell.copy(vcrParams = shell.vcrParams.copy(enableVMEPerfCounters = true))
+})
+
+class TestPynqConfig extends Config(new VMEPerfConfig ++ new DefaultPynqConfig)
+class TestF1Config extends Config(new VMEPerfConfig ++ new DefaultF1Config)
+class TestDe10Config extends Config(new VMEPerfConfig ++ new DefaultDe10Config)
+
 object DefaultPynqConfig extends App {
   implicit val p: Parameters = new DefaultPynqConfig
   (new chisel3.stage.ChiselStage).emitSystemVerilog(new XilinxShell, args)
@@ -51,17 +62,17 @@ object DefaultDe10Config extends App {
 }
 
 object TestDefaultPynqConfig extends App {
-  implicit val p: Parameters = new DefaultPynqConfig
+  implicit val p: Parameters = new TestPynqConfig
   (new chisel3.stage.ChiselStage).emitSystemVerilog(new Test, args)
 }
 
 object TestDefaultF1Config extends App {
-  implicit val p: Parameters = new DefaultF1Config
+  implicit val p: Parameters = new TestF1Config
   (new chisel3.stage.ChiselStage).emitSystemVerilog(new Test, args)
 }
 
 object TestDefaultDe10Config extends App {
-  implicit val p: Parameters = new DefaultDe10Config
+  implicit val p: Parameters = new TestDe10Config
   (new chisel3.stage.ChiselStage).emitSystemVerilog(new Test, args)
 }
 
@@ -73,7 +84,7 @@ object APBHostDefaultDe10Config extends App {
 
 /** Generate the native APB-host TSIM testbench. */
 object TestAPBDefaultDe10Config extends App {
-  implicit val p: Parameters = new DefaultDe10Config
+  implicit val p: Parameters = new TestDe10Config
   (new chisel3.stage.ChiselStage).emitSystemVerilog(new TestAPB, args)
 }
 
@@ -90,11 +101,11 @@ object APBAHBDefaultDe10Config extends App {
 }
 
 object TestAHBDefaultDe10Config extends App {
-  implicit val p: Parameters = new DefaultDe10Config
+  implicit val p: Parameters = new TestDe10Config
   (new chisel3.stage.ChiselStage).emitSystemVerilog(new TestAHB, args)
 }
 
 object TestAPBAHBDefaultDe10Config extends App {
-  implicit val p: Parameters = new DefaultDe10Config
+  implicit val p: Parameters = new TestDe10Config
   (new chisel3.stage.ChiselStage).emitSystemVerilog(new TestAPBAHB, args)
 }

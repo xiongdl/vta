@@ -30,12 +30,12 @@ import vta.interface.apb._
  *
  * These parameters are used on VCR interfaces and modules.
  */
-case class VCRParams() {
+case class VCRParams(enableVMEPerfCounters: Boolean = false) {
   val nCtrl = 1
   val nECnt = 1
   val nVals = 1
   val nPtrs = 6
-  val nUCnt = 1 + VMEPerf.nCounters
+  val nUCnt = 1 + (if (enableVMEPerfCounters) VMEPerf.nCounters else 0)
   val regBits = 32
 }
 

@@ -65,8 +65,10 @@ class EventCounters(debug: Boolean = false)(implicit p: Parameters) extends Modu
   }
   io.ucnt(0).valid := io.finish
   io.ucnt(0).bits := acc_wr_count
-  for (i <- 0 until VMEPerf.nCounters) {
-    io.ucnt(i + 1).valid := io.finish
-    io.ucnt(i + 1).bits := io.vme_perf(i)
+  if (vp.enableVMEPerfCounters) {
+    for (i <- 0 until VMEPerf.nCounters) {
+      io.ucnt(i + 1).valid := io.finish
+      io.ucnt(i + 1).bits := io.vme_perf(i)
+    }
   }
 }

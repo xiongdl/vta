@@ -58,8 +58,11 @@ class VMEAHB(implicit p: Parameters) extends Module {
   val writeAck = RegInit(false.B)
   val writeQueue = Module(new Queue(new VMEWriteData, 1 << mp.lenBits))
   val readQueue = Module(new Queue(new VMEData, 1 << mp.lenBits))
-  val perf = RegInit(VecInit(Seq.fill(VMEPerf.nCounters)(0.U(32.W))))
-  io.perf.counters := perf
+  val perfEnabled = p(ShellKey).vcrParams.enableVMEPerfCounters
+  val perf = if (perfEnabled) Some(RegInit(
+    VecInit(Seq.fill(VMEPerf.nCounters)(0.U(32.W))))) else None
+  io.perf.counters.foreach(_ := 0.U)
+  perf.foreach(io.perf.counters := _)
 
   def nextBurstLen(beats: UInt, addr: UInt): UInt = {
     // AHB incrementing bursts cannot cross a 1KB address boundary.
@@ -223,34 +226,34 @@ class VMEAHB(implicit p: Parameters) extends Module {
   val waitEvent = ((state === readBurst || state === writeBurst) && !io.mem.hready) ||
     io.mem.htrans === AHBTransfer.busy
 
-  when(!io.launch) {
-    for (i <- 0 until VMEPerf.nCounters) { perf(i) := 0.U }
+  perf.foreach { counters => when(!io.launch) {
+    for (i <- 0 until VMEPerf.nCounters) { counters(i) := 0.U }
   }.otherwise {
-    perf(VMEPerf.readRequests) := perf(VMEPerf.readRequests) + readRequest.asUInt
-    perf(VMEPerf.readBeats) := perf(VMEPerf.readBeats) + readBeat.asUInt
-    perf(VMEPerf.writeRequests) := perf(VMEPerf.writeRequests) + writeRequest.asUInt
-    perf(VMEPerf.writeBeats) := perf(VMEPerf.writeBeats) + writeBeat.asUInt
-    perf(VMEPerf.waitCycles) := perf(VMEPerf.waitCycles) + waitEvent.asUInt
-    perf(VMEPerf.singleBursts) := perf(VMEPerf.singleBursts) +
+    counters(VMEPerf.readRequests) := counters(VMEPerf.readRequests) + readRequest.asUInt
+    counters(VMEPerf.readBeats) := counters(VMEPerf.readBeats) + readBeat.asUInt
+    counters(VMEPerf.writeRequests) := counters(VMEPerf.writeRequests) + writeRequest.asUInt
+    counters(VMEPerf.writeBeats) := counters(VMEPerf.writeBeats) + writeBeat.asUInt
+    counters(VMEPerf.waitCycles) := counters(VMEPerf.waitCycles) + waitEvent.asUInt
+    counters(VMEPerf.singleBursts) := counters(VMEPerf.singleBursts) +
       (burstStart && burstLen === 0.U).asUInt
-    perf(VMEPerf.incr4Bursts) := perf(VMEPerf.incr4Bursts) +
+    counters(VMEPerf.incr4Bursts) := counters(VMEPerf.incr4Bursts) +
       (burstStart && burstLen === 3.U).asUInt
-    perf(VMEPerf.incr8Bursts) := perf(VMEPerf.incr8Bursts) +
+    counters(VMEPerf.incr8Bursts) := counters(VMEPerf.incr8Bursts) +
       (burstStart && burstLen === 7.U).asUInt
-    perf(VMEPerf.incr16Bursts) := perf(VMEPerf.incr16Bursts) +
+    counters(VMEPerf.incr16Bursts) := counters(VMEPerf.incr16Bursts) +
       (burstStart && burstLen === 15.U).asUInt
-    perf(VMEPerf.incrBursts) := perf(VMEPerf.incrBursts) +
+    counters(VMEPerf.incrBursts) := counters(VMEPerf.incrBursts) +
       (burstStart && (burstLen === 1.U || burstLen === 2.U)).asUInt
-    perf(VMEPerf.boundarySplits) := perf(VMEPerf.boundarySplits) +
+    counters(VMEPerf.boundarySplits) := counters(VMEPerf.boundarySplits) +
       boundarySplit.asUInt
     for (i <- 0 until nReadClients) {
-      perf(VMEPerf.readClientStallBase + i) :=
-        perf(VMEPerf.readClientStallBase + i) +
+      counters(VMEPerf.readClientStallBase + i) :=
+        counters(VMEPerf.readClientStallBase + i) +
           (io.vme.rd(i).cmd.valid && !io.vme.rd(i).cmd.ready).asUInt
     }
-    perf(VMEPerf.writeCmdStalls) := perf(VMEPerf.writeCmdStalls) +
+    counters(VMEPerf.writeCmdStalls) := counters(VMEPerf.writeCmdStalls) +
       (io.vme.wr(0).cmd.valid && !io.vme.wr(0).cmd.ready).asUInt
-    perf(VMEPerf.writeDataStalls) := perf(VMEPerf.writeDataStalls) +
+    counters(VMEPerf.writeDataStalls) := counters(VMEPerf.writeDataStalls) +
       (io.vme.wr(0).data.valid && !io.vme.wr(0).data.ready).asUInt
-  }
+  }}
 }

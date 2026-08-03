@@ -22,7 +22,7 @@ package unittest
 import chiseltest._
 import chiseltest.iotesters._
 import org.scalatest.flatspec.AnyFlatSpec
-import vta.DefaultDe10Config
+import vta.TestDe10Config
 import vta.shell._
 import vta.util.config._
 
@@ -112,7 +112,7 @@ class VMEAHBBoundaryTester(c: VMEAHB) extends PeekPokeTester(c) {
 }
 
 class VMEAHBBoundaryTest extends AnyFlatSpec with ChiselScalatestTester {
-  implicit val p: Parameters = new DefaultDe10Config
+  implicit val p: Parameters = new TestDe10Config
 
   behavior of "VMEAHBBoundaryTest"
   it should "split fixed bursts at 1KB boundaries" in {

@@ -23,6 +23,7 @@ import chisel3._
 import chisel3.util._
 import vta.util.config._
 import vta.interface.axi._
+import vta.interface.apb._
 import vta.shell._
 
 /** Host DPI parameters */
@@ -158,6 +159,58 @@ class VTAHostDPIToAXI(debug: Boolean = false)(implicit p: Parameters) extends Mo
     }
     when(io.axi.w.fire) {
       printf("[VTAHostDPIToAXI] [W] value:%x\n", io.axi.w.bits.data)
+    }
+  }
+}
+
+/** Host DPI to APB4 converter. */
+class VTAHostDPIToAPB(debug: Boolean = false)(implicit p: Parameters) extends Module {
+  private val hp = p(ShellKey).hostParams
+  private val ap = APBParams(addrBits = hp.addrBits, dataBits = hp.dataBits)
+
+  val io = IO(new Bundle {
+    val dpi = new VTAHostDPIClient
+    val apb = new APBMaster(ap)
+  })
+
+  val idle :: access :: Nil = Enum(2)
+  val state = RegInit(idle)
+  val addr = Reg(UInt(ap.addrBits.W))
+  val data = Reg(UInt(ap.dataBits.W))
+  val write = Reg(Bool())
+
+  // Drive the APB setup phase directly from the DPI request.  The request is
+  // captured at the setup/access boundary and remains stable through access.
+  val setup = state === idle && io.dpi.req.valid
+  io.apb.psel := setup || state === access
+  io.apb.penable := state === access
+  io.apb.paddr := Mux(setup, io.dpi.req.addr, addr)
+  io.apb.pwrite := Mux(setup, io.dpi.req.opcode, write)
+  io.apb.pwdata := Mux(setup, io.dpi.req.value, data)
+  io.apb.pstrb := Fill(ap.strbBits, true.B)
+  io.apb.pprot := 0.U
+
+  when(setup) {
+    addr := io.dpi.req.addr
+    data := io.dpi.req.value
+    write := io.dpi.req.opcode
+    state := access
+  }.elsewhen(state === access && io.apb.pready) {
+    state := idle
+  }
+
+  val complete = state === access && io.apb.pready
+  // Dequeue at the setup/access boundary.  VTAHostDPI registers its outputs,
+  // so this also gives it the access phase to present the next request before
+  // the converter returns to idle.
+  io.dpi.req.deq := setup
+  io.dpi.resp.valid := complete && !write
+  io.dpi.resp.bits := io.apb.prdata
+
+  if (debug) {
+    when(complete) {
+      printf("[VTAHostDPIToAPB] write:%x addr:%x data:%x error:%x\n",
+        write, addr, Mux(write, data, io.apb.prdata), io.apb.pslverr)
     }
   }
 }

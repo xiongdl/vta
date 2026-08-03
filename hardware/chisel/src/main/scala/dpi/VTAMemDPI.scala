@@ -24,6 +24,7 @@ import chisel3.util._
 import chisel3.experimental.IntParam
 import vta.util.config._
 import vta.interface.axi._
+import vta.interface.ahb._
 import vta.shell._
 
 /** Memory DPI parameters */
@@ -231,4 +232,99 @@ when(rstate === rIdle && dpiReqQueue.io.deq.valid){
   io.axi.b.bits.resp := 0.U
   io.axi.b.bits.user := 0.U
   io.axi.b.bits.id := 0.U
+}
+
+/** Native AHB-Lite slave backed directly by the memory DPI interface. */
+class VTAMemDPIToAHB(debug: Boolean = false)(implicit val p: Parameters) extends Module {
+  private val mp = p(ShellKey).memParams
+  private val ap = AHBParams(addrBits = mp.addrBits, dataBits = mp.dataBits)
+
+  val io = IO(new Bundle {
+    val dpi = new VTAMemDPIMaster
+    val ahb = new AHBSlave(ap)
+  })
+
+  val idle :: readData :: writeData :: writeWait :: Nil = Enum(4)
+  val state = RegInit(idle)
+  val transfer = io.ahb.htrans(1)
+  val readSetup = state === idle && transfer && !io.ahb.hwrite
+  val writeSetup = state === idle && transfer && io.ahb.hwrite
+  val burstLen = RegInit(0.U(4.W))
+  val burstBeat = RegInit(0.U(4.W))
+
+  val requestLen = MuxLookup(io.ahb.hburst, 0.U, Seq(
+    AHBBurst.incr4 -> 3.U,
+    AHBBurst.incr8 -> 7.U,
+    AHBBurst.incr16 -> 15.U))
+
+  // Each fixed-length AHB burst maps to one DPI burst request.
+  io.dpi.req.ar_valid := readSetup
+  io.dpi.req.ar_len := requestLen
+  io.dpi.req.ar_addr := io.ahb.haddr
+  io.dpi.req.ar_id := 0.U
+  io.dpi.req.aw_valid := writeSetup
+  io.dpi.req.aw_len := requestLen
+  io.dpi.req.aw_addr := io.ahb.haddr
+
+  io.dpi.wr.valid := state === writeData
+  io.dpi.wr.bits.data := io.ahb.hwdata
+  io.dpi.wr.bits.strb := Fill(mp.strbBits, true.B)
+  // VTAMemDPI registers the C++ response.  Advancing the DPI memory on the
+  // request cycle prepares the first beat for the following AHB data phase.
+  io.dpi.rd.ready := state === readData || readSetup
+
+  io.ahb.hrdata := io.dpi.rd.bits.data
+  io.ahb.hready := state === idle || state === writeData || state === writeWait ||
+    (state === readData && io.dpi.rd.valid)
+  io.ahb.hresp := false.B
+
+  when(readSetup) {
+    burstLen := requestLen
+    burstBeat := 0.U
+    state := readData
+  }.elsewhen(writeSetup) {
+    burstLen := requestLen
+    burstBeat := 0.U
+    state := writeData
+  }.elsewhen(state === readData && io.dpi.rd.fire) {
+    when(burstBeat === burstLen) {
+      state := idle
+    }.otherwise {
+      assert(io.ahb.htrans === AHBTransfer.seq && !io.ahb.hwrite,
+        "AHB read burst requires a sequential read transfer")
+      burstBeat := burstBeat + 1.U
+    }
+  }.elsewhen(state === writeData) {
+    when(burstBeat === burstLen) {
+      state := idle
+    }.otherwise {
+      burstBeat := burstBeat + 1.U
+      when(io.ahb.htrans === AHBTransfer.busy) {
+        state := writeWait
+      }.otherwise {
+        assert(io.ahb.htrans === AHBTransfer.seq && io.ahb.hwrite,
+          "AHB write burst requires a sequential or busy transfer")
+      }
+    }
+  }.elsewhen(state === writeWait) {
+    when(io.ahb.htrans === AHBTransfer.seq) {
+      assert(io.ahb.hwrite, "AHB write burst requires a write transfer")
+      state := writeData
+    }.otherwise {
+      assert(io.ahb.htrans === AHBTransfer.busy,
+        "AHB write burst wait requires a busy or sequential transfer")
+    }
+  }
+
+  if (debug) {
+    when(readSetup) {
+      printf("[VTAMemDPIToAHB] read addr:%x\n", io.ahb.haddr)
+    }
+    when(writeSetup) {
+      printf("[VTAMemDPIToAHB] write addr:%x\n", io.ahb.haddr)
+    }
+    when(state === writeData) {
+      printf("[VTAMemDPIToAHB] write data:%x\n", io.ahb.hwdata)
+    }
+  }
 }

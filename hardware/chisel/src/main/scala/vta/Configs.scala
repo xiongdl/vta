@@ -71,7 +71,7 @@ object APBHostDefaultDe10Config extends App {
   (new chisel3.stage.ChiselStage).emitSystemVerilog(new VTAShellAPB, args)
 }
 
-/** Generate the APB-host TSIM testbench with the unchanged AXI DPI ABI. */
+/** Generate the native APB-host TSIM testbench. */
 object TestAPBDefaultDe10Config extends App {
   implicit val p: Parameters = new DefaultDe10Config
   (new chisel3.stage.ChiselStage).emitSystemVerilog(new TestAPB, args)

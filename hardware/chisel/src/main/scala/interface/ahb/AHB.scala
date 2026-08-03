@@ -42,6 +42,17 @@ object AHBTransfer {
   val seq = 3.U(2.W)
 }
 
+object AHBBurst {
+  val single = 0.U(3.W)
+  val incr = 1.U(3.W)
+  val wrap4 = 2.U(3.W)
+  val incr4 = 3.U(3.W)
+  val wrap8 = 4.U(3.W)
+  val incr8 = 5.U(3.W)
+  val wrap16 = 6.U(3.W)
+  val incr16 = 7.U(3.W)
+}
+
 /** AHB-Lite master port. */
 class AHBMaster(params: AHBParams) extends GenericParameterizedBundle(params) {
   val haddr = Output(UInt(params.addrBits.W))

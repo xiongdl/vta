@@ -19,31 +19,32 @@
 
 package vta.core
 
-import vta.util.config._
+import chisel3._
+import chisel3.util._
 
-/** CoreConfig.
+/** Current instruction register for an execution stage.
  *
- * This is one supported configuration for VTA. This file will
- * be eventually filled out with class configurations that can be
- * mixed/matched with Shell configurations for different backends.
+ * Fetch owns the corresponding next instruction register.  This register can
+ * consume that next instruction in the same cycle in which the current
+ * instruction completes, so no empty cycle is introduced between tasks.
  */
-class CoreConfig extends Config((site, here, up) => {
-  case CoreKey =>
-    CoreParams(
-      batch = 1,
-      blockOut = 16,
-      blockOutFactor = 1,
-      blockIn = 16,
-      inpBits = 8,
-      wgtBits = 8,
-      uopBits = 32,
-      accBits = 32,
-      outBits = 8,
-      uopMemDepth = 2048,
-      inpMemDepth = 2048,
-      wgtMemDepth = 1024,
-      accMemDepth = 2048,
-      outMemDepth = 2048,
-      instQueueEntries = 32
-    )
-})
+class CurrentInstBuffer extends Module {
+  val io = IO(new Bundle {
+    val enq = Flipped(Decoupled(UInt(INST_BITS.W)))
+    val deq = Decoupled(UInt(INST_BITS.W))
+  })
+
+  val current = Reg(UInt(INST_BITS.W))
+  val valid = RegInit(false.B)
+
+  io.deq.bits := current
+  io.deq.valid := valid
+  io.enq.ready := !valid || io.deq.ready
+
+  when(io.enq.fire) {
+    current := io.enq.bits
+    valid := true.B
+  }.elsewhen(io.deq.fire) {
+    valid := false.B
+  }
+}

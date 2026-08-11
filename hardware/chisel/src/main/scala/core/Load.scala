@@ -47,17 +47,17 @@ class Load(debug: Boolean = false)(implicit p: Parameters) extends Module {
   val state = RegInit(sIdle)
 
   val s = Module(new Semaphore(counterBits = 8, counterInitValue = 0))
-  val inst_q = Module(new Queue(UInt(INST_BITS.W), p(CoreKey).instQueueEntries))
+  val inst_buffer = Module(new CurrentInstBuffer)
 
   val dec = Module(new LoadDecode)
-  dec.io.inst := inst_q.io.deq.bits
+  dec.io.inst := inst_buffer.io.deq.bits
 
   val tensorType = Seq("inp", "wgt")
   val tensorDec = Seq(dec.io.isInput, dec.io.isWeight)
   val tensorLoad =
     Seq.tabulate(2)(i => Module(new TensorLoad(tensorType = tensorType(i))))
 
-  val start = inst_q.io.deq.valid & Mux(dec.io.pop_next, s.io.sready, true.B)
+  val start = inst_buffer.io.deq.valid & Mux(dec.io.pop_next, s.io.sready, true.B)
   val done = Mux(dec.io.isInput, tensorLoad(0).io.done, tensorLoad(1).io.done)
 
   // control
@@ -82,8 +82,8 @@ class Load(debug: Boolean = false)(implicit p: Parameters) extends Module {
   }
 
   // instructions
-  inst_q.io.enq <> io.inst
-  inst_q.io.deq.ready := (state === sExe & done) | (state === sSync)
+  inst_buffer.io.enq <> io.inst
+  inst_buffer.io.deq.ready := (state === sExe & done) | (state === sSync)
 
   // load tensor
   // [0] input (inp)
@@ -92,7 +92,7 @@ class Load(debug: Boolean = false)(implicit p: Parameters) extends Module {
   val tsor = Seq(io.inp, io.wgt)
   for (i <- 0 until 2) {
     tensorLoad(i).io.start := state === sIdle & start & tensorDec(i)
-    tensorLoad(i).io.inst := inst_q.io.deq.bits
+    tensorLoad(i).io.inst := inst_buffer.io.deq.bits
     tensorLoad(i).io.baddr := ptr(i)
     tensorLoad(i).io.tensor <> tsor(i)
     io.vme_rd(i) <> tensorLoad(i).io.vme_rd

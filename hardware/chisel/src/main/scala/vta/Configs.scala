@@ -46,66 +46,83 @@ class TestPynqConfig extends Config(new VMEPerfConfig ++ new DefaultPynqConfig)
 class TestF1Config extends Config(new VMEPerfConfig ++ new DefaultF1Config)
 class TestDe10Config extends Config(new VMEPerfConfig ++ new DefaultDe10Config)
 
+private object ChiselOptions {
+  def inferReadWrite(args: Array[String]): Array[String] =
+    args ++ Array("--infer-rw")
+}
+
 object DefaultPynqConfig extends App {
   implicit val p: Parameters = new DefaultPynqConfig
-  (new chisel3.stage.ChiselStage).emitSystemVerilog(new XilinxShell, args)
+  (new chisel3.stage.ChiselStage).emitSystemVerilog(new XilinxShell,
+    ChiselOptions.inferReadWrite(args))
 }
 
 object DefaultF1Config extends App {
   implicit val p: Parameters = new DefaultF1Config
-  (new chisel3.stage.ChiselStage).emitSystemVerilog(new XilinxShell, args)
+  (new chisel3.stage.ChiselStage).emitSystemVerilog(new XilinxShell,
+    ChiselOptions.inferReadWrite(args))
 }
 
 object DefaultDe10Config extends App {
   implicit val p: Parameters = new DefaultDe10Config
-  (new chisel3.stage.ChiselStage).emitSystemVerilog(new IntelShell, args)
+  (new chisel3.stage.ChiselStage).emitSystemVerilog(new IntelShell,
+    ChiselOptions.inferReadWrite(args))
 }
 
 object TestDefaultPynqConfig extends App {
   implicit val p: Parameters = new TestPynqConfig
-  (new chisel3.stage.ChiselStage).emitSystemVerilog(new Test, args)
+  (new chisel3.stage.ChiselStage).emitSystemVerilog(new Test,
+    ChiselOptions.inferReadWrite(args))
 }
 
 object TestDefaultF1Config extends App {
   implicit val p: Parameters = new TestF1Config
-  (new chisel3.stage.ChiselStage).emitSystemVerilog(new Test, args)
+  (new chisel3.stage.ChiselStage).emitSystemVerilog(new Test,
+    ChiselOptions.inferReadWrite(args))
 }
 
 object TestDefaultDe10Config extends App {
   implicit val p: Parameters = new TestDe10Config
-  (new chisel3.stage.ChiselStage).emitSystemVerilog(new Test, args)
+  (new chisel3.stage.ChiselStage).emitSystemVerilog(new Test,
+    ChiselOptions.inferReadWrite(args))
 }
 
 /** Generate a VTA shell with native APB4 host and AXI4 memory interfaces. */
 object APBHostDefaultDe10Config extends App {
   implicit val p: Parameters = new DefaultDe10Config
-  (new chisel3.stage.ChiselStage).emitSystemVerilog(new VTAShellAPB, args)
+  (new chisel3.stage.ChiselStage).emitSystemVerilog(new VTAShellAPB,
+    ChiselOptions.inferReadWrite(args))
 }
 
 /** Generate the native APB-host TSIM testbench. */
 object TestAPBDefaultDe10Config extends App {
   implicit val p: Parameters = new TestDe10Config
-  (new chisel3.stage.ChiselStage).emitSystemVerilog(new TestAPB, args)
+  (new chisel3.stage.ChiselStage).emitSystemVerilog(new TestAPB,
+    ChiselOptions.inferReadWrite(args))
 }
 
 /** Generate a native AXI4-Lite-host/AHB-Lite-memory VTA shell. */
 object AHBMemoryDefaultDe10Config extends App {
   implicit val p: Parameters = new DefaultDe10Config
-  (new chisel3.stage.ChiselStage).emitSystemVerilog(new VTAShellAHB, args)
+  (new chisel3.stage.ChiselStage).emitSystemVerilog(new VTAShellAHB,
+    ChiselOptions.inferReadWrite(args))
 }
 
 /** Generate a native APB4-host/AHB-Lite-memory VTA shell. */
 object APBAHBDefaultDe10Config extends App {
   implicit val p: Parameters = new DefaultDe10Config
-  (new chisel3.stage.ChiselStage).emitSystemVerilog(new VTAShellAPBAHB, args)
+  (new chisel3.stage.ChiselStage).emitSystemVerilog(new VTAShellAPBAHB,
+    ChiselOptions.inferReadWrite(args))
 }
 
 object TestAHBDefaultDe10Config extends App {
   implicit val p: Parameters = new TestDe10Config
-  (new chisel3.stage.ChiselStage).emitSystemVerilog(new TestAHB, args)
+  (new chisel3.stage.ChiselStage).emitSystemVerilog(new TestAHB,
+    ChiselOptions.inferReadWrite(args))
 }
 
 object TestAPBAHBDefaultDe10Config extends App {
   implicit val p: Parameters = new TestDe10Config
-  (new chisel3.stage.ChiselStage).emitSystemVerilog(new TestAPBAHB, args)
+  (new chisel3.stage.ChiselStage).emitSystemVerilog(new TestAPBAHB,
+    ChiselOptions.inferReadWrite(args))
 }

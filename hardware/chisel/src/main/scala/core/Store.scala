@@ -44,14 +44,14 @@ class Store(debug: Boolean = false)(implicit p: Parameters) extends Module {
   val state = RegInit(sIdle)
 
   val s = Module(new Semaphore(counterBits = 8, counterInitValue = 0))
-  val inst_q = Module(new Queue(UInt(INST_BITS.W), p(CoreKey).instQueueEntries))
+  val inst_buffer = Module(new CurrentInstBuffer)
 
   val dec = Module(new StoreDecode)
-  dec.io.inst := inst_q.io.deq.bits
+  dec.io.inst := inst_buffer.io.deq.bits
 
   val tensorStore = Module(new TensorStore(tensorType = "out"))
 
-  val start = inst_q.io.deq.valid & Mux(dec.io.pop_prev, s.io.sready, true.B)
+  val start = inst_buffer.io.deq.valid & Mux(dec.io.pop_prev, s.io.sready, true.B)
   val done = tensorStore.io.done
 
   // control
@@ -76,12 +76,12 @@ class Store(debug: Boolean = false)(implicit p: Parameters) extends Module {
   }
 
   // instructions
-  inst_q.io.enq <> io.inst
-  inst_q.io.deq.ready := (state === sExe & done) | (state === sSync)
+  inst_buffer.io.enq <> io.inst
+  inst_buffer.io.deq.ready := (state === sExe & done) | (state === sSync)
 
   // store
   tensorStore.io.start := state === sIdle & start & dec.io.isStore
-  tensorStore.io.inst := inst_q.io.deq.bits
+  tensorStore.io.inst := inst_buffer.io.deq.bits
   tensorStore.io.baddr := io.out_baddr
   io.vme_wr <> tensorStore.io.vme_wr
   tensorStore.io.tensor <> io.out

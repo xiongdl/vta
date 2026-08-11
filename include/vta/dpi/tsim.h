@@ -67,7 +67,7 @@ typedef void (*VTAHostDPIFunc)(
  * \brief Memory DPI callback function that is invoked in VTAMemDPI.v every clock cycle
  * \param req_valid Accel has a valid request for Host
  * \param req_opcode Accel request type, opcode=0 (read) and opcode=1 (write)
- * \param req_len Accel request length of size 8-byte and starts at 0
+ * \param req_len Accel request length in memory-bus beats and starts at 0
  * \param req_addr Accel request base address
  * \param wr_valid Accel has a valid value for Host
  * \param wr_value Accel has a value to be written Host

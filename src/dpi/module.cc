@@ -62,7 +62,7 @@ struct HostResponse {
 struct MemResponse {
   uint8_t valid;
   uint8_t id;
-  uint64_t* value;
+  uint32_t* value;
 };
 
 template <typename T>
@@ -136,16 +136,17 @@ class MemDevice {
   void WriteData(svOpenArrayHandle value, uint64_t wr_strb);
 
  private:
-  uint64_t* raddr_{0};
-  uint64_t* waddr_{0};
+  uint32_t* raddr_{0};
+  uint32_t* waddr_{0};
   uint32_t rlen_{0};
   uint32_t rid_{0};
   uint32_t wlen_{0};
   std::mutex mutex_;
-  uint64_t dead_beef_ [8] = {0xdeadbeefdeadbeef,0xdeadbeefdeadbeef,
-                              0xdeadbeefdeadbeef,0xdeadbeefdeadbeef,
-                              0xdeadbeefdeadbeef,0xdeadbeefdeadbeef,
-                              0xdeadbeefdeadbeef,0xdeadbeefdeadbeef };
+  uint32_t dead_beef_[16] = {
+      0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef,
+      0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef,
+      0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef,
+      0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef};
   
 };
 
@@ -214,7 +215,7 @@ void MemDevice::SetRequest(
     if(rd_req_valid == 1) {
       rlen_ = rd_req_len + 1;
       rid_  = rd_req_id;
-      raddr_ = reinterpret_cast<uint64_t*>(rd_vaddr);
+      raddr_ = reinterpret_cast<uint32_t*>(rd_vaddr);
     }
   }
 
@@ -222,7 +223,7 @@ void MemDevice::SetRequest(
     void * wr_vaddr = vta::vmem::VirtualMemoryManager::Global()->GetAddr(wr_req_addr);
     if (wr_req_valid == 1) {
       wlen_ = wr_req_len + 1;
-      waddr_ = reinterpret_cast<uint64_t*>(wr_vaddr);
+      waddr_ = reinterpret_cast<uint32_t*>(wr_vaddr);
     } 
   }
 }
@@ -249,21 +250,24 @@ void MemDevice::WriteData(svOpenArrayHandle value, uint64_t wr_strb) {
   assert(rgtIdx >= 0);
   assert(lftIdx >= rgtIdx);
   assert(blkNb > 0);
-  // supported up to 64bit strb
-  assert(blkNb <= 8);
+  // A 64-bit strobe supports up to sixteen 32-bit data blocks (512 bits).
+  assert(blkNb <= 16);
 
   std::lock_guard<std::mutex> lock(mutex_);
-  int strbMask = 0xff;
   if (wlen_ > 0) {
     for (int idx = 0 ; idx < blkNb; ++idx) {
-      int strbFlags = (wr_strb >> (idx * 8)) & strbMask;
-      if (!(strbFlags == 0 || strbFlags == strbMask)) {
-        LOG(FATAL) << "Unexpected strb data " << (void*)wr_strb;
-      }
+      uint32_t strbFlags = (wr_strb >> (idx * 4)) & 0xf;
       if (strbFlags != 0) {
-        uint64_t* elemPtr = (uint64_t*)svGetArrElemPtr1(value, rgtIdx + idx);
+        uint32_t* elemPtr =
+            static_cast<uint32_t*>(svGetArrElemPtr1(value, rgtIdx + idx));
         assert(elemPtr != NULL);
-        waddr_[idx] = (*elemPtr);
+        uint32_t writeMask = 0;
+        for (int byte = 0; byte < 4; ++byte) {
+          if (strbFlags & (1U << byte)) {
+            writeMask |= 0xffU << (byte * 8);
+          }
+        }
+        waddr_[idx] = (waddr_[idx] & ~writeMask) | (*elemPtr & writeMask);
       }
     }
     waddr_ += blkNb;
@@ -387,17 +391,17 @@ class DPIModule final : public DPIModuleNode {
       dpi8_t rd_ready) {
     
     // check data pointers
-    // data is expected to come in 64bit chunks
+    // Data is transported in 32-bit chunks so a 32-bit memory beat is valid.
     // up to 512 bits total
     // more bits require wider strb data
     assert(wr_value != NULL);
     assert(svDimensions(wr_value) == 1);
-    assert(svSize(wr_value, 1) <= 8);
-    assert(svSize(wr_value, 0) == 64);
+    assert(svSize(wr_value, 1) <= 16);
+    assert(svSize(wr_value, 0) == 32);
     assert(rd_value != NULL);
     assert(svDimensions(rd_value) == 1);
-    assert(svSize(rd_value, 1) <= 8);
-    assert(svSize(rd_value, 0) == 64);
+    assert(svSize(rd_value, 1) <= 16);
+    assert(svSize(rd_value, 0) == 32);
     
     int lftIdx = svLeft(rd_value, 1);
     int rgtIdx = svRight(rd_value, 1);
@@ -425,7 +429,8 @@ class DPIModule final : public DPIModuleNode {
     MemResponse r = mem_device_.ReadData(rd_ready, blkNb);
     *rd_valid = r.valid;
     for (int idx = 0; idx < blkNb; idx ++) {
-      uint64_t* dataPtr = (uint64_t*)svGetArrElemPtr1(rd_value, rgtIdx + idx);
+      uint32_t* dataPtr =
+          static_cast<uint32_t*>(svGetArrElemPtr1(rd_value, rgtIdx + idx));
       assert(dataPtr != NULL);
       (*dataPtr) = r.value[idx];
     }

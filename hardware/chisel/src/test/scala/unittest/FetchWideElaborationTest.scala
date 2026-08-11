@@ -30,6 +30,8 @@ import vta.util.config._
  * instructions in each external-memory beat.
  */
 class FetchWideElaborationTest extends AnyFlatSpec {
+  private val targetDir = "../../build/chisel"
+
   private def wideConfig(dataBits: Int): Parameters = {
     new Config((site, here, up) => {
       case ShellKey =>
@@ -42,11 +44,13 @@ class FetchWideElaborationTest extends AnyFlatSpec {
 
   it should "elaborate for a 256-bit memory bus" in {
     implicit val p: Parameters = wideConfig(256)
-    (new ChiselStage).emitSystemVerilog(new Fetch, Array("--infer-rw"))
+    (new ChiselStage).emitSystemVerilog(new Fetch,
+      Array("--infer-rw", "--target-dir", targetDir, "-o", "Fetch.256"))
   }
 
   it should "elaborate for a 512-bit memory bus" in {
     implicit val p: Parameters = wideConfig(512)
-    (new ChiselStage).emitSystemVerilog(new Fetch, Array("--infer-rw"))
+    (new ChiselStage).emitSystemVerilog(new Fetch,
+      Array("--infer-rw", "--target-dir", targetDir, "-o", "Fetch.512"))
   }
 }

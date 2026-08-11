@@ -32,7 +32,8 @@ ifeq (, $(VERILATOR_INC_DIR))
 	endif
 endif
 
-CONFIG = DefaultDe10Config
+CONFIG ?= DefaultDe10Config
+# Use CONFIG=DefaultSim32Config to build TSIM with a 32-bit memory bus.
 TOP = VTA
 TOP_TEST = Test
 BUILD_NAME = build

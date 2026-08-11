@@ -27,3 +27,11 @@ the hardware runtime build.
 For TSIM builds, `VTA_TSIM_MEM_READ_LATENCY` selects a non-negative number of
 additional RTL read-response cycles. The same delay module is used by the AXI
 and AHB memory shells, and the default is zero.
+
+Set `"LOG_BUS_WIDTH": 5` in the TSIM JSON configuration so the software
+runtime uses 32-bit beats. Build the matching Chisel design by selecting its
+dedicated configuration:
+
+```bash
+make -C hardware/chisel CONFIG=DefaultSim32Config
+```

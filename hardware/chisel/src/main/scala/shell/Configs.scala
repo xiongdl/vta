@@ -78,3 +78,20 @@ class De10Config extends Config((site, here, up) => {
       vmeParams = VMEParams()
     )
 })
+
+/** Sim32Config. TSIM shell configuration with a 32-bit memory bus. */
+class Sim32Config extends Config((site, here, up) => {
+  case ShellKey =>
+    ShellParams(
+      hostParams = AXIParams(
+        addrBits = 16, dataBits = 32, idBits = 13, lenBits = 4),
+      memParams = AXIParams(
+        addrBits = 32,
+        dataBits = 32,
+        userBits = 5,
+        lenBits = 8,
+        coherent = true),
+      vcrParams = VCRParams(),
+      vmeParams = VMEParams()
+    )
+})

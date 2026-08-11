@@ -34,6 +34,7 @@ import vta.test._
 class DefaultPynqConfig extends Config(new CoreConfig ++ new PynqConfig)
 class DefaultF1Config extends Config(new CoreConfig ++ new F1Config)
 class DefaultDe10Config extends Config(new CoreConfig ++ new De10Config)
+class DefaultSim32Config extends Config(new CoreConfig ++ new Sim32Config)
 
 /** Enable detailed VME counters for simulation and performance analysis. */
 class VMEPerfConfig extends Config((site, here, up) => {
@@ -45,6 +46,7 @@ class VMEPerfConfig extends Config((site, here, up) => {
 class TestPynqConfig extends Config(new VMEPerfConfig ++ new DefaultPynqConfig)
 class TestF1Config extends Config(new VMEPerfConfig ++ new DefaultF1Config)
 class TestDe10Config extends Config(new VMEPerfConfig ++ new DefaultDe10Config)
+class TestSim32Config extends Config(new VMEPerfConfig ++ new DefaultSim32Config)
 
 private object ChiselOptions {
   def inferReadWrite(args: Array[String]): Array[String] =
@@ -83,6 +85,19 @@ object TestDefaultF1Config extends App {
 
 object TestDefaultDe10Config extends App {
   implicit val p: Parameters = new TestDe10Config
+  (new chisel3.stage.ChiselStage).emitSystemVerilog(new Test,
+    ChiselOptions.inferReadWrite(args))
+}
+
+/** Generate the 32-bit memory-bus TSIM testbench. */
+object DefaultSim32Config extends App {
+  implicit val p: Parameters = new DefaultSim32Config
+  (new chisel3.stage.ChiselStage).emitSystemVerilog(new IntelShell,
+    ChiselOptions.inferReadWrite(args))
+}
+
+object TestDefaultSim32Config extends App {
+  implicit val p: Parameters = new TestSim32Config
   (new chisel3.stage.ChiselStage).emitSystemVerilog(new Test,
     ChiselOptions.inferReadWrite(args))
 }

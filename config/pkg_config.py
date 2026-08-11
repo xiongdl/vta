@@ -195,6 +195,16 @@ class PkgConfig(object):
             self.load_base_addr = "0x43C01000"
             self.compute_base_addr = "0x43C02000"
             self.store_base_addr = "0x43C03000"
+
+        # Simulators may override the default target bus width.  Keep board
+        # targets backward compatible while allowing TSIM configurations to
+        # select, for example, a 32-bit memory bus with LOG_BUS_WIDTH=5.
+        if "LOG_BUS_WIDTH" in cfg:
+            if self.TARGET != "tsim":
+                raise ValueError("LOG_BUS_WIDTH override is only supported for TSIM")
+            if cfg["LOG_BUS_WIDTH"] < 3 or cfg["LOG_BUS_WIDTH"] > 9:
+                raise ValueError("TSIM LOG_BUS_WIDTH must describe an 8-512 bit bus")
+            self.fpga_log_axi_bus_width = cfg["LOG_BUS_WIDTH"]
         # Set coherence settings
         coherent = True
         if coherent:
@@ -268,7 +278,8 @@ class PkgConfig(object):
         for key in cfg:
             self.macro_defs.append("-DVTA_%s=%s" % (key, str(cfg[key])))
             self.cfg_dict[key] = cfg[key]
-        self.macro_defs.append("-DVTA_LOG_BUS_WIDTH=%s" % (self.fpga_log_axi_bus_width))
+        if "LOG_BUS_WIDTH" not in cfg:
+            self.macro_defs.append("-DVTA_LOG_BUS_WIDTH=%s" % (self.fpga_log_axi_bus_width))
         # Macros used by the VTA driver
         self.macro_defs.append("-DVTA_IP_REG_MAP_RANGE=%s" % (self.ip_reg_map_range))
         self.macro_defs.append("-DVTA_FETCH_ADDR=%s" % (self.fetch_base_addr))

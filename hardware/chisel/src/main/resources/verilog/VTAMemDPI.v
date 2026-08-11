@@ -52,18 +52,18 @@ module VTAMemDPI #
       input byte     unsigned wr_req_len,
       input longint  unsigned wr_req_addr,
       input byte     unsigned wr_valid,
-      input longint  unsigned wr_value[],
+      input int      unsigned wr_value[],
       input longint  unsigned wr_strb,
       output byte    unsigned rd_valid,
       output byte    unsigned rd_id,
-      output longint unsigned rd_value[],
+      output int     unsigned rd_value[],
       input byte     unsigned rd_ready
     );
-  parameter blockNb = DATA_BITS/64;
+  parameter blockNb = DATA_BITS/32;
 
   generate
-    if (blockNb*64 != DATA_BITS) begin
-      $error("-F- 64 bit data blocks expected.");
+    if (blockNb*32 != DATA_BITS) begin
+      $error("-F- 32 bit data blocks expected.");
     end
   endgenerate
   generate
@@ -76,7 +76,7 @@ module VTAMemDPI #
   typedef logic [7:0]         dpi8_t;
   typedef logic [31:0]       dpi32_t;
   typedef logic [63:0]       dpi64_t;
-  typedef longint        dpi_data_t [blockNb-1:0];
+  typedef int unsigned   dpi_data_t [blockNb-1:0];
 
   dpi1_t  __reset;
   dpi8_t  __rd_req_valid;
@@ -104,7 +104,7 @@ module VTAMemDPI #
   always_ff @(posedge clock) begin
     dpi_rd_valid <= dpi1_t ' (__rd_valid);
     for (i = 0; i < blockNb; i = i +1) begin
-      dpi_rd_bits_data[64 * i +: 64]  <= __rd_value[i];
+      dpi_rd_bits_data[32 * i +: 32]  <= __rd_value[i];
     end
     dpi_rd_bits_id    <= __rd_id;
   end
@@ -130,7 +130,7 @@ module VTAMemDPI #
   genvar j;
   generate
   for (j = 0; j < blockNb; j = j +1) begin
-    assign __wr_value[j] = dpi_wr_bits_data[64 * j +: 64];
+    assign __wr_value[j] = dpi_wr_bits_data[32 * j +: 32];
   end
   endgenerate
   assign __rd_ready   = dpi8_t ' (dpi_rd_ready);
@@ -160,7 +160,7 @@ module VTAMemDPI #
         __rd_ready);
       dpi_rd_valid <= dpi1_t ' (__rd_valid);
       for (i = 0; i < blockNb; i = i +1) begin
-        dpi_rd_bits_data[64 * i +: 64] <= __rd_value[i];
+        dpi_rd_bits_data[32 * i +: 32] <= __rd_value[i];
       end
       dpi_rd_bits_id <= __rd_id;
     end // else: !if(reset | __reset)

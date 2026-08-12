@@ -47,3 +47,30 @@ class CoreConfig extends Config((site, here, up) => {
       instQueueEntries = 32
     )
 })
+
+private object TSimEnv {
+  def int(name: String): Int =
+    sys.env.getOrElse(name, throw new IllegalArgumentException(s"Missing $name")).toInt
+}
+
+/** Core configuration supplied by the TSIM build from vta_config.json. */
+class TSimCoreConfig extends Config((site, here, up) => {
+  case CoreKey =>
+    CoreParams(
+      batch = TSimEnv.int("VTA_TSIM_BATCH"),
+      blockOut = TSimEnv.int("VTA_TSIM_BLOCK_OUT"),
+      blockOutFactor = 1,
+      blockIn = TSimEnv.int("VTA_TSIM_BLOCK_IN"),
+      inpBits = TSimEnv.int("VTA_TSIM_INP_BITS"),
+      wgtBits = TSimEnv.int("VTA_TSIM_WGT_BITS"),
+      uopBits = 32,
+      accBits = TSimEnv.int("VTA_TSIM_ACC_BITS"),
+      outBits = TSimEnv.int("VTA_TSIM_OUT_BITS"),
+      uopMemDepth = TSimEnv.int("VTA_TSIM_UOP_DEPTH"),
+      inpMemDepth = TSimEnv.int("VTA_TSIM_INP_DEPTH"),
+      wgtMemDepth = TSimEnv.int("VTA_TSIM_WGT_DEPTH"),
+      accMemDepth = TSimEnv.int("VTA_TSIM_ACC_DEPTH"),
+      outMemDepth = TSimEnv.int("VTA_TSIM_OUT_DEPTH"),
+      instQueueEntries = 32
+    )
+})

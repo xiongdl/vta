@@ -351,7 +351,10 @@ class FetchInstMemWide(debug: Boolean = false)(implicit p: Parameters) extends M
   val instsPerBeat = mp.dataBits / INST_BITS
   val instIndexBits = math.max(1, log2Ceil(instsPerBeat))
   val bytesPerBeat = mp.dataBits / 8
-  val maxBurstInsts = entries / 4
+  // A wide beat already carries multiple complete instructions.  Keep this
+  // path to one memory beat per command so burst accounting cannot split a
+  // packed instruction beat.
+  val maxBurstInsts = instsPerBeat
   val maxBurstBeats = maxBurstInsts / instsPerBeat
   val maxBurstBytes = maxBurstBeats * bytesPerBeat
   val burstCountBits = mp.lenBits + 1
@@ -400,7 +403,9 @@ class FetchInstMemWide(debug: Boolean = false)(implicit p: Parameters) extends M
 
   val wantedInsts = Mux(remaining > maxBurstInsts.U,
     maxBurstInsts.U, remaining(countBits - 1, 0))
-  val wantedBeats = (wantedInsts + (instsPerBeat - 1).U) / instsPerBeat.U
+  val wantedBeats =
+    (wantedInsts + (instsPerBeat - 1).U(wantedInsts.getWidth.W)) /
+      instsPerBeat.U(wantedInsts.getWidth.W)
   core.io.reserve.valid := state === dReserve
   core.io.reserve.bits := wantedInsts
 

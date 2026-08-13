@@ -6,6 +6,7 @@ from tvm import relay
 from tvm.relay.dataflow_pattern import is_constant, is_op, wildcard
 
 from ..config import VTAConfig
+from .quantization import fixed_point_ratio
 
 
 def _as_int(value):
@@ -65,7 +66,17 @@ def _check_common_qnn(call, config, dense=False):
         return False
     if not np.allclose(input_scale * kernel_scale, requant_input_scale):
         return False
-    if not np.allclose(requant_input_scale, requant_output_scale):
+    try:
+        shifts = np.broadcast_to(requant_input_scale, np.broadcast_shapes(
+            requant_input_scale.shape, requant_output_scale.shape
+        )) / np.broadcast_to(requant_output_scale, np.broadcast_shapes(
+            requant_input_scale.shape, requant_output_scale.shape
+        ))
+        if dense and not np.allclose(shifts, 1.0):
+            return False
+        if any(fixed_point_ratio(value, 1.0) < 0 for value in shifts.reshape(-1)):
+            return False
+    except (ValueError, TypeError):
         return False
     if any(
         not isinstance(dim, tvm.tir.IntImm)

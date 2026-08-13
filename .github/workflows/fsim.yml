@@ -30,3 +30,9 @@ jobs:
       - name: Run standalone VTA FSIM regression
         shell: bash -el {0}
         run: ./scripts/run_fsim_regression.sh
+      - name: Enforce standalone compiler invariants
+        shell: bash -el {0}
+        run: |
+          test -z "$(git -C tvm status --short)"
+          grep -q 'VTA_MEM_ID_ACC_8BIT' runtime/runtime.cc
+          grep -q 'test_resnet18_four_block_subgraph_and_profiler_metrics' tests/python/test_external_codegen_fsim.py

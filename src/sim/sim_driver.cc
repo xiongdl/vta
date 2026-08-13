@@ -194,11 +194,12 @@ class SRAM {
     CHECK_EQ(VTA_INP_WIDTH, 8);
 
     int factor = VTA_ACC_WIDTH / VTA_INP_WIDTH;
-    load_counter[0] += (op->x_size * op->y_size) * kElemBytes;
+    load_counter[0] +=
+        (op->x_size * op->y_size * VTA_BATCH * VTA_BLOCK_OUT * VTA_INP_WIDTH / 8);
     if (skip_exec) return;
     DType* sram_ptr = data_ + op->sram_base;
     int8_t* dram_ptr = static_cast<int8_t*>(dram->GetAddr(
-        op->dram_base * kElemBytes / factor));
+        op->dram_base * VTA_INP_ELEM_BYTES));
     uint64_t xtotal = op->x_size + op->x_pad_0 + op->x_pad_1;
     uint32_t ytotal = op->y_size + op->y_pad_0 + op->y_pad_1;
     uint64_t sram_end = op->sram_base + xtotal * ytotal;

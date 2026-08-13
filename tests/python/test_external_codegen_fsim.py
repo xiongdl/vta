@@ -10,6 +10,7 @@ from tvm.topi.testing import conv2d_nchw_python
 from tvm.topi.testing import depthwise_conv2d_python_nchw
 
 import vta
+from vta.testing import simulator
 
 
 def _dense(data, weight):
@@ -162,6 +163,25 @@ def test_uniform_per_channel_scale_normalization_and_fixed_point_ratio():
     assert vta.fixed_point_ratio(0.125, 0.5) == -2
     with pytest.raises(ValueError, match="power-of-two"):
         vta.fixed_point_ratio(0.3, 0.2)
+
+
+def test_power_of_two_requantize_conv2d_fsim():
+    data_var = relay.var("data", shape=(1, 16, 3, 3), dtype="int8")
+    weight = np.zeros((16, 16, 1, 1), dtype="int8")
+    for channel in range(16):
+        weight[channel, channel, 0, 0] = 1
+    value = relay.qnn.op.conv2d(
+        data_var, relay.const(weight), relay.const(0, "int32"), relay.const(0, "int32"),
+        relay.const(1.0, "float32"), relay.const(1.0, "float32"),
+        channels=16, kernel_size=(1, 1), out_dtype="int32",
+    )
+    value = relay.qnn.op.requantize(
+        value, relay.const(1.0, "float32"), relay.const(0, "int32"),
+        relay.const(0.5, "float32"), relay.const(0, "int32"), out_dtype="int8",
+    )
+    data = np.random.randint(-20, 21, (1, 16, 3, 3)).astype("int8")
+    mod = tvm.IRModule.from_expr(relay.Function([data_var], value))
+    np.testing.assert_equal(_run(mod, data), (data.astype("int16") * 2).astype("int8"))
 
 
 def test_graph_executor_depthwise_conv2d():
@@ -320,3 +340,45 @@ def test_resnet_stage_with_stride2_downsample():
     expected = np.zeros((1, out_channels, 4, 4), dtype="int8")
     expected[:, :env.BLOCK_IN] = (downsampled.astype("int16") * 4).astype("int8")
     np.testing.assert_equal(runtime.get_output(0).numpy(), expected)
+
+
+def test_resnet18_four_block_subgraph_and_profiler_metrics():
+    """Run one ResNet-18-sized four-block stage with measurable VTA work."""
+    env = vta.get_env()
+    shape = (1, env.BLOCK_IN, 4, 4)
+    data_var = relay.var("data", shape=shape, dtype="int8")
+    identity = np.zeros((env.BLOCK_OUT, env.BLOCK_IN, 1, 1), dtype="int8")
+    for channel in range(env.BLOCK_IN):
+        identity[channel, channel, 0, 0] = 1
+    value = data_var
+    for _ in range(4):
+        branch = _conv2d(_conv2d(value, identity), identity)
+        value = relay.annotation.stop_fusion(relay.add(branch, value))
+    mod = tvm.IRModule.from_expr(relay.Function([data_var], value))
+    partitioned = vta.partition_for_vta(mod)
+    regions = [
+        function for function in partitioned.functions.values()
+        if isinstance(function, relay.Function) and function.attrs
+        and function.attrs.get("Compiler") == "vta"
+    ]
+    assert len(regions) == 4
+    runtime = _build_runtime(mod)
+    data = np.random.randint(-4, 5, shape).astype("int8")
+    simulator.clear_stats()
+    runtime.set_input("data", data)
+    runtime.run()
+    expected = (data.astype("int16") * 16).astype("int8")
+    np.testing.assert_equal(runtime.get_output(0).numpy(), expected)
+    stats = simulator.stats()
+    assert stats["gemm_counter"] > 0
+    assert stats["alu_counter"] > 0
+    assert stats["inp_load_nbytes"] > 0
+    assert stats["out_store_nbytes"] > 0
+    print("ResNet-18 four-block FSIM metrics:", stats)
+
+
+def test_acc8_runtime_uses_input_element_address_units():
+    runtime_source = (
+        __import__("pathlib").Path(vta.__file__).resolve().parents[2] / "runtime" / "runtime.cc"
+    ).read_text(encoding="utf-8")
+    assert "case VTA_MEM_ID_ACC_8BIT:\n        elem_bytes = VTA_INP_ELEM_BYTES;" in runtime_source

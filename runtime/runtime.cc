@@ -1027,7 +1027,7 @@ class CommandQueue {
         elem_bytes = VTA_OUT_ELEM_BYTES;
         break;
       case VTA_MEM_ID_ACC_8BIT:
-        elem_bytes = VTA_ACC_ELEM_BYTES / 4;
+        elem_bytes = VTA_INP_ELEM_BYTES;
         break;
       default:
         LOG(FATAL) << "Memory id not recognized:" << memory_id;

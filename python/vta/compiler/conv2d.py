@@ -9,6 +9,7 @@ from tvm import relay, te, topi
 from ..build_module import build, lower
 from ..environment import get_env
 from .dense import _find_call, _scalar
+from ..relay.quantization import fixed_point_ratio
 
 
 @dataclass
@@ -57,8 +58,11 @@ def _extract_conv2d(function):
         raise ValueError("VTA conv2d currently requires zero input and kernel zero-points")
     if not np.allclose(input_scale * kernel_scale, requant_input_scale):
         raise ValueError("qnn.conv2d scales must match the requantize input scale")
-    if not np.allclose(requant_input_scale, requant_output_scale):
-        raise ValueError("VTA ALU cannot exactly express requantize with unequal scales")
+    shifts = [fixed_point_ratio(value, 1.0) for value in
+              np.asarray(requant_input_scale / requant_output_scale).reshape(-1)]
+    if len(set(shifts)) != 1 or shifts[0] < 0:
+        raise ValueError("VTA conv2d currently supports a uniform non-negative power-of-two shift")
+    requant_shift = shifts[0]
     if requantize.checked_type.dtype != "int8":
         raise ValueError("VTA conv2d currently requires int8 requantize output")
 
@@ -74,13 +78,13 @@ def _extract_conv2d(function):
             min(clip_bounds[1], int(clip.attrs.a_max)),
         )
     correction = requant_output_zero_point - requant_input_zero_point
-    return typed, conv, bias, clip_bounds, correction
+    return typed, conv, bias, clip_bounds, correction, requant_shift
 
 
 def compile_qnn_conv2d(function, name="vta_qnn_conv2d"):
     """Compile one supported QNN conv2d Relay function into a VTA module."""
     env = get_env()
-    _, conv, raw_bias, clip_bounds, correction = _extract_conv2d(function)
+    _, conv, raw_bias, clip_bounds, correction, requant_shift = _extract_conv2d(function)
     batch, in_channels, height, width = (int(x) for x in conv.args[0].checked_type.shape)
     out_channels, weight_in_per_group, kernel_h, kernel_w = (
         int(x) for x in conv.args[1].checked_type.shape
@@ -149,10 +153,17 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d"):
         name="accum",
     )
     biased = te.compute(output_shape, lambda *idx: accum(*idx) + bias(*idx), name="biased")
+    scaled = biased
+    if requant_shift:
+        scaled = te.compute(
+            output_shape,
+            lambda *idx: biased(*idx) * tvm.tir.const(1 << requant_shift, env.acc_dtype),
+            name="requantize_shift",
+        )
     clip_min, clip_max = clip_bounds
     clipped_max = te.compute(
         output_shape,
-        lambda *idx: tvm.te.min(biased(*idx), tvm.tir.const(clip_max, env.acc_dtype)),
+        lambda *idx: tvm.te.min(scaled(*idx), tvm.tir.const(clip_max, env.acc_dtype)),
         name="clip_max",
     )
     narrowed = te.compute(
@@ -165,9 +176,14 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d"):
     schedule = te.create_schedule(output.op)
     schedule[data_buf].set_scope(env.inp_scope)
     schedule[weight_buf].set_scope(env.wgt_scope)
-    for stage in (accum, biased, clipped_max, narrowed):
+    accumulator_stages = (accum, biased, clipped_max, narrowed)
+    alu_stages = (biased, clipped_max, narrowed)
+    if requant_shift:
+        accumulator_stages += (scaled,)
+        alu_stages += (scaled,)
+    for stage in accumulator_stages:
         schedule[stage].set_scope(env.acc_scope)
-    for stage in (biased, clipped_max, narrowed):
+    for stage in alu_stages:
         schedule[stage].pragma(schedule[stage].op.axis[0], env.alu)
     bias_buf = schedule.cache_read(bias, env.acc_scope, [biased])
     schedule[bias_buf].pragma(schedule[bias_buf].op.axis[0], env.dma_copy)

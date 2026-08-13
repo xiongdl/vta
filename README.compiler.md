@@ -19,6 +19,13 @@ The script derives every TSIM hardware parameter from `VTA_CONFIG`, builds
 standalone `libvta_fsim` and `libvta_tsim`, then rebuilds `libvta_hw`. TVM's
 `USE_VTA_FSIM`, `USE_VTA_TSIM`, and `USE_VTA_FPGA` options remain disabled.
 
+For the independent FSIM compiler flow, load the standalone runtime and call
+`vta.build_graph(mod)`. This registers `relay.ext.vta`, runs the graphpack-free
+Relay partition passes, compiles VTA regions into native runtime modules with
+logical-to-packed ABI wrappers, and returns TVM's standard GraphExecutor
+factory. The first external-codegen capability is QNN dense; CPU operators may
+remain around the VTA region in the same Relay graph.
+
 ## Python compiler passes
 
 Use `tvm-vta/python` ahead of TVM's legacy `vta/python` directory:

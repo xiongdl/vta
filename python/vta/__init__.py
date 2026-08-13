@@ -10,6 +10,7 @@ from .relay import partition_for_vta, pattern_table
 from .build_module import build, build_config, lower
 from .compiler import (compile, compile_plan, compile_partitioned_dense, compile_qnn_conv2d,
                        compile_qnn_dense, run_artifact)
+from .compiler import build_graph, register_external_codegen
 
 
 def register_compiler():
@@ -19,9 +20,10 @@ def register_compiler():
     return _register_compiler()
 
 
-__all__ = ["Environment", "VTAConfig", "build", "build_config", "compile",
+__all__ = ["Environment", "VTAConfig", "build", "build_config", "build_graph", "compile",
            "compile_partitioned_dense",
            "compile_plan",
            "compile_qnn_conv2d",
            "compile_qnn_dense", "get_env", "lower",
-           "partition_for_vta", "pattern_table", "register_compiler", "run_artifact"]
+           "partition_for_vta", "pattern_table", "register_compiler",
+           "register_external_codegen", "run_artifact"]

@@ -6,7 +6,10 @@ on:
 
 jobs:
   fsim:
-    runs-on: macos-14
+    strategy:
+      matrix:
+        os: [macos-14, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
@@ -29,7 +32,11 @@ jobs:
           cmake --build tvm/build --parallel 3
       - name: Run standalone VTA FSIM regression
         shell: bash -el {0}
-        run: ./scripts/run_fsim_regression.sh
+        run: |
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            export VTA_HOST_CC=/usr/bin/clang VTA_HOST_CXX=/usr/bin/clang++
+          fi
+          ./scripts/run_fsim_regression.sh
       - name: Enforce standalone compiler invariants
         shell: bash -el {0}
         run: |

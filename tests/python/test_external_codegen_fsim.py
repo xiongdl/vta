@@ -205,6 +205,31 @@ def test_power_of_two_right_shift_and_output_zero_point_fsim():
     np.testing.assert_equal(_run(mod, data), expected.astype("int8"))
 
 
+def test_non_power_of_two_requantize_uses_exact_llvm_fallback():
+    data = relay.var("data", shape=(1, 16, 2, 2), dtype="int32")
+    value = relay.qnn.op.requantize(
+        data, relay.const(0.3, "float32"), relay.const(0, "int32"),
+        relay.const(0.2, "float32"), relay.const(1, "int32"), out_dtype="int8",
+    )
+    mod = tvm.IRModule.from_expr(relay.Function([data], value))
+    partitioned = vta.partition_for_vta(mod)
+    assert not any(
+        isinstance(function, relay.Function) and function.attrs
+        and function.attrs.get("Compiler") == "vta"
+        for function in partitioned.functions.values()
+    )
+    with tvm.transform.PassContext(opt_level=3):
+        factory = relay.build(partitioned, target="llvm")
+    runtime = graph_executor.GraphModule(factory["default"](tvm.cpu()))
+    values = np.arange(-32, 32, dtype="int32").reshape(1, 16, 2, 2)
+    runtime.set_input("data", values)
+    runtime.run()
+    reference = relay.create_executor("vm", mod=mod, device=tvm.cpu(), target="llvm").evaluate()(
+        tvm.nd.array(values)
+    ).numpy()
+    np.testing.assert_equal(runtime.get_output(0).numpy(), reference)
+
+
 def test_graph_executor_depthwise_conv2d():
     channels = 16
     data_var = relay.var("data", shape=(1, channels, 5, 5), dtype="int8")

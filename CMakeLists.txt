@@ -44,6 +44,10 @@ if(VTA_RUNTIME STREQUAL "sim")
 elseif(VTA_RUNTIME STREQUAL "tsim")
   set(VTA_TARGET_NAME vta_tsim)
   list(APPEND VTA_COMMON_SOURCES src/tsim/tsim_driver.cc src/dpi/module.cc)
+  set(VERILATOR_INC_DIR "" CACHE PATH "Path to Verilator runtime headers")
+  if(NOT EXISTS "${VERILATOR_INC_DIR}/vltstd/svdpi.h")
+    message(FATAL_ERROR "VERILATOR_INC_DIR must contain vltstd/svdpi.h for TSIM")
+  endif()
 else()
   message(FATAL_ERROR "Unsupported VTA_RUNTIME=${VTA_RUNTIME}")
 endif()
@@ -55,6 +59,13 @@ target_include_directories(${VTA_TARGET_NAME} PRIVATE
   "${TVM_SOURCE_DIR}/include"
   "${TVM_SOURCE_DIR}/3rdparty/dlpack/include"
   "${TVM_SOURCE_DIR}/3rdparty/dmlc-core/include")
+if(VTA_RUNTIME STREQUAL "tsim")
+  target_include_directories(${VTA_TARGET_NAME} PRIVATE
+    "${VERILATOR_INC_DIR}" "${VERILATOR_INC_DIR}/vltstd")
+  if(EXISTS "${VERILATOR_INC_DIR}/verilated_threads.cpp")
+    target_sources(${VTA_TARGET_NAME} PRIVATE "${VERILATOR_INC_DIR}/verilated_threads.cpp")
+  endif()
+endif()
 if(APPLE)
   # Load as a TVM plugin. Linking another libtvm_runtime instance would create
   # a second global Registry invisible to the host Python process.

@@ -11,6 +11,7 @@ __pycache__/
 env/
 build/
 build-standalone-*/
+build-independent-*/
 develop-eggs/
 dist/
 downloads/

@@ -4,6 +4,21 @@ The new integration keeps VTA-specific compilation, configuration, and
 simulation in this repository. Apache TVM is built with `USE_VTA_FSIM`,
 `USE_VTA_TSIM`, and `USE_VTA_FPGA` disabled.
 
+Build the simulator runtimes and the cycle-accurate Chisel model entirely from
+this repository (TVM only supplies public headers and the host runtime):
+
+```bash
+export TVM_SOURCE_DIR=/path/to/tvm
+export TVM_BUILD_DIR=/path/to/tvm/build
+export PYTHON=/path/to/python
+export VERILATOR=/path/to/verilator
+./scripts/build_simulators.sh all
+```
+
+The script derives every TSIM hardware parameter from `VTA_CONFIG`, builds
+standalone `libvta_fsim` and `libvta_tsim`, then rebuilds `libvta_hw`. TVM's
+`USE_VTA_FSIM`, `USE_VTA_TSIM`, and `USE_VTA_FPGA` options remain disabled.
+
 ## Python compiler passes
 
 Use `tvm-vta/python` ahead of TVM's legacy `vta/python` directory:

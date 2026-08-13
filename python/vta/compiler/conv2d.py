@@ -19,6 +19,8 @@ class Conv2DArtifact:
     packed_bias: np.ndarray
     input_shape: tuple
     output_shape: tuple
+    packed_input_shape: tuple
+    packed_output_shape: tuple
 
 
 def _pair(value, name):
@@ -84,8 +86,10 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d"):
     )
     if weight_in != in_channels:
         raise ValueError("Conv2d input/kernel channel dimensions do not match")
-    if batch % env.BATCH or in_channels % env.BLOCK_IN or out_channels % env.BLOCK_OUT:
-        raise ValueError("Conv2d dimensions must align to VTA BATCH/BLOCK_IN/BLOCK_OUT")
+    if batch % env.BATCH:
+        raise ValueError("Conv2d batch must align to VTA BATCH")
+    padded_in_channels = ((in_channels + env.BLOCK_IN - 1) // env.BLOCK_IN) * env.BLOCK_IN
+    padded_out_channels = ((out_channels + env.BLOCK_OUT - 1) // env.BLOCK_OUT) * env.BLOCK_OUT
     stride_h, stride_w = _pair(conv.attrs.strides, "strides")
     pad_top, pad_left, pad_bottom, pad_right = (int(x) for x in conv.attrs.padding)
     if pad_top != pad_bottom or pad_left != pad_right:
@@ -94,11 +98,16 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d"):
     out_width = (width + pad_left + pad_right - kernel_w) // stride_w + 1
 
     data_shape = (
-        batch // env.BATCH, in_channels // env.BLOCK_IN, height, width, env.BATCH, env.BLOCK_IN
+        batch // env.BATCH,
+        padded_in_channels // env.BLOCK_IN,
+        height,
+        width,
+        env.BATCH,
+        env.BLOCK_IN,
     )
     weight_shape = (
-        out_channels // env.BLOCK_OUT,
-        in_channels // env.BLOCK_IN,
+        padded_out_channels // env.BLOCK_OUT,
+        padded_in_channels // env.BLOCK_IN,
         kernel_h,
         kernel_w,
         env.BLOCK_OUT,
@@ -106,7 +115,7 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d"):
     )
     output_shape = (
         batch // env.BATCH,
-        out_channels // env.BLOCK_OUT,
+        padded_out_channels // env.BLOCK_OUT,
         out_height,
         out_width,
         env.BATCH,
@@ -120,7 +129,7 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d"):
         name="data_buf",
     )
     weight_buf = te.compute(weight_shape, lambda *idx: weight(*idx), name="weight_buf")
-    ic = te.reduce_axis((0, in_channels // env.BLOCK_IN), name="ic")
+    ic = te.reduce_axis((0, padded_in_channels // env.BLOCK_IN), name="ic")
     dy = te.reduce_axis((0, kernel_h), name="dy")
     dx = te.reduce_axis((0, kernel_w), name="dx")
     ic_tns = te.reduce_axis((0, env.BLOCK_IN), name="ic_tns")
@@ -171,10 +180,14 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d"):
     lowered = lower(schedule, args, simple_mode=True)
     module = build(schedule, args, tvm.target.Target("ext_dev", host=env.target_host), name=name)
     raw_weight = conv.args[1].data.numpy().astype(env.wgt_dtype)
-    packed_weight = raw_weight.reshape(
-        out_channels // env.BLOCK_OUT,
+    padded_weight = np.zeros(
+        (padded_out_channels, padded_in_channels, kernel_h, kernel_w), dtype=env.wgt_dtype
+    )
+    padded_weight[:out_channels, :in_channels] = raw_weight
+    packed_weight = padded_weight.reshape(
+        padded_out_channels // env.BLOCK_OUT,
         env.BLOCK_OUT,
-        in_channels // env.BLOCK_IN,
+        padded_in_channels // env.BLOCK_IN,
         env.BLOCK_IN,
         kernel_h,
         kernel_w,
@@ -183,13 +196,15 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d"):
         raw_bias = np.zeros((out_channels,), dtype=env.acc_dtype)
     raw_bias = raw_bias.astype(env.acc_dtype) + np.asarray(correction, env.acc_dtype)
     packed_bias = np.broadcast_to(
-        raw_bias.reshape(1, out_channels, 1, 1),
-        (batch, out_channels, out_height, out_width),
+        np.pad(raw_bias, (0, padded_out_channels - out_channels)).reshape(
+            1, padded_out_channels, 1, 1
+        ),
+        (batch, padded_out_channels, out_height, out_width),
     ).copy()
     packed_bias = packed_bias.reshape(
         batch // env.BATCH,
         env.BATCH,
-        out_channels // env.BLOCK_OUT,
+        padded_out_channels // env.BLOCK_OUT,
         env.BLOCK_OUT,
         out_height,
         out_width,
@@ -201,4 +216,6 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d"):
         packed_bias,
         (batch, in_channels, height, width),
         (batch, out_channels, out_height, out_width),
+        data_shape,
+        output_shape,
     )

@@ -4,7 +4,8 @@ import threading
 
 from .dense import DenseArtifact, compile_partitioned_dense, compile_qnn_dense
 from .conv2d import Conv2DArtifact, compile_qnn_conv2d
-from .pipeline import compile
+from .pipeline import compile, compile_plan
+from .executor import ExecutionPlan, run_artifact
 
 _LOCK = threading.Lock()
 _REGISTERED = False
@@ -27,6 +28,7 @@ def register_compiler():
         return True
 
 
-__all__ = ["Conv2DArtifact", "DenseArtifact", "compile", "compile_partitioned_dense",
+__all__ = ["Conv2DArtifact", "DenseArtifact", "ExecutionPlan", "compile", "compile_plan",
+           "compile_partitioned_dense",
            "compile_qnn_conv2d", "compile_qnn_dense",
-           "register_compiler"]
+           "register_compiler", "run_artifact"]

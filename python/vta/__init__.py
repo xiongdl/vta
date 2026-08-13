@@ -8,7 +8,7 @@ from .config import VTAConfig
 from .environment import Environment, get_env
 from .relay import partition_for_vta, pattern_table
 from .build_module import build, build_config, lower
-from .compiler import (compile, compile_plan, compile_partitioned_dense, compile_qnn_conv2d,
+from .compiler import (compile, compile_add, compile_plan, compile_partitioned_dense, compile_qnn_conv2d,
                        compile_qnn_dense, run_artifact)
 from .compiler import build_graph, register_external_codegen
 
@@ -21,6 +21,7 @@ def register_compiler():
 
 
 __all__ = ["Environment", "VTAConfig", "build", "build_config", "build_graph", "compile",
+           "compile_add",
            "compile_partitioned_dense",
            "compile_plan",
            "compile_qnn_conv2d",

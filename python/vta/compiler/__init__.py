@@ -4,6 +4,7 @@ import threading
 
 from .dense import DenseArtifact, compile_partitioned_dense, compile_qnn_dense
 from .conv2d import Conv2DArtifact, compile_qnn_conv2d
+from .alu import AddArtifact, compile_add
 from .pipeline import compile, compile_plan
 from .executor import ExecutionPlan, run_artifact
 from .codegen import build_graph, register_external_codegen
@@ -29,7 +30,8 @@ def register_compiler():
         return True
 
 
-__all__ = ["Conv2DArtifact", "DenseArtifact", "ExecutionPlan", "build_graph", "compile",
+__all__ = ["AddArtifact", "Conv2DArtifact", "DenseArtifact", "ExecutionPlan", "build_graph", "compile",
+           "compile_add",
            "compile_plan",
            "compile_partitioned_dense",
            "compile_qnn_conv2d", "compile_qnn_dense",

@@ -8,6 +8,7 @@ from tvm import relay
 from tvm.contrib import cc, utils
 
 from .conv2d import compile_qnn_conv2d
+from .alu import compile_add
 from .dense import _find_call, compile_qnn_dense
 from ..relay import partition_for_vta
 
@@ -293,6 +294,29 @@ TVM_DLL int {symbol}(TVMValue* args,int* tcodes,int nargs,TVMValue* ret,int* ret
     return _compile_wrapper(artifacts, source)
 
 
+def _add_wrapper(function, symbol):
+    artifact = compile_add(function, f"{symbol}_kernel")
+    elements = int(np.prod(artifact.logical_shape)); padded = int(np.prod(artifact.packed_shape))
+    source = f'''
+{_C_HEADER}
+extern int {symbol}_kernel(TVMValue*,int*,int,TVMValue*,int*,void*);
+static void *a=0,*b=0,*o=0;static pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER;
+__attribute__((destructor)) static void release(void){{
+ if(a)VTABufferFree(a);if(b)VTABufferFree(b);if(o)VTABufferFree(o);a=b=o=0;}}
+TVM_DLL int {symbol}(TVMValue* args,int* tc,int n,TVMValue* r,int* rt,void* x){{
+ if(n!=3)return -1;pthread_mutex_lock(&lock);if(!a){{a=VTABufferAlloc({padded*4});b=VTABufferAlloc({padded*4});o=VTABufferAlloc({padded});}}
+ int32_t ha[{padded}],hb[{padded}];int8_t ho[{padded}];for(int i=0;i<{padded};++i)ha[i]=hb[i]=0;
+ int8_t* ia=(int8_t*)((DLTensor*)args[0].v_handle)->data;int8_t* ib=(int8_t*)((DLTensor*)args[1].v_handle)->data;
+ for(int i=0;i<{elements};++i){{ha[i]=ia[i];hb[i]=ib[i];}}VTABufferCopy(ha,0,a,0,{padded*4},1);VTABufferCopy(hb,0,b,0,{padded*4},1);
+ int64_t s[4]={{{','.join(str(x) for x in artifact.packed_shape)}}};DLDevice d={{kDLExtDev,0}};
+ DLTensor ts[3]={{{{a,d,4,{{kDLInt,32,1}},s,0,0}},{{b,d,4,{{kDLInt,32,1}},s,0,0}},{{o,d,4,{{kDLInt,8,1}},s,0,0}}}};
+ TVMValue ka[3];int kt[3]={{kTVMDLTensorHandle,kTVMDLTensorHandle,kTVMDLTensorHandle}};for(int i=0;i<3;++i)ka[i].v_handle=&ts[i];
+ int rc={symbol}_kernel(ka,kt,3,r,rt,x);if(!rc)VTABufferCopy(o,0,ho,0,{padded},2);int8_t* out=(int8_t*)((DLTensor*)args[2].v_handle)->data;
+ if(!rc)for(int i=0;i<{elements};++i)out[i]=ho[i];pthread_mutex_unlock(&lock);return rc;}}
+'''
+    return _compile_wrapper(artifact, source)
+
+
 def register_external_codegen():
     """Register ``relay.ext.vta`` without modifying or rebuilding TVM."""
     def compiler(function):
@@ -304,6 +328,8 @@ def register_external_codegen():
             return _dense_wrapper(function, symbol)
         if _find_call(function.body, "qnn.conv2d") is not None:
             return _conv2d_wrapper(function, symbol)
+        if _find_call(function.body, "add") is not None:
+            return _add_wrapper(function, symbol)
         raise ValueError("relay.ext.vta region contains no supported core operator")
 
     tvm._ffi.register_func("relay.ext.vta", compiler, override=True)
@@ -311,6 +337,10 @@ def register_external_codegen():
 
 def build_graph(mod, params=None, target="llvm", config=None):
     """Build a standard Relay executor factory with out-of-tree VTA regions."""
+    # Register the selected out-of-tree runtime before loading native wrappers
+    # that resolve VTABuffer* symbols from it.
+    from ..testing import simulator  # pylint: disable=import-outside-toplevel,unused-import
+
     register_external_codegen()
     partitioned = partition_for_vta(mod, params=params, config=config)
     with tvm.transform.PassContext(opt_level=3):

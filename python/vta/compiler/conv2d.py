@@ -43,20 +43,21 @@ def _extract_conv2d(function):
         raise ValueError("VTA conv2d weights must be constant")
     if conv.attrs.data_layout != "NCHW" or conv.attrs.kernel_layout != "OIHW":
         raise ValueError("VTA conv2d currently requires NCHW data and OIHW kernels")
-    if int(conv.attrs.groups) != 1 or _pair(conv.attrs.dilation, "dilation") != (1, 1):
-        raise ValueError("VTA conv2d currently requires groups=1 and dilation=(1, 1)")
+    if _pair(conv.attrs.dilation, "dilation") != (1, 1):
+        raise ValueError("VTA conv2d currently requires dilation=(1, 1)")
 
     input_zero_point, kernel_zero_point = (_scalar(conv.args[i]) for i in range(2, 4))
-    input_scale, kernel_scale = (_scalar(conv.args[i]) for i in range(4, 6))
-    requant_input_scale = _scalar(requantize.args[1])
+    input_scale = np.asarray(conv.args[4].data.numpy())
+    kernel_scale = np.asarray(conv.args[5].data.numpy())
+    requant_input_scale = np.asarray(requantize.args[1].data.numpy())
     requant_input_zero_point = _scalar(requantize.args[2])
-    requant_output_scale = _scalar(requantize.args[3])
+    requant_output_scale = np.asarray(requantize.args[3].data.numpy())
     requant_output_zero_point = _scalar(requantize.args[4])
     if input_zero_point != 0 or kernel_zero_point != 0:
         raise ValueError("VTA conv2d currently requires zero input and kernel zero-points")
-    if not np.isclose(input_scale * kernel_scale, requant_input_scale):
+    if not np.allclose(input_scale * kernel_scale, requant_input_scale):
         raise ValueError("qnn.conv2d scales must match the requantize input scale")
-    if not np.isclose(requant_input_scale, requant_output_scale):
+    if not np.allclose(requant_input_scale, requant_output_scale):
         raise ValueError("VTA ALU cannot exactly express requantize with unequal scales")
     if requantize.checked_type.dtype != "int8":
         raise ValueError("VTA conv2d currently requires int8 requantize output")
@@ -81,10 +82,13 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d"):
     env = get_env()
     _, conv, raw_bias, clip_bounds, correction = _extract_conv2d(function)
     batch, in_channels, height, width = (int(x) for x in conv.args[0].checked_type.shape)
-    out_channels, weight_in, kernel_h, kernel_w = (
+    out_channels, weight_in_per_group, kernel_h, kernel_w = (
         int(x) for x in conv.args[1].checked_type.shape
     )
-    if weight_in != in_channels:
+    groups = int(conv.attrs.groups)
+    if groups <= 0 or in_channels % groups or out_channels % groups:
+        raise ValueError("Conv2d groups must divide input and output channels")
+    if weight_in_per_group * groups != in_channels:
         raise ValueError("Conv2d input/kernel channel dimensions do not match")
     if batch % env.BATCH:
         raise ValueError("Conv2d batch must align to VTA BATCH")
@@ -179,7 +183,16 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d"):
     args = [data, weight, bias, output]
     lowered = lower(schedule, args, simple_mode=True)
     module = build(schedule, args, tvm.target.Target("ext_dev", host=env.target_host), name=name)
-    raw_weight = conv.args[1].data.numpy().astype(env.wgt_dtype)
+    grouped_weight = conv.args[1].data.numpy().astype(env.wgt_dtype)
+    raw_weight = np.zeros((out_channels, in_channels, kernel_h, kernel_w), dtype=env.wgt_dtype)
+    outputs_per_group = out_channels // groups
+    for group in range(groups):
+        out_begin = group * outputs_per_group
+        in_begin = group * weight_in_per_group
+        raw_weight[out_begin : out_begin + outputs_per_group,
+                   in_begin : in_begin + weight_in_per_group] = grouped_weight[
+                       out_begin : out_begin + outputs_per_group
+                   ]
     padded_weight = np.zeros(
         (padded_out_channels, padded_in_channels, kernel_h, kernel_w), dtype=env.wgt_dtype
     )

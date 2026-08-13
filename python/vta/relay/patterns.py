@@ -36,6 +36,12 @@ def _scalar(expr):
     return expr.data.numpy().item()
 
 
+def _array(expr):
+    if not isinstance(expr, relay.Constant):
+        return None
+    return np.asarray(expr.data.numpy())
+
+
 def _check_common_qnn(call, config, dense=False):
     op_name = "qnn.dense" if dense else "qnn.conv2d"
     core = _find_call(call, op_name)
@@ -51,15 +57,15 @@ def _check_common_qnn(call, config, dense=False):
     if requantize is None or requantize.checked_type.dtype != "int8":
         return False
     input_zero_point, kernel_zero_point = (_scalar(core.args[i]) for i in range(2, 4))
-    input_scale, kernel_scale = (_scalar(core.args[i]) for i in range(4, 6))
-    requant_input_scale = _scalar(requantize.args[1])
-    requant_output_scale = _scalar(requantize.args[3])
+    input_scale, kernel_scale = (_array(core.args[i]) for i in range(4, 6))
+    requant_input_scale = _array(requantize.args[1])
+    requant_output_scale = _array(requantize.args[3])
     values = (input_scale, kernel_scale, requant_input_scale, requant_output_scale)
     if input_zero_point != 0 or kernel_zero_point != 0 or any(x is None for x in values):
         return False
-    if not np.isclose(input_scale * kernel_scale, requant_input_scale):
+    if not np.allclose(input_scale * kernel_scale, requant_input_scale):
         return False
-    if not np.isclose(requant_input_scale, requant_output_scale):
+    if not np.allclose(requant_input_scale, requant_output_scale):
         return False
     if any(
         not isinstance(dim, tvm.tir.IntImm)
@@ -74,7 +80,12 @@ def _check_common_qnn(call, config, dense=False):
         return False
     if tuple(int(x) for x in core.attrs.dilation) != (1, 1):
         return False
-    if _as_int(core.attrs.groups) != 1:
+    groups = _as_int(core.attrs.groups)
+    if groups is None or groups <= 0:
+        return False
+    in_channels = int(data_type.shape[1])
+    out_channels, weight_in = int(weight_type.shape[0]), int(weight_type.shape[1])
+    if in_channels % groups or out_channels % groups or weight_in * groups != in_channels:
         return False
     padding = tuple(int(x) for x in core.attrs.padding)
     if len(padding) != 4 or padding[0] != padding[2] or padding[1] != padding[3]:
@@ -106,10 +117,24 @@ def _qnn_dense_pattern():
     return requantize.optional(is_op("clip"))
 
 
+def _check_add(call, config):
+    if len(call.args) != 2:
+        return False
+    # Keep constant post-processing adds on LLVM.  The VTA ALU region is
+    # intended for a genuine residual edge with two runtime tensors.
+    if any(isinstance(arg, relay.Constant) for arg in call.args):
+        return False
+    lhs, rhs = call.args[0].checked_type, call.args[1].checked_type
+    return lhs.dtype == "int8" and rhs.dtype == "int8" and list(lhs.shape) == list(rhs.shape) and all(
+        isinstance(dim, tvm.tir.IntImm) for dim in lhs.shape
+    )
+
+
 def pattern_table(config=None):
     """Return VTA composite patterns without importing TVM's legacy graphpack."""
     config = config or VTAConfig.from_json()
     return [
+        ("vta.add", is_op("add")(wildcard(), wildcard()), lambda call: _check_add(call, config)),
         ("vta.qnn_conv2d", _qnn_conv2d_pattern(), lambda call: _check_common_qnn(call, config)),
         (
             "vta.qnn_dense",

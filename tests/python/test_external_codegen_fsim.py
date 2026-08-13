@@ -47,6 +47,11 @@ def _run(mod, data):
     return runtime.get_output(0).numpy()
 
 
+def _build_runtime(mod):
+    factory = vta.build_graph(mod)
+    return graph_executor.GraphModule(factory["default"](tvm.cpu()))
+
+
 def test_graph_executor_cpu_vta_dense():
     env = vta.get_env()
     features = 2 * env.BLOCK_IN
@@ -83,6 +88,29 @@ def test_graph_executor_two_vta_conv2d_regions():
     mod = tvm.IRModule.from_expr(relay.Function([data_var], second))
     data = np.random.randint(-10, 10, (1, env.BLOCK_IN, 4, 4)).astype("int8")
     np.testing.assert_equal(_run(mod, data), (data + 1).astype("int8"))
+
+
+def test_adjacent_conv2d_keeps_packed_boundary_and_reuses_buffers():
+    env = vta.get_env()
+    data_var = relay.var("data", shape=(1, env.BLOCK_IN, 4, 4), dtype="int8")
+    identity = np.zeros((env.BLOCK_OUT, env.BLOCK_IN, 1, 1), dtype="int8")
+    for channel in range(env.BLOCK_IN):
+        identity[channel, channel, 0, 0] = 1
+    result = _conv2d(_conv2d(data_var, identity), identity)
+    mod = tvm.IRModule.from_expr(relay.Function([data_var], result))
+    partitioned = vta.partition_for_vta(mod)
+    regions = [
+        function for function in partitioned.functions.values()
+        if isinstance(function, relay.Function) and function.attrs
+        and function.attrs.get("Compiler") == "vta"
+    ]
+    assert len(regions) == 1
+    runtime = _build_runtime(mod)
+    for _ in range(3):
+        data = np.random.randint(-10, 10, (1, env.BLOCK_IN, 4, 4)).astype("int8")
+        runtime.set_input("data", data)
+        runtime.run()
+        np.testing.assert_equal(runtime.get_output(0).numpy(), data)
 
 
 def test_inexact_quantization_stays_on_cpu():

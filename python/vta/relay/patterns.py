@@ -74,8 +74,7 @@ def _check_common_qnn(call, config, dense=False):
         ))
         if dense and not np.allclose(shifts, 1.0):
             return False
-        if any(fixed_point_ratio(value, 1.0) < 0 for value in shifts.reshape(-1)):
-            return False
+        [fixed_point_ratio(value, 1.0) for value in shifts.reshape(-1)]
     except (ValueError, TypeError):
         return False
     if any(

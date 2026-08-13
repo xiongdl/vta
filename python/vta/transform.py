@@ -962,9 +962,13 @@ def InjectALUIntrin():
                     lhs = loop_body.value.a
                     rhs = loop_body.value.b
                 elif isinstance(loop_body.value, tvm.tir.Sub):
-                    alu_opcode = env.dev.ALU_OPCODE_SUB
+                    # VTA has no SUB opcode.  Subtraction by an immediate is
+                    # exactly ADD with the negated signed immediate.
+                    if not isinstance(loop_body.value.b, tvm.tir.IntImm):
+                        raise RuntimeError("VTA ALU only supports subtraction by an immediate")
+                    alu_opcode = env.dev.ALU_OPCODE_ADD
                     lhs = loop_body.value.a
-                    rhs = loop_body.value.b
+                    rhs = tvm.tir.const(-int(loop_body.value.b), loop_body.value.b.dtype)
                 elif isinstance(loop_body.value, tvm.tir.Mul):
                     alu_opcode = env.dev.ALU_OPCODE_MUL
                     lhs = loop_body.value.a
@@ -1002,6 +1006,14 @@ def InjectALUIntrin():
 
                 # Derive array index coefficients
                 dst_coeff = tvm.arith.detect_linear_equation(dst_idx, indices)
+                # ACC_8BIT DMA sign-extends int8 shortcut data.  Storage
+                # rewrite may retain a redundant int32 Cast around the
+                # resulting accumulator BufferLoad; ALU addressing depends
+                # on the load itself, not on that value cast.
+                if isinstance(lhs, tvm.tir.Cast) and isinstance(lhs.value, tvm.tir.BufferLoad):
+                    lhs = lhs.value
+                if isinstance(rhs, tvm.tir.Cast) and isinstance(rhs.value, tvm.tir.BufferLoad):
+                    rhs = rhs.value
                 # Check if lhs/rhs is immediate
                 use_imm = False
                 imm_val = None

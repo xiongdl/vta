@@ -184,6 +184,27 @@ def test_power_of_two_requantize_conv2d_fsim():
     np.testing.assert_equal(_run(mod, data), (data.astype("int16") * 2).astype("int8"))
 
 
+def test_power_of_two_right_shift_and_output_zero_point_fsim():
+    data_var = relay.var("data", shape=(1, 16, 3, 3), dtype="int8")
+    weight = np.zeros((16, 16, 1, 1), dtype="int8")
+    for channel in range(16):
+        weight[channel, channel, 0, 0] = 1
+    value = relay.qnn.op.conv2d(
+        data_var, relay.const(weight), relay.const(0, "int32"), relay.const(0, "int32"),
+        relay.const(1.0, "float32"), relay.const(1.0, "float32"),
+        channels=16, kernel_size=(1, 1), out_dtype="int32",
+    )
+    value = relay.qnn.op.requantize(
+        value, relay.const(1.0, "float32"), relay.const(0, "int32"),
+        relay.const(2.0, "float32"), relay.const(3, "int32"), out_dtype="int8",
+    )
+    data = np.random.randint(-20, 21, (1, 16, 3, 3)).astype("int8")
+    mod = tvm.IRModule.from_expr(relay.Function([data_var], value))
+    # TVM's default UPWARD rounding adds half before arithmetic right shift.
+    expected = ((data.astype("int32") + 1) >> 1) + 3
+    np.testing.assert_equal(_run(mod, data), expected.astype("int8"))
+
+
 def test_graph_executor_depthwise_conv2d():
     channels = 16
     data_var = relay.var("data", shape=(1, channels, 5, 5), dtype="int8")
@@ -382,3 +403,85 @@ def test_acc8_runtime_uses_input_element_address_units():
         __import__("pathlib").Path(vta.__file__).resolve().parents[2] / "runtime" / "runtime.cc"
     ).read_text(encoding="utf-8")
     assert "case VTA_MEM_ID_ACC_8BIT:\n        elem_bytes = VTA_INP_ELEM_BYTES;" in runtime_source
+
+
+def test_fused_residual_removes_host_bridge_and_reduces_transfers():
+    env = vta.get_env()
+    shape = (1, env.BLOCK_IN, 4, 4)
+    data_var = relay.var("data", shape=shape, dtype="int8")
+    identity = np.zeros((env.BLOCK_OUT, env.BLOCK_IN, 1, 1), dtype="int8")
+    for channel in range(env.BLOCK_IN):
+        identity[channel, channel, 0, 0] = 1
+
+    fused = relay.add(_conv2d(_conv2d(data_var, identity), identity), data_var)
+    fused_mod = tvm.IRModule.from_expr(relay.Function([data_var], fused))
+    fused_runtime = _build_runtime(fused_mod)
+    data = np.random.randint(-16, 17, shape).astype("int8")
+    simulator.clear_stats()
+    fused_runtime.set_input("data", data)
+    fused_runtime.run()
+    fused_stats = simulator.stats()
+
+    split_first = relay.annotation.stop_fusion(_conv2d(data_var, identity))
+    split_second = relay.annotation.stop_fusion(_conv2d(split_first, identity))
+    split_mod = tvm.IRModule.from_expr(relay.Function([data_var], relay.add(split_second, data_var)))
+    split_runtime = _build_runtime(split_mod)
+    simulator.clear_stats()
+    split_runtime.set_input("data", data)
+    split_runtime.run()
+    split_stats = simulator.stats()
+
+    np.testing.assert_equal(fused_runtime.get_output(0).numpy(), split_runtime.get_output(0).numpy())
+    assert fused_stats["acc_load_nbytes"] < split_stats["acc_load_nbytes"]
+    codegen_source = (__import__("pathlib").Path(vta.__file__).resolve().parent /
+                      "compiler" / "codegen.py").read_text(encoding="utf-8")
+    residual_source = codegen_source.split("def _residual_conv_wrapper", 1)[1].split(
+        "def _add_wrapper", 1
+    )[0]
+    assert "habranch" not in residual_source
+    assert "host_bridge_count=0" in residual_source
+
+
+def test_complete_resnet18_mixed_graph_executor_fsim():
+    """Eight basic blocks; projection boundaries use correct multi-region fallback."""
+    env = vta.get_env()
+    data_var = relay.var("data", shape=(1, env.BLOCK_IN, 4, 4), dtype="int8")
+    value = data_var
+    channels = env.BLOCK_IN
+    for stage in range(4):
+        target_channels = env.BLOCK_OUT * (2 ** stage)
+        if stage:
+            main1 = np.zeros((target_channels, channels, 3, 3), dtype="int8")
+            main2 = np.zeros((target_channels, target_channels, 3, 3), dtype="int8")
+            projection = np.zeros((target_channels, channels, 1, 1), dtype="int8")
+            for channel in range(channels):
+                main1[channel, channel, 1, 1] = 1
+                projection[channel, channel, 0, 0] = 1
+            for channel in range(target_channels):
+                main2[channel, channel, 1, 1] = 1
+            branch = relay.annotation.stop_fusion(
+                _conv2d(_conv2d(value, main1, stride=2, padding=1), main2, padding=1)
+            )
+            shortcut = relay.annotation.stop_fusion(_conv2d(value, projection, stride=2))
+            value = relay.annotation.stop_fusion(relay.add(branch, shortcut))
+            channels = target_channels
+        identity = np.zeros((channels, channels, 1, 1), dtype="int8")
+        for channel in range(channels):
+            identity[channel, channel, 0, 0] = 1
+        for _ in range(2 if stage == 0 else 1):
+            value = relay.annotation.stop_fusion(
+                relay.add(_conv2d(_conv2d(value, identity), identity), value)
+            )
+    pooled = relay.mean(value.astype("int32"), axis=[2, 3])
+    flattened = relay.reshape(pooled, (1, channels))
+    logits = relay.nn.dense(flattened.astype("float32"), relay.const(
+        np.ones((4, channels), dtype="float32")
+    ))
+    mod = tvm.IRModule.from_expr(relay.Function([data_var], logits))
+    runtime = _build_runtime(mod)
+    data = np.random.randint(-2, 3, (1, env.BLOCK_IN, 4, 4)).astype("int8")
+    runtime.set_input("data", data)
+    runtime.run()
+    output = runtime.get_output(0).numpy()
+    assert output.shape == (1, 4)
+    assert np.isfinite(output).all()

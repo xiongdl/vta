@@ -1048,7 +1048,13 @@ class CommandQueue {
     VTAMemInsn* insn = insn_queue_.CreateMemInsn(dst_memory_type);
     insn->opcode = VTA_OPCODE_LOAD;
     insn->memory_type = dst_memory_type;
+    // StorageRewrite expresses ACC_8BIT destinations in packed int8 vector
+    // units, while the accumulator SRAM and ALU uops address int32 vectors.
+    // Convert the destination index to accumulator-vector units.
     insn->sram_base = dst_sram_index;
+    if (dst_memory_type == VTA_MEM_ID_ACC_8BIT) {
+      insn->sram_base *= VTA_ACC_WIDTH / VTA_INP_WIDTH;
+    }
     DataBuffer* src = DataBuffer::FromHandle(src_dram_addr);
     insn->dram_base = src->phy_addr() / GetElemBytes(dst_memory_type) + src_elem_offset;
     insn->y_size = y_size;

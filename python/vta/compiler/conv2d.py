@@ -60,8 +60,8 @@ def _extract_conv2d(function):
         raise ValueError("qnn.conv2d scales must match the requantize input scale")
     shifts = [fixed_point_ratio(value, 1.0) for value in
               np.asarray(requant_input_scale / requant_output_scale).reshape(-1)]
-    if len(set(shifts)) != 1 or shifts[0] < 0:
-        raise ValueError("VTA conv2d currently supports a uniform non-negative power-of-two shift")
+    if len(set(shifts)) != 1:
+        raise ValueError("VTA conv2d currently requires a uniform power-of-two shift")
     requant_shift = shifts[0]
     if requantize.checked_type.dtype != "int8":
         raise ValueError("VTA conv2d currently requires int8 requantize output")
@@ -77,14 +77,14 @@ def _extract_conv2d(function):
             max(clip_bounds[0], int(clip.attrs.a_min)),
             min(clip_bounds[1], int(clip.attrs.a_max)),
         )
-    correction = requant_output_zero_point - requant_input_zero_point
-    return typed, conv, bias, clip_bounds, correction, requant_shift
+    correction = -requant_input_zero_point
+    return typed, conv, bias, clip_bounds, correction, requant_shift, requant_output_zero_point
 
 
-def compile_qnn_conv2d(function, name="vta_qnn_conv2d"):
+def compile_qnn_conv2d(function, name="vta_qnn_conv2d", residual=False):
     """Compile one supported QNN conv2d Relay function into a VTA module."""
     env = get_env()
-    _, conv, raw_bias, clip_bounds, correction, requant_shift = _extract_conv2d(function)
+    _, conv, raw_bias, clip_bounds, correction, requant_shift, output_zero_point = _extract_conv2d(function)
     batch, in_channels, height, width = (int(x) for x in conv.args[0].checked_type.shape)
     out_channels, weight_in_per_group, kernel_h, kernel_w = (
         int(x) for x in conv.args[1].checked_type.shape
@@ -132,6 +132,7 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d"):
     data = te.placeholder(data_shape, name="data", dtype=env.inp_dtype)
     weight = te.placeholder(weight_shape, name="weight", dtype=env.wgt_dtype)
     bias = te.placeholder(output_shape, name="bias", dtype=env.acc_dtype)
+    shortcut = te.placeholder(output_shape, name="shortcut", dtype=env.inp_dtype) if residual else None
     data_buf = topi.nn.pad(
         data, [0, 0, pad_top, pad_left, 0, 0], [0, 0, pad_bottom, pad_right, 0, 0],
         name="data_buf",
@@ -153,17 +154,44 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d"):
         name="accum",
     )
     biased = te.compute(output_shape, lambda *idx: accum(*idx) + bias(*idx), name="biased")
-    scaled = biased
-    if requant_shift:
+    residual_sum = biased
+    if residual:
+        shortcut_buf = te.compute(output_shape, lambda *idx: shortcut(*idx), name="shortcut_buf")
+        residual_sum = te.compute(
+            output_shape,
+            lambda *idx: biased(*idx) + shortcut_buf(*idx),
+            name="residual_add",
+        )
+    scaled = residual_sum
+    if requant_shift > 0:
         scaled = te.compute(
             output_shape,
-            lambda *idx: biased(*idx) * tvm.tir.const(1 << requant_shift, env.acc_dtype),
+            lambda *idx: residual_sum(*idx) * tvm.tir.const(1 << requant_shift, env.acc_dtype),
             name="requantize_shift",
+        )
+    elif requant_shift < 0:
+        rounding = 1 << (-requant_shift - 1)
+        rounded = te.compute(
+            output_shape,
+            lambda *idx: residual_sum(*idx) + tvm.tir.const(rounding, env.acc_dtype),
+            name="requantize_round",
+        )
+        scaled = te.compute(
+            output_shape,
+            lambda *idx: rounded(*idx) >> tvm.tir.const(-requant_shift, env.acc_dtype),
+            name="requantize_shift",
+        )
+    shifted = scaled
+    if output_zero_point:
+        shifted = te.compute(
+            output_shape,
+            lambda *idx: scaled(*idx) + tvm.tir.const(output_zero_point, env.acc_dtype),
+            name="output_zero_point",
         )
     clip_min, clip_max = clip_bounds
     clipped_max = te.compute(
         output_shape,
-        lambda *idx: tvm.te.min(scaled(*idx), tvm.tir.const(clip_max, env.acc_dtype)),
+        lambda *idx: tvm.te.min(shifted(*idx), tvm.tir.const(clip_max, env.acc_dtype)),
         name="clip_max",
     )
     narrowed = te.compute(
@@ -178,15 +206,26 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d"):
     schedule[weight_buf].set_scope(env.wgt_scope)
     accumulator_stages = (accum, biased, clipped_max, narrowed)
     alu_stages = (biased, clipped_max, narrowed)
+    if residual:
+        accumulator_stages += (shortcut_buf, residual_sum)
+        alu_stages += (residual_sum,)
     if requant_shift:
         accumulator_stages += (scaled,)
         alu_stages += (scaled,)
+    if requant_shift < 0:
+        accumulator_stages += (rounded,)
+        alu_stages += (rounded,)
+    if output_zero_point:
+        accumulator_stages += (shifted,)
+        alu_stages += (shifted,)
     for stage in accumulator_stages:
         schedule[stage].set_scope(env.acc_scope)
     for stage in alu_stages:
         schedule[stage].pragma(schedule[stage].op.axis[0], env.alu)
     bias_buf = schedule.cache_read(bias, env.acc_scope, [biased])
     schedule[bias_buf].pragma(schedule[bias_buf].op.axis[0], env.dma_copy)
+    if residual:
+        schedule[shortcut_buf].pragma(schedule[shortcut_buf].op.axis[0], env.dma_copy)
     schedule[data_buf].compute_at(schedule[accum], ic)
     schedule[weight_buf].compute_at(schedule[accum], ic)
     schedule[data_buf].pragma(schedule[data_buf].op.axis[0], env.dma_copy)
@@ -196,7 +235,7 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d"):
     schedule[accum].tensorize(bi, env.gemm)
     schedule[output].pragma(schedule[output].op.axis[0], env.dma_copy)
 
-    args = [data, weight, bias, output]
+    args = [data, weight, bias] + ([shortcut] if residual else []) + [output]
     lowered = lower(schedule, args, simple_mode=True)
     module = build(schedule, args, tvm.target.Target("ext_dev", host=env.target_host), name=name)
     grouped_weight = conv.args[1].data.numpy().astype(env.wgt_dtype)

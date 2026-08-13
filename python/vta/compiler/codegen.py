@@ -8,7 +8,7 @@ from tvm import relay
 from tvm.contrib import cc, utils
 
 from .conv2d import compile_qnn_conv2d
-from .alu import compile_add
+from .alu import compile_add, compile_packed_add
 from .dense import _find_call, compile_qnn_dense
 from ..relay import partition_for_vta
 
@@ -50,6 +50,7 @@ _C_HEADER = """
 extern void* VTABufferAlloc(size_t);
 extern void VTABufferFree(void*);
 extern void VTABufferCopy(const void*, size_t, void*, size_t, size_t, int);
+extern void VTARuntimeShutdown(void);
 """
 
 
@@ -294,6 +295,97 @@ TVM_DLL int {symbol}(TVMValue* args,int* tcodes,int nargs,TVMValue* ret,int* ret
     return _compile_wrapper(artifacts, source)
 
 
+def _residual_conv_wrapper(function, symbol, functions):
+    """Compile a linear Conv2d branch plus an input shortcut as one VTA region."""
+    env = __import__("vta").get_env()
+    convs = [
+        compile_qnn_conv2d(item, name=f"{symbol}_conv_{index}")
+        for index, item in enumerate(functions)
+    ]
+    first, last = convs[0], convs[-1]
+    if first.input_shape != last.output_shape or first.packed_input_shape != last.packed_output_shape:
+        raise ValueError("Fused VTA residual currently requires an identity shortcut shape")
+    if any(
+        left.packed_output_shape != right.packed_input_shape
+        for left, right in zip(convs, convs[1:])
+    ):
+        raise ValueError("Adjacent residual Conv2d kernels require matching packed shapes")
+    add = compile_packed_add(last.output_shape, last.packed_output_shape, f"{symbol}_add")
+    n, channels, height, width = first.input_shape
+    pn, pc, _, _, pb, pi = first.packed_input_shape
+    packed_bytes = int(np.prod(first.packed_input_shape))
+    constants, declarations, init, calls = [], [], [], []
+    for index, item in enumerate(convs):
+        constants += [_c_array(f"rw{index}", item.packed_weight, "int8_t"),
+                      _c_array(f"rb{index}", item.packed_bias, "int32_t")]
+        declarations.append(
+            f"static void *rwbuf{index}=0,*rbbuf{index}=0;"
+            f"extern int {symbol}_conv_{index}(TVMValue*,int*,int,TVMValue*,int*,void*);"
+        )
+        init.append(
+            f"rwbuf{index}=VTABufferAlloc({item.packed_weight.nbytes});"
+            f"rbbuf{index}=VTABufferAlloc({item.packed_bias.nbytes});"
+            f"VTABufferCopy(rw{index},0,rwbuf{index},0,{item.packed_weight.nbytes},1);"
+            f"VTABufferCopy(rb{index},0,rbbuf{index},0,{item.packed_bias.nbytes},1);"
+        )
+        input_buffer = "skip" if index == 0 else ("mid0" if index % 2 else "mid1")
+        output_buffer = "branch" if index == len(convs) - 1 else ("mid0" if index % 2 == 0 else "mid1")
+        ds = ",".join(str(int(x)) for x in item.packed_input_shape)
+        ws = ",".join(str(int(x)) for x in item.packed_weight.shape)
+        os = ",".join(str(int(x)) for x in item.packed_output_shape)
+        calls.append(f"""
+  int64_t rds{index}[6]={{{ds}}},rws{index}[6]={{{ws}}},ros{index}[6]={{{os}}};
+  DLTensor rts{index}[4]={{{{{input_buffer},dev,6,{{kDLInt,8,1}},rds{index},0,0}},
+    {{rwbuf{index},dev,6,{{kDLInt,8,1}},rws{index},0,0}},
+    {{rbbuf{index},dev,6,{{kDLInt,32,1}},ros{index},0,0}},
+    {{{output_buffer},dev,6,{{kDLInt,8,1}},ros{index},0,0}}}};
+  for(int i=0;i<4;++i)ka[i].v_handle=&rts{index}[i];
+  if(!rc)rc={symbol}_conv_{index}(ka,kt4,4,ret,ret_tcode,resource);VTARuntimeShutdown();
+""")
+    packed_shape = ",".join(str(int(x)) for x in add.packed_shape)
+    source = f'''
+{_C_HEADER}
+{''.join(constants)}
+{''.join(declarations)}
+extern int {symbol}_add(TVMValue*,int*,int,TVMValue*,int*,void*);
+static void *skip=0,*branch=0,*outbuf=0,*adda=0,*addb=0,*mid0=0,*mid1=0;static int ready=0;
+static pthread_mutex_t residual_lock=PTHREAD_MUTEX_INITIALIZER;
+__attribute__((destructor))static void residual_release(void){{
+ if(skip)VTABufferFree(skip);if(branch)VTABufferFree(branch);if(outbuf)VTABufferFree(outbuf);
+ if(adda)VTABufferFree(adda);if(addb)VTABufferFree(addb);
+ if(mid0)VTABufferFree(mid0);if(mid1)VTABufferFree(mid1);
+ {''.join(f'if(rwbuf{i})VTABufferFree(rwbuf{i});if(rbbuf{i})VTABufferFree(rbbuf{i});' for i in range(len(convs)))}}}
+TVM_DLL int {symbol}(TVMValue* args,int* tcodes,int nargs,TVMValue* ret,int* ret_tcode,void* resource){{
+ if(nargs!=2)return -1;pthread_mutex_lock(&residual_lock);
+ if(!ready){{skip=VTABufferAlloc({packed_bytes});branch=VTABufferAlloc({packed_bytes});
+  outbuf=VTABufferAlloc({packed_bytes});adda=VTABufferAlloc({packed_bytes*4});addb=VTABufferAlloc({packed_bytes*4});
+  mid0=VTABufferAlloc({packed_bytes});mid1=VTABufferAlloc({packed_bytes});
+  {''.join(init)}ready=1;}}
+ int8_t hi[{packed_bytes}],ho[{packed_bytes}];for(int i=0;i<{packed_bytes};++i)hi[i]=0;
+ int8_t* src=(int8_t*)((DLTensor*)args[0].v_handle)->data;
+ for(int b=0;b<{n};++b)for(int c=0;c<{channels};++c)for(int y=0;y<{height};++y)for(int x=0;x<{width};++x){{
+  int bo=b/{env.BATCH},bi=b%{env.BATCH},co=c/{env.BLOCK_IN},ci=c%{env.BLOCK_IN};
+  hi[(((((bo*{pc}+co)*{height}+y)*{width}+x)*{env.BATCH}+bi)*{env.BLOCK_IN}+ci)]=src[((b*{channels}+c)*{height}+y)*{width}+x];}}
+ VTABufferCopy(hi,0,skip,0,{packed_bytes},1);DLDevice dev={{kDLExtDev,0}};TVMValue ka[4];
+ int kt4[4]={{kTVMDLTensorHandle,kTVMDLTensorHandle,kTVMDLTensorHandle,kTVMDLTensorHandle}};int rc=0;
+{''.join(calls)}
+ int8_t hbranch[{packed_bytes}],hskip[{packed_bytes}];int32_t habranch[{packed_bytes}],haskip[{packed_bytes}];
+ VTABufferCopy(branch,0,hbranch,0,{packed_bytes},2);VTABufferCopy(skip,0,hskip,0,{packed_bytes},2);
+ for(int i=0;i<{packed_bytes};++i){{habranch[i]=hbranch[i];haskip[i]=hskip[i];}}
+ VTABufferCopy(habranch,0,adda,0,{packed_bytes*4},1);VTABufferCopy(haskip,0,addb,0,{packed_bytes*4},1);
+ int64_t ads[4]={{{packed_shape}}};DLTensor ats[3]={{{{adda,dev,4,{{kDLInt,32,1}},ads,0,0}},
+  {{addb,dev,4,{{kDLInt,32,1}},ads,0,0}},{{outbuf,dev,4,{{kDLInt,8,1}},ads,0,0}}}};
+ int akt[3]={{kTVMDLTensorHandle,kTVMDLTensorHandle,kTVMDLTensorHandle}};
+ for(int i=0;i<3;++i)ka[i].v_handle=&ats[i];if(!rc)rc={symbol}_add(ka,akt,3,ret,ret_tcode,resource);VTARuntimeShutdown();
+ if(!rc)VTABufferCopy(outbuf,0,ho,0,{packed_bytes},2);int8_t* dst=(int8_t*)((DLTensor*)args[1].v_handle)->data;
+ if(!rc)for(int b=0;b<{n};++b)for(int c=0;c<{channels};++c)for(int y=0;y<{height};++y)for(int x=0;x<{width};++x){{
+  int bo=b/{env.BATCH},bi=b%{env.BATCH},co=c/{env.BLOCK_OUT},ci=c%{env.BLOCK_OUT};
+  dst[((b*{channels}+c)*{height}+y)*{width}+x]=ho[(((((bo*{pc}+co)*{height}+y)*{width}+x)*{env.BATCH}+bi)*{env.BLOCK_OUT}+ci)];}}
+ pthread_mutex_unlock(&residual_lock);return rc;}}
+'''
+    return _compile_wrapper(convs + [add], source)
+
+
 def _add_wrapper(function, symbol):
     artifact = compile_add(function, f"{symbol}_kernel")
     elements = int(np.prod(artifact.logical_shape)); padded = int(np.prod(artifact.packed_shape))
@@ -322,6 +414,8 @@ def register_external_codegen():
     def compiler(function):
         symbol = str(function.attrs["global_symbol"])
         conv_chain = _composite_chain(function.body, "vta.qnn_conv2d")
+        if len(conv_chain) > 1 and _find_call(function.body, "add") is not None:
+            return _residual_conv_wrapper(function, symbol, conv_chain)
         if len(conv_chain) > 1:
             return _conv2d_chain_wrapper(function, symbol, conv_chain)
         if _find_call(function.body, "qnn.dense") is not None:

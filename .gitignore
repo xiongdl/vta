@@ -12,6 +12,7 @@ env/
 build/
 build-standalone-*/
 build-independent-*/
+build-fsim/
 develop-eggs/
 dist/
 downloads/

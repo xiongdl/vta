@@ -147,6 +147,23 @@ def test_relay_017_rejects_per_channel_requantize_scale():
         relay.transform.InferType()(tvm.IRModule.from_expr(relay.Function([data], value)))
 
 
+def test_uniform_per_channel_scale_normalization_and_fixed_point_ratio():
+    data = relay.var("data", shape=(1, 16, 4, 4), dtype="int32")
+    scales = relay.const(np.full(16, 0.25, dtype="float32"))
+    value = relay.qnn.op.requantize(
+        data, scales, relay.const(0, "int32"), scales, relay.const(0, "int32"),
+        axis=1, out_dtype="int8",
+    )
+    normalized = vta.normalize_qnn_scales(
+        tvm.IRModule.from_expr(relay.Function([data], value))
+    )
+    relay.transform.InferType()(normalized)
+    assert vta.fixed_point_ratio(0.5, 0.125) == 2
+    assert vta.fixed_point_ratio(0.125, 0.5) == -2
+    with pytest.raises(ValueError, match="power-of-two"):
+        vta.fixed_point_ratio(0.3, 0.2)
+
+
 def test_graph_executor_depthwise_conv2d():
     channels = 16
     data_var = relay.var("data", shape=(1, channels, 5, 5), dtype="int8")
@@ -247,3 +264,59 @@ def test_quantized_resnet_basic_block_fsim():
         samples.append(time.perf_counter() - started)
     assert np.median(samples) > 0
     print(f"ResNet basic block FSIM median: {np.median(samples) * 1e3:.3f} ms")
+
+
+def test_fused_resnet_basic_block_keeps_packed_residual():
+    env = vta.get_env()
+    shape = (1, env.BLOCK_IN, 4, 4)
+    data_var = relay.var("data", shape=shape, dtype="int8")
+    identity = np.zeros((env.BLOCK_OUT, env.BLOCK_IN, 1, 1), dtype="int8")
+    for channel in range(env.BLOCK_IN):
+        identity[channel, channel, 0, 0] = 1
+    result = relay.add(_conv2d(_conv2d(data_var, identity), identity), data_var)
+    mod = tvm.IRModule.from_expr(relay.Function([data_var], result))
+    partitioned = vta.partition_for_vta(mod)
+    regions = [
+        function for function in partitioned.functions.values()
+        if isinstance(function, relay.Function) and function.attrs
+        and function.attrs.get("Compiler") == "vta"
+    ]
+    assert len(regions) == 1
+    runtime = _build_runtime(mod)
+    data = np.random.randint(-64, 64, shape).astype("int8")
+    runtime.set_input("data", data)
+    runtime.run()
+    np.testing.assert_equal(runtime.get_output(0).numpy(), (data + data).astype("int8"))
+
+
+def test_resnet_stage_with_stride2_downsample():
+    """Two blocks including the ResNet stage-transition projection shortcut."""
+    env = vta.get_env()
+    input_shape = (1, env.BLOCK_IN, 8, 8)
+    data_var = relay.var("data", shape=input_shape, dtype="int8")
+    out_channels = 2 * env.BLOCK_OUT
+    conv1_weight = np.zeros((out_channels, env.BLOCK_IN, 3, 3), dtype="int8")
+    projection = np.zeros((out_channels, env.BLOCK_IN, 1, 1), dtype="int8")
+    conv2_weight = np.zeros((out_channels, out_channels, 3, 3), dtype="int8")
+    identity = np.zeros((out_channels, out_channels, 1, 1), dtype="int8")
+    for channel in range(env.BLOCK_IN):
+        conv1_weight[channel, channel, 1, 1] = 1
+        projection[channel, channel, 0, 0] = 1
+    for channel in range(out_channels):
+        conv2_weight[channel, channel, 1, 1] = 1
+        identity[channel, channel, 0, 0] = 1
+    branch = relay.annotation.stop_fusion(
+        _conv2d(_conv2d(data_var, conv1_weight, stride=2, padding=1), conv2_weight, padding=1)
+    )
+    shortcut = relay.annotation.stop_fusion(_conv2d(data_var, projection, stride=2))
+    transitioned = relay.annotation.stop_fusion(relay.add(branch, shortcut))
+    result = relay.add(_conv2d(_conv2d(transitioned, identity), identity), transitioned)
+    mod = tvm.IRModule.from_expr(relay.Function([data_var], result))
+    runtime = _build_runtime(mod)
+    data = np.random.randint(-20, 21, input_shape).astype("int8")
+    runtime.set_input("data", data)
+    runtime.run()
+    downsampled = data[:, :, ::2, ::2]
+    expected = np.zeros((1, out_channels, 4, 4), dtype="int8")
+    expected[:, :env.BLOCK_IN] = (downsampled.astype("int16") * 4).astype("int8")
+    np.testing.assert_equal(runtime.get_output(0).numpy(), expected)

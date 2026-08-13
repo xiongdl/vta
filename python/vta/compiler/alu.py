@@ -17,17 +17,10 @@ class AddArtifact:
     packed_shape: tuple
 
 
-def compile_add(function, name):
+def _compile_add_shapes(logical_shape, packed_shape, name, input_dtype):
     env = get_env()
-    shape = tuple(int(x) for x in function.params[0].checked_type.shape)
-    elements = int(np.prod(shape))
-    lanes = env.BATCH * env.BLOCK_OUT
-    padded = ((elements + lanes - 1) // lanes) * lanes
-    # Retain the canonical four-dimensional VTA ALU layout.  The instruction
-    # injector uses the outer two axes when deriving SRAM strides.
-    packed_shape = (1, padded // lanes, env.BATCH, env.BLOCK_OUT)
-    lhs = te.placeholder(packed_shape, dtype=env.acc_dtype, name="lhs")
-    rhs = te.placeholder(packed_shape, dtype=env.acc_dtype, name="rhs")
+    lhs = te.placeholder(packed_shape, dtype=input_dtype, name="lhs")
+    rhs = te.placeholder(packed_shape, dtype=input_dtype, name="rhs")
     lhs_buf = te.compute(packed_shape, lambda *i: lhs(*i), "lhs_buf")
     rhs_buf = te.compute(packed_shape, lambda *i: rhs(*i), "rhs_buf")
     added = te.compute(packed_shape, lambda *i: lhs_buf(*i) + rhs_buf(*i), "added")
@@ -41,5 +34,25 @@ def compile_add(function, name):
     args = [lhs, rhs, output]
     return AddArtifact(
         build(schedule, args, tvm.target.Target("ext_dev", host=env.target_host), name=name),
-        lower(schedule, args, simple_mode=True), shape, packed_shape,
+        lower(schedule, args, simple_mode=True), logical_shape, packed_shape,
     )
+
+
+def compile_add(function, name):
+    """Compile a logical Relay residual add with a flat tiled ABI."""
+    env = get_env()
+    shape = tuple(int(x) for x in function.params[0].checked_type.shape)
+    elements = int(np.prod(shape))
+    lanes = env.BATCH * env.BLOCK_OUT
+    padded = ((elements + lanes - 1) // lanes) * lanes
+    return _compile_add_shapes(
+        shape, (1, padded // lanes, env.BATCH, env.BLOCK_OUT), name, env.acc_dtype
+    )
+
+
+def compile_packed_add(logical_shape, packed_shape, name):
+    """Compile add directly over an existing VTA packed Conv2d boundary."""
+    env = get_env()
+    elements = int(np.prod(packed_shape))
+    canonical = (1, elements // (env.BATCH * env.BLOCK_OUT), env.BATCH, env.BLOCK_OUT)
+    return _compile_add_shapes(tuple(logical_shape), canonical, name, env.acc_dtype)

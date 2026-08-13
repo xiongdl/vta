@@ -3,6 +3,7 @@
 import threading
 
 from .dense import DenseArtifact, compile_partitioned_dense, compile_qnn_dense
+from .pipeline import compile
 
 _LOCK = threading.Lock()
 _REGISTERED = False
@@ -25,4 +26,5 @@ def register_compiler():
         return True
 
 
-__all__ = ["DenseArtifact", "compile_partitioned_dense", "compile_qnn_dense", "register_compiler"]
+__all__ = ["DenseArtifact", "compile", "compile_partitioned_dense", "compile_qnn_dense",
+           "register_compiler"]

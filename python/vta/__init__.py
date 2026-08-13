@@ -8,7 +8,7 @@ from .config import VTAConfig
 from .environment import Environment, get_env
 from .relay import partition_for_vta, pattern_table
 from .build_module import build, build_config, lower
-from .compiler import compile_partitioned_dense, compile_qnn_dense
+from .compiler import compile, compile_partitioned_dense, compile_qnn_dense
 
 
 def register_compiler():
@@ -18,6 +18,7 @@ def register_compiler():
     return _register_compiler()
 
 
-__all__ = ["Environment", "VTAConfig", "build", "build_config", "compile_partitioned_dense",
+__all__ = ["Environment", "VTAConfig", "build", "build_config", "compile",
+           "compile_partitioned_dense",
            "compile_qnn_dense", "get_env", "lower",
            "partition_for_vta", "pattern_table", "register_compiler"]

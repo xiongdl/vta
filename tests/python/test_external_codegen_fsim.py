@@ -4,6 +4,7 @@ import numpy as np
 import tvm
 from tvm import relay
 from tvm.contrib import graph_executor
+from tvm.topi.testing import conv2d_nchw_python
 
 import vta
 
@@ -24,6 +25,28 @@ def _dense(data, weight):
     )
 
 
+def _conv2d(data, weight, stride=1, padding=0):
+    value = relay.qnn.op.conv2d(
+        data, relay.const(weight),
+        relay.const(0, "int32"), relay.const(0, "int32"),
+        relay.const(1.0, "float32"), relay.const(1.0, "float32"),
+        strides=(stride, stride), padding=(padding, padding),
+        channels=weight.shape[0], kernel_size=weight.shape[2:], out_dtype="int32",
+    )
+    return relay.qnn.op.requantize(
+        value, relay.const(1.0, "float32"), relay.const(0, "int32"),
+        relay.const(1.0, "float32"), relay.const(0, "int32"), out_dtype="int8",
+    )
+
+
+def _run(mod, data):
+    factory = vta.build_graph(mod)
+    runtime = graph_executor.GraphModule(factory["default"](tvm.cpu()))
+    runtime.set_input("data", data)
+    runtime.run()
+    return runtime.get_output(0).numpy()
+
+
 def test_graph_executor_cpu_vta_dense():
     env = vta.get_env()
     features = 2 * env.BLOCK_IN
@@ -32,9 +55,50 @@ def test_graph_executor_cpu_vta_dense():
     vta_value = _dense(data_var, weight)
     result = relay.add(vta_value, relay.const(np.ones((env.BATCH, features), dtype="int8")))
     mod = tvm.IRModule.from_expr(relay.Function([data_var], result))
-    factory = vta.build_graph(mod)
-    runtime = graph_executor.GraphModule(factory["default"](tvm.cpu()))
     data = np.random.randint(-20, 20, (env.BATCH, features)).astype("int8")
-    runtime.set_input("data", data)
-    runtime.run()
-    np.testing.assert_equal(runtime.get_output(0).numpy(), (data + 1).astype("int8"))
+    np.testing.assert_equal(_run(mod, data), (data + 1).astype("int8"))
+
+
+def test_graph_executor_cpu_vta_conv2d_unaligned_stride2():
+    data_var = relay.var("data", shape=(1, 3, 7, 7), dtype="int8")
+    weight = np.random.randint(-2, 3, (5, 3, 3, 3)).astype("int8")
+    value = _conv2d(data_var, weight, stride=2)
+    result = relay.add(value, relay.const(np.ones((1, 5, 3, 3), dtype="int8")))
+    mod = tvm.IRModule.from_expr(relay.Function([data_var], result))
+    data = np.random.randint(-3, 4, (1, 3, 7, 7)).astype("int8")
+    expected = conv2d_nchw_python(data.astype("int32"), weight.astype("int32"), 2, 0)
+    expected = (np.clip(expected, -128, 127).astype("int8") + 1).astype("int8")
+    np.testing.assert_equal(_run(mod, data), expected)
+
+
+def test_graph_executor_two_vta_conv2d_regions():
+    env = vta.get_env()
+    data_var = relay.var("data", shape=(1, env.BLOCK_IN, 4, 4), dtype="int8")
+    identity = np.zeros((env.BLOCK_OUT, env.BLOCK_IN, 1, 1), dtype="int8")
+    for channel in range(min(env.BLOCK_IN, env.BLOCK_OUT)):
+        identity[channel, channel, 0, 0] = 1
+    first = _conv2d(data_var, identity)
+    cpu = relay.add(first, relay.const(np.ones((1, env.BLOCK_OUT, 4, 4), dtype="int8")))
+    second = _conv2d(cpu, identity)
+    mod = tvm.IRModule.from_expr(relay.Function([data_var], second))
+    data = np.random.randint(-10, 10, (1, env.BLOCK_IN, 4, 4)).astype("int8")
+    np.testing.assert_equal(_run(mod, data), (data + 1).astype("int8"))
+
+
+def test_inexact_quantization_stays_on_cpu():
+    data = relay.var("data", shape=(1, 16, 4, 4), dtype="int8")
+    weight = np.ones((16, 16, 1, 1), dtype="int8")
+    value = relay.qnn.op.conv2d(
+        data, relay.const(weight), relay.const(1, "int32"), relay.const(0, "int32"),
+        relay.const(1.0, "float32"), relay.const(1.0, "float32"),
+        channels=16, kernel_size=(1, 1), out_dtype="int32",
+    )
+    value = relay.qnn.op.requantize(
+        value, relay.const(1.0, "float32"), relay.const(0, "int32"),
+        relay.const(0.5, "float32"), relay.const(0, "int32"), out_dtype="int8",
+    )
+    partitioned = vta.partition_for_vta(tvm.IRModule.from_expr(relay.Function([data], value)))
+    assert not any(
+        isinstance(function, relay.Function) and function.attrs and function.attrs.get("Compiler") == "vta"
+        for function in partitioned.functions.values()
+    )

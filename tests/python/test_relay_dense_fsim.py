@@ -107,7 +107,10 @@ def test_relay_qnn_dense_rejects_inexact_requantize():
         weight,
         output_scale=0.5,
     )
-    with np.testing.assert_raises_regex(
-        ValueError, "cannot exactly express requantize with unequal scales"
-    ):
-        vta.compile(tvm.IRModule.from_expr(function))
+    partitioned = vta.partition_for_vta(tvm.IRModule.from_expr(function))
+    assert not any(
+        isinstance(candidate, relay.Function)
+        and candidate.attrs
+        and candidate.attrs.get("Compiler") == "vta"
+        for candidate in partitioned.functions.values()
+    )

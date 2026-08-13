@@ -27,12 +27,12 @@
 #ifndef VTA_DRIVER_H_
 #define VTA_DRIVER_H_
 
+#include <stdint.h>
+#include <stdlib.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <stdint.h>
-#include <stdlib.h>
 
 /*! \brief Memory management constants for cached memory */
 #define VTA_CACHED 1

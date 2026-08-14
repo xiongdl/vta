@@ -132,11 +132,7 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d", residual=False):
     data = te.placeholder(data_shape, name="data", dtype=env.inp_dtype)
     weight = te.placeholder(weight_shape, name="weight", dtype=env.wgt_dtype)
     bias = te.placeholder(output_shape, name="bias", dtype=env.acc_dtype)
-    # Chisel currently has no decoder/data path for VTA_MEM_ID_ACC_8BIT (5).
-    # TSIM therefore consumes an explicitly widened accumulator shortcut;
-    # FSIM retains the native packed int8 shortcut path.
-    shortcut_dtype = env.acc_dtype if env.TARGET == "tsim" else env.inp_dtype
-    shortcut = te.placeholder(output_shape, name="shortcut", dtype=shortcut_dtype) if residual else None
+    shortcut = te.placeholder(output_shape, name="shortcut", dtype=env.inp_dtype) if residual else None
     data_buf = topi.nn.pad(
         data, [0, 0, pad_top, pad_left, 0, 0], [0, 0, pad_bottom, pad_right, 0, 0],
         name="data_buf",

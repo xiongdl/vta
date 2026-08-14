@@ -68,6 +68,7 @@ trait ISAConstants {
   val M_ID_I = 2.asUInt(M_ID_BITS.W)
   val M_ID_A = 3.asUInt(M_ID_BITS.W)
   val M_ID_O = 4.asUInt(M_ID_BITS.W)
+  val M_ID_A8 = 5.asUInt(M_ID_BITS.W)
 }
 
 /** ISA.
@@ -93,7 +94,8 @@ object ISA {
       ("alu", "100"))
 
   private val memId: HashMap[String, String] =
-    HashMap(("uop", "000"), ("wgt", "001"), ("inp", "010"), ("acc", "011"), ("out", "100"))
+    HashMap(("uop", "000"), ("wgt", "001"), ("inp", "010"), ("acc", "011"),
+      ("out", "100"), ("acc8", "101"))
 
   private val aluId: HashMap[String, String] =
     HashMap(("minpool", "000"),
@@ -139,6 +141,7 @@ object ISA {
   def LWGT = load("wgt")
   def LINP = load("inp")
   def LACC = load("acc")
+  def LACC8 = load("acc8")
   def SOUT = store
   def GEMM = gemm
   def VMIN = alu("minpool")

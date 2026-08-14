@@ -63,6 +63,7 @@ class TensorLoadNarrowVME(tensorType: String = "none", debug: Boolean = false)(
   }
 
   val dec = io.inst.asTypeOf(new MemDecode)
+  val isAcc8 = if (tensorType == "acc") dec.id === 5.U else false.B
 
   val vmeDataBitsPipe = RegNext(io.vme_rd.data.bits)
   val vmeDataValidPipe = RegNext(io.vme_rd.data.valid, init = false.B)
@@ -104,6 +105,7 @@ class TensorLoadNarrowVME(tensorType: String = "none", debug: Boolean = false)(
 
   val readData = Module(new ReadVMEData(tensorType, debug))
   readData.io.start := io.start
+  readData.io.acc8 := isAcc8
   readData.io.vmeData.valid := vmeDataValidPipe
   readData.io.vmeData.bits := vmeDataBitsPipe
   assert(!readData.io.vmeData.valid || readData.io.vmeData.ready,
@@ -193,8 +195,19 @@ class TensorLoadNarrowVME(tensorType: String = "none", debug: Boolean = false)(
   //-------------------------------
   val dataOffset = rdDataDestCol
   // get en sygnal and duplicate
+  val acc8BanksPerBeat = if (tensorType == "acc") {
+    mp.dataBits / (p(CoreKey).inpBits * 2)
+  } else {
+    1
+  }
   val wenTensInstr = VecInit((for (j <- 0 until memSizeRatio) yield {
-    Mux(isZeroPadWrite, true.B, dataOffset === j.U && vmeDataFirePipe)
+    val regularEnable = dataOffset === j.U && vmeDataFirePipe
+    val acc8Enable = if (tensorType == "acc") {
+      dataOffset === (j / acc8BanksPerBeat).U && vmeDataFirePipe
+    } else {
+      false.B
+    }
+    Mux(isZeroPadWrite, true.B, Mux(isAcc8, acc8Enable, regularEnable))
   }).flatMap(elem => for (k <- 0 until splitMemBlockFactor) yield {elem}))
 
   val wenDirect = VecInit((for (grIdx <- 0 until splitDataFactor) yield {
@@ -231,10 +244,19 @@ class TensorLoadNarrowVME(tensorType: String = "none", debug: Boolean = false)(
     // pipe 1 stage paddingControl per group
     val padValue = 0.U
 
+    val regularData = wdataTensInstrDataPipe(j)
+    val acc8Data = if (tensorType == "acc") {
+      val bytes = vmeDataBitsPipe.data.asTypeOf(Vec(mp.dataBits / 8, SInt(8.W)))
+      val pair = j % acc8BanksPerBeat
+      Cat(bytes(pair * 2 + 1).asSInt.pad(p(CoreKey).accBits).asUInt,
+        bytes(pair * 2).asSInt.pad(p(CoreKey).accBits).asUInt)
+    } else {
+      0.U
+    }
     wdataTensInstr(j) := Mux(
       ShiftRegister(isZeroPadWrite, writePipeLatency, resetData = false.B, en = true.B),
       ShiftRegister(padValue /* a single group total data bits */, writePipeLatency),
-      wdataTensInstrDataPipe(j))
+      Mux(isAcc8, ShiftRegister(acc8Data, writePipeLatency), regularData))
   }
 
   // THIS wdataDirect writes continous scratchpad data space
@@ -476,6 +498,7 @@ class ReadVMEData(tensorType: String = "none", debug: Boolean = false)(
   val mp = p(ShellKey).memParams
   val io = IO(new Bundle {
     val start = Input(Bool())
+    val acc8 = Input(Bool())
     val vmeData = Flipped(Decoupled(new VMEData))
     val idx = Output(UInt(tp.memAddrBits.W))
     val col = Output(UInt(log2Ceil(tp.tsSizeRatio).W))
@@ -531,9 +554,14 @@ class ReadVMEData(tensorType: String = "none", debug: Boolean = false)(
       rdDataDestIdxNext := rdDataIdx
     }.otherwise {
       rdDataDestCol := rdDataDestColNext //continue burst read
-      rdDataDestColNext := rdDataDestColNext + 1.U //increment col in tensor
       rdDataDestIdx := rdDataDestIdxNext
-      when(rdDataDestCol === (tp.tsSizeRatio - 1).U) {
+      when(io.acc8 && rdDataDestCol === 1.U) {
+        rdDataDestColNext := 0.U
+        rdDataDestIdxNext := rdDataDestIdxNext + 1.U
+      }.otherwise {
+        rdDataDestColNext := rdDataDestColNext + 1.U //increment col in tensor
+      }
+      when(!io.acc8 && rdDataDestCol === (tp.tsSizeRatio - 1).U) {
         rdDataDestIdxNext := rdDataDestIdxNext + 1.U //increment tensor index
       }
     }
@@ -564,13 +592,26 @@ class GenVMECmd(tensorType: String = "none", debug: Boolean = false)(
 
 
   val dec = io.inst.asTypeOf(new MemDecode)
+  val isAcc8 = if (tensorType == "acc") dec.id === 5.U else false.B
+  val acc8SizeFactor = if (tensorType == "acc") {
+    p(CoreKey).batch * p(CoreKey).blockOut * p(CoreKey).inpBits / mp.dataBits
+  } else {
+    sizeFactor
+  }
+  val acc8ElemBytes = if (tensorType == "acc") {
+    p(CoreKey).batch * p(CoreKey).blockOut * p(CoreKey).inpBits / 8
+  } else {
+    tp.tensorLength * tp.tensorWidth * tp.tensorElemBits / 8
+  }
 
   val rdCmdExtAddr = Reg(UInt(mp.addrBits.W)) // current address in the row
   val maxTransfer = (1 << mp.lenBits).U // max number of blocks in transfer
   // from old data ctrl
   val elemBytes = tp.tensorLength * tp.tensorWidth * tp.tensorElemBits / 8 // bytes in tensor
   val maskOffset = VecInit(Seq.fill(M_DRAM_OFFSET_BITS)(true.B)).asUInt
-  val xfer_init_addr = io.baddr | (maskOffset & (dec.dram_offset << log2Ceil(elemBytes)))
+  val regularInitAddr = dec.dram_offset << log2Ceil(elemBytes)
+  val acc8InitAddr = dec.dram_offset << log2Ceil(acc8ElemBytes)
+  val xfer_init_addr = io.baddr | (maskOffset & Mux(isAcc8, acc8InitAddr, regularInitAddr))
   val maxTrBytes = maxTransfer << (log2Ceil(mp.dataBits) - 3)
   //Align first transfer to maxTrBytes boundary. It occures on every dec.xsize transfer
   //all other transfers in the row will end at maxTrBytes boundary
@@ -587,7 +628,9 @@ class GenVMECmd(tensorType: String = "none", debug: Boolean = false)(
   val readLen = Wire(UInt((mp.lenBits + 1).W)) // read cmd transaction length. It is <= maxTransfer
   val commandsDone = RegInit(true.B) // Done generating VME commands
   val stride = Wire(Bool()) // flags change to the next row to read
-  val blocksReadSize = (dec.xsize << log2Ceil(sizeFactor)) // how many blocks to read in a singl src row
+  val regularBlocksReadSize = dec.xsize << log2Ceil(sizeFactor)
+  val acc8BlocksReadSize = dec.xsize << log2Ceil(acc8SizeFactor)
+  val blocksReadSize = Mux(isAcc8, acc8BlocksReadSize, regularBlocksReadSize)
   val blocksReadNb = Reg(blocksReadSize.cloneType)
   val rdCmdExtAddrRowBegin = Reg(UInt(mp.addrBits.W)) // starting address in the row
   val newReadRow = Reg(Bool()) // flags the first read of dec.xsize
@@ -669,7 +712,9 @@ class GenVMECmd(tensorType: String = "none", debug: Boolean = false)(
     newReadRow := true.B
   }.elsewhen (io.vmeCmd.fire) {
     when(stride) {
-      val memRow = rdCmdExtAddrRowBegin + (dec.xstride << log2Ceil(elemBytes))
+      val regularRowBytes = dec.xstride << log2Ceil(elemBytes)
+      val acc8RowBytes = dec.xstride << log2Ceil(acc8ElemBytes)
+      val memRow = rdCmdExtAddrRowBegin + Mux(isAcc8, acc8RowBytes, regularRowBytes)
       rdCmdExtAddr := memRow //  go to the next source matrix row with xstride tensors offset
       rdCmdExtAddrRowBegin := memRow
       newReadRow := true.B

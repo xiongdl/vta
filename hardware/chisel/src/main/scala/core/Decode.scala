@@ -140,6 +140,7 @@ class FetchDecode extends Module {
         LWGT -> List(Y, OP_L),
         LINP -> List(Y, OP_L),
         LACC -> List(Y, OP_G),
+        LACC8 -> List(Y, OP_G),
         SOUT -> List(Y, OP_S),
         GEMM -> List(Y, OP_G),
         FNSH -> List(Y, OP_G),
@@ -201,9 +202,9 @@ class ComputeDecode extends Module {
   io.push_prev := dec.push_prev
   io.pop_next := dec.pop_next
   io.pop_prev := dec.pop_prev
-  io.isLoadAcc := io.inst === LACC & dec.xsize =/= 0.U
+  io.isLoadAcc := (io.inst === LACC | io.inst === LACC8) & dec.xsize =/= 0.U
   io.isLoadUop := io.inst === LUOP & dec.xsize =/= 0.U
-  io.isSync := (io.inst === LACC | io.inst === LUOP) & dec.xsize === 0.U
+  io.isSync := (io.inst === LACC | io.inst === LACC8 | io.inst === LUOP) & dec.xsize === 0.U
   io.isAlu := io.inst === VMIN | io.inst === VMAX | io.inst === VADD | io.inst === VSHX
   io.isGemm := io.inst === GEMM
   io.isFinish := io.inst === FNSH

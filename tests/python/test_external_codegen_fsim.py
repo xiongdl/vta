@@ -479,6 +479,21 @@ def test_acc8_runtime_uses_input_element_address_units():
     assert "case VTA_MEM_ID_ACC_8BIT:\n        elem_bytes = VTA_INP_ELEM_BYTES;" in runtime_source
 
 
+def test_acc8_chisel_path_and_codegen_have_no_tsim_bridge():
+    repo = __import__("pathlib").Path(vta.__file__).resolve().parents[2]
+    isa = (repo / "hardware/chisel/src/main/scala/core/ISA.scala").read_text(encoding="utf-8")
+    decode = (repo / "hardware/chisel/src/main/scala/core/Decode.scala").read_text(encoding="utf-8")
+    tensor_load = (
+        repo / "hardware/chisel/src/main/scala/core/TensorLoadNarrowVME.scala"
+    ).read_text(encoding="utf-8")
+    codegen = (repo / "python/vta/compiler/codegen.py").read_text(encoding="utf-8")
+    assert 'def LACC8 = load("acc8")' in isa
+    assert "io.inst === LACC8" in decode
+    assert "readData.io.acc8 := isAcc8" in tensor_load
+    assert "skip_acc" not in codegen
+    assert "pshort_acc" not in codegen
+
+
 def test_fused_residual_removes_host_bridge_and_reduces_transfers():
     env = vta.get_env()
     shape = (1, env.BLOCK_IN, 4, 4)

@@ -122,9 +122,8 @@ def test_single_primfunc_conv_residual_acc8():
     data = np.random.randint(-16, 17, shape).astype("int8")
     packed = data.reshape(1, env.BATCH, 1, env.BLOCK_IN, 1, 1).transpose(0, 2, 4, 5, 1, 3)
     result = tvm.nd.empty(artifact.packed_output_shape, "int8", device)
-    shortcut = packed.astype("int32") if env.TARGET == "tsim" else packed
     module(
         tvm.nd.array(packed, device), tvm.nd.array(artifact.packed_weight, device),
-        tvm.nd.array(artifact.packed_bias, device), tvm.nd.array(shortcut, device), result,
+        tvm.nd.array(artifact.packed_bias, device), tvm.nd.array(packed, device), result,
     )
     np.testing.assert_equal(result.numpy(), (packed + packed).astype("int8"))

@@ -60,8 +60,14 @@ trait ISAConstants {
   val OP_A = 4.asUInt(OP_BITS.W)
   val OP_X = 5.asUInt(OP_BITS.W)
 
-  val ALU_OP_NUM = 6
+  val ALU_OP_NUM = 5
   val ALU_OP = Enum(ALU_OP_NUM)
+
+  val ALU_UOP_VARIANT_BITS = 2
+  val ALU_UOP_VARIANT_SHIFT = C_WIDX_BITS - ALU_UOP_VARIANT_BITS - 1
+  val ALU_UOP_ROUNDING_SHIFT = C_WIDX_BITS - 1
+  val ALU_UOP_VARIANT_DEFAULT = 0.U(ALU_UOP_VARIANT_BITS.W)
+  val ALU_UOP_VARIANT_HIGH = 1.U(ALU_UOP_VARIANT_BITS.W)
 
   val M_ID_U = 0.asUInt(M_ID_BITS.W)
   val M_ID_W = 1.asUInt(M_ID_BITS.W)

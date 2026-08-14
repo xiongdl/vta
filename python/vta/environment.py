@@ -73,7 +73,9 @@ class DevContext(object):
     ALU_OPCODE_ADD = 2
     ALU_OPCODE_SHR = 3
     ALU_OPCODE_MUL = 4
-    ALU_OPCODE_REQUANTIZE = 5
+    # ALU-only metadata is packed into the high bits of the Uop u2/wgt field.
+    ALU_UOP_VARIANT_DEFAULT = 0
+    ALU_UOP_VARIANT_HIGH = 1
     # Task queue id (pipeline stage)
     QID_LOAD_INP = 1
     QID_LOAD_WGT = 1
@@ -82,6 +84,14 @@ class DevContext(object):
     QID_COMPUTE = 2
 
     def __init__(self, env):
+        log_wgt_buff_depth = (
+            env.LOG_WGT_BUFF_SIZE - env.LOG_BLOCK_OUT - env.LOG_BLOCK_IN
+            - env.LOG_WGT_WIDTH + 3
+        )
+        if log_wgt_buff_depth < 3:
+            raise ValueError("VTA ALU Uop modifiers require at least three wgt_idx bits")
+        self.ALU_UOP_VARIANT_SHIFT = log_wgt_buff_depth - 3
+        self.ALU_UOP_ROUNDING_SHIFT = log_wgt_buff_depth - 1
         self.vta_axis = te.thread_axis("vta")
         self.vta_push_uop = tvm.tir.StringImm("VTAPushGEMMOp")
         ctx = tvm.tir.call_intrin("handle", "tir.vta.command_handle")

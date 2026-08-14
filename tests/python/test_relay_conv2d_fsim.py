@@ -25,7 +25,7 @@ def _run_conv2d(channels, out_channels, size, kernel_size, stride, padding,
         relay.const(0, "int32"),
         relay.const(0, "int32"),
         relay.const(0.5, "float32"),
-        relay.const(0.25, "float32"),
+        relay.const(requant_input_scale / 0.5, "float32"),
         strides=(stride, stride),
         padding=(padding, padding),
         channels=out_channels,
@@ -102,6 +102,11 @@ def test_relay_qnn_conv2d_stride2_unaligned_channels():
 def test_relay_qnn_conv2d_non_power_of_two_requantize_fsim():
     env = vta.get_env()
     _run_conv2d(env.BLOCK_IN, env.BLOCK_OUT, 5, 3, 1, 1, 0.125, 0.2)
+
+
+def test_relay_qnn_conv2d_non_power_of_two_right_shift_fsim():
+    env = vta.get_env()
+    _run_conv2d(env.BLOCK_IN, env.BLOCK_OUT, 5, 3, 1, 1, 0.06, 0.2)
 
 
 def test_single_primfunc_conv_residual_acc8():

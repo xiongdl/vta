@@ -157,7 +157,7 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d", residual=False):
     )
     biased = te.compute(output_shape, lambda *idx: accum(*idx) + bias(*idx), name="biased")
     # Materialize the Q31 multiplier using signed 16-bit ALU immediates, then
-    # consume it as the second accumulator operand of the REQUANTIZE opcode.
+    # consume it as the second accumulator operand of a rounded Q31 MUL.
     multiplier_hi = (requant_multiplier + (1 << 15)) >> 16
     if multiplier_hi >= 1 << 15:
         multiplier_hi -= 1 << 16
@@ -184,13 +184,33 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d", residual=False):
         lambda *idx: multiplier_shifted(*idx) + tvm.tir.const(multiplier_lo, env.acc_dtype),
         name="requantize_multiplier",
     )
-    scaled = te.compute(
+    requant_input = biased
+    left_shifted = None
+    if requant_shift > 0:
+        left_shifted = te.compute(
+            output_shape,
+            lambda *idx: biased(*idx) << tvm.tir.const(requant_shift, env.acc_dtype),
+            name="requantize_left_shift",
+        )
+        requant_input = left_shifted
+    high_multiplied = te.compute(
         output_shape,
         lambda *idx: tvm.tir.call_pure_extern(
-            env.acc_dtype, "VTARequantize", biased(*idx), multiplier_value(*idx), requant_shift
+            env.acc_dtype, "VTAQMultiply", requant_input(*idx), multiplier_value(*idx)
         ),
-        name="requantize",
+        name="requantize_high_mul",
     )
+    scaled = high_multiplied
+    right_shifted = None
+    if requant_shift < 0:
+        right_shifted = te.compute(
+            output_shape,
+            lambda *idx: tvm.tir.call_pure_extern(
+                env.acc_dtype, "VTARoundingShiftRight", high_multiplied(*idx), -requant_shift
+            ),
+            name="requantize_right_shift",
+        )
+        scaled = right_shifted
     shifted = scaled
     if output_zero_point:
         shifted = te.compute(
@@ -222,8 +242,14 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d", residual=False):
     schedule = te.create_schedule(output.op)
     schedule[data_buf].set_scope(env.inp_scope)
     schedule[weight_buf].set_scope(env.wgt_scope)
-    requant_stages = (multiplier_zero, multiplier_high, multiplier_shifted,
-                      multiplier_value, scaled)
+    requant_stages = ()
+    if left_shifted is not None:
+        requant_stages += (left_shifted,)
+    requant_stages += (multiplier_zero, multiplier_high, multiplier_shifted,
+                       multiplier_value)
+    requant_stages += (high_multiplied,)
+    if right_shifted is not None:
+        requant_stages += (right_shifted,)
     accumulator_stages = (accum, biased, clipped_max, narrowed) + requant_stages
     alu_stages = (biased, clipped_max, narrowed) + requant_stages
     if residual:

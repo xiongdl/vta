@@ -464,54 +464,52 @@ class Device {
   void RunALU_(const VTAAluInsn* op) {
     switch (op->alu_opcode) {
       case VTA_ALU_OPCODE_ADD: {
-        return RunALULoop<use_imm>(op, [](int32_t x, int32_t y) {
+        return RunALULoop<use_imm>(op, [](int32_t x, int32_t y, uint32_t variant, bool rounding) {
+            CHECK_EQ(variant, VTA_ALU_UOP_VARIANT_DEFAULT);
+            CHECK(!rounding);
             return x + y;
           });
       }
       case VTA_ALU_OPCODE_MAX: {
-        return RunALULoop<use_imm>(op, [](int32_t x, int32_t y) {
+        return RunALULoop<use_imm>(op, [](int32_t x, int32_t y, uint32_t variant, bool rounding) {
+            CHECK_EQ(variant, VTA_ALU_UOP_VARIANT_DEFAULT);
+            CHECK(!rounding);
             return std::max(x, y);
           });
       }
       case VTA_ALU_OPCODE_MIN: {
-        return RunALULoop<use_imm>(op, [](int32_t x, int32_t y) {
+        return RunALULoop<use_imm>(op, [](int32_t x, int32_t y, uint32_t variant, bool rounding) {
+            CHECK_EQ(variant, VTA_ALU_UOP_VARIANT_DEFAULT);
+            CHECK(!rounding);
             return std::min(x, y);
           });
       }
       case VTA_ALU_OPCODE_SHR: {
-        return RunALULoop<use_imm>(op, [](int32_t x, int32_t y) {
-            if (y >= 0) {
-              return x >> y;
-            } else {
-              return x << (-y);
+        return RunALULoop<use_imm>(op, [](int32_t x, int32_t y, uint32_t variant, bool rounding) {
+            CHECK_EQ(variant, VTA_ALU_UOP_VARIANT_DEFAULT);
+            CHECK_GE(y, -31);
+            CHECK_LE(y, 31);
+            if (y < 0) {
+              CHECK(!rounding) << "Rounding is only defined for right shift";
+              return static_cast<int32_t>(static_cast<uint32_t>(x) << (-y));
             }
+            if (!rounding || y == 0) return x >> y;
+            const uint32_t mask = (uint32_t{1} << y) - 1;
+            const uint32_t remainder = static_cast<uint32_t>(x) & mask;
+            int32_t result = x >> y;
+            const uint32_t threshold = (mask >> 1) + static_cast<uint32_t>(result < 0);
+            return result + static_cast<int32_t>(remainder > threshold);
           });
       }
       case VTA_ALU_OPCODE_MUL: {
-        return RunALULoop<use_imm>(op, [](int32_t x, int32_t y) {
-            return x * y;
-          });
-      }
-      case VTA_ALU_OPCODE_REQUANTIZE: {
-        CHECK(!use_imm) << "REQUANTIZE uses an accumulator Q31 multiplier operand";
-        const int shift = op->imm;
-        CHECK_GE(shift, -31);
-        CHECK_LE(shift, 30);
-        return RunALULoop<use_imm>(op, [shift](int32_t value, int32_t multiplier) {
-            if (shift > 0) {
-              value = static_cast<int32_t>(static_cast<uint32_t>(value) << shift);
+        return RunALULoop<use_imm>(op, [](int32_t x, int32_t y, uint32_t variant, bool rounding) {
+            if (variant == VTA_ALU_UOP_VARIANT_DEFAULT) {
+              CHECK(!rounding);
+              return static_cast<int32_t>(static_cast<uint32_t>(x) * static_cast<uint32_t>(y));
             }
-            const int64_t product = static_cast<int64_t>(value) * multiplier + (1LL << 30);
-            int32_t result = static_cast<int32_t>(product >> 31);
-            const int exponent = shift < 0 ? -shift : 0;
-            if (exponent != 0) {
-              const uint32_t mask = (uint32_t{1} << exponent) - 1;
-              const uint32_t remainder = static_cast<uint32_t>(result) & mask;
-              result >>= exponent;
-              const uint32_t threshold = (mask >> 1) + static_cast<uint32_t>(result < 0);
-              result += remainder > threshold;
-            }
-            return result;
+            CHECK_EQ(variant, VTA_ALU_UOP_VARIANT_HIGH);
+            const int64_t offset = rounding ? (1LL << 30) : 0;
+            return static_cast<int32_t>((static_cast<int64_t>(x) * y + offset) >> 31);
           });
       }
       default: {
@@ -529,6 +527,8 @@ class Device {
         for (int k = op->uop_bgn; k < op->uop_end; ++k) {
           // Read micro op
           VTAUop* uop_ptr = static_cast<VTAUop*>(uop_.BeginPtr(k));
+          const uint32_t variant = VTA_ALU_UOP_VARIANT(uop_ptr->wgt_idx);
+          const bool rounding = VTA_ALU_UOP_ROUNDING(uop_ptr->wgt_idx);
           uint32_t dst_index = uop_ptr->dst_idx;
           uint32_t src_index = uop_ptr->src_idx;
           dst_index += y * op->dst_factor_out + x * op->dst_factor_in;
@@ -537,9 +537,12 @@ class Device {
           BitPacker<VTA_ACC_WIDTH> src(acc_.BeginPtr(src_index));
           for (int k = 0; k < VTA_BATCH * VTA_BLOCK_OUT; ++k) {
             if (use_imm) {
-              dst.SetSigned(k, func(dst.GetSigned(k), op->imm));
+              // TensorAlu reads src_idx for immediate operations and writes dst_idx.
+              // Existing in-place Uops have src_idx == dst_idx, while this also
+              // permits compiler-created out-of-place ALU stages.
+              dst.SetSigned(k, func(src.GetSigned(k), op->imm, variant, rounding));
             } else {
-              dst.SetSigned(k, func(dst.GetSigned(k), src.GetSigned(k)));
+              dst.SetSigned(k, func(dst.GetSigned(k), src.GetSigned(k), variant, rounding));
             }
           }
         }

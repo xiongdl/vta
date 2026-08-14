@@ -957,7 +957,8 @@ def InjectALUIntrin():
                     extents.append(tmp_body.extent)
                     tmp_body = tmp_body.body
                 # Derive opcode
-                requantize_shift = None
+                alu_uop_variant = env.dev.ALU_UOP_VARIANT_DEFAULT
+                alu_uop_rounding = 0
                 if isinstance(loop_body.value, tvm.tir.Add):
                     alu_opcode = env.dev.ALU_OPCODE_ADD
                     lhs = loop_body.value.a
@@ -985,13 +986,19 @@ def InjectALUIntrin():
                 elif isinstance(loop_body.value, tvm.tir.Call):
                     if (loop_body.value.op.name == "tir.call_pure_extern"
                             and isinstance(loop_body.value.args[0], tvm.tir.StringImm)
-                            and loop_body.value.args[0].value == "VTARequantize"):
-                        alu_opcode = env.dev.ALU_OPCODE_REQUANTIZE
+                            and loop_body.value.args[0].value == "VTAQMultiply"):
+                        alu_opcode = env.dev.ALU_OPCODE_MUL
                         lhs = loop_body.value.args[1]
                         rhs = loop_body.value.args[2]
-                        requantize_shift = loop_body.value.args[3]
-                        if not isinstance(requantize_shift, tvm.tir.IntImm):
-                            raise RuntimeError("VTA requantize requires a constant signed shift")
+                        alu_uop_variant = env.dev.ALU_UOP_VARIANT_HIGH
+                        alu_uop_rounding = 1
+                    elif (loop_body.value.op.name == "tir.call_pure_extern"
+                          and isinstance(loop_body.value.args[0], tvm.tir.StringImm)
+                          and loop_body.value.args[0].value == "VTARoundingShiftRight"):
+                        alu_opcode = env.dev.ALU_OPCODE_SHR
+                        lhs = loop_body.value.args[1]
+                        rhs = loop_body.value.args[2]
+                        alu_uop_rounding = 1
                     elif (loop_body.value.op.name == "tir.call_pure_extern"
                           and isinstance(loop_body.value.args[0], tvm.tir.StringImm)
                           and loop_body.value.args[0].value == "VTAALUMul"):
@@ -1032,20 +1039,19 @@ def InjectALUIntrin():
                     rhs = rhs.value
                 # Check if lhs/rhs is immediate
                 use_imm = False
-                imm_val = requantize_shift
-                if requantize_shift is None and isinstance(rhs, tvm.tir.IntImm):
+                imm_val = None
+                if isinstance(rhs, tvm.tir.IntImm):
                     assert lhs.buffer.data.same_as(dst_var)
                     src_coeff = tvm.arith.detect_linear_equation(lhs.indices[0], indices)
                     use_imm = True
                     imm_val = rhs
-                if requantize_shift is None and isinstance(lhs, tvm.tir.IntImm):
+                if isinstance(lhs, tvm.tir.IntImm):
                     assert rhs.buffer.data.same_as(dst_var)
                     src_coeff = tvm.arith.detect_linear_equation(rhs.indices[0], indices)
                     use_imm = True
                     imm_val = lhs
-                if imm_val is None or requantize_shift is not None:
-                    if imm_val is None:
-                        imm_val = 0
+                if imm_val is None:
+                    imm_val = 0
                     assert lhs.buffer.data.same_as(dst_var) and rhs.buffer.data.same_as(dst_var)
                     src_lhs_coeff = tvm.arith.detect_linear_equation(lhs.indices[0], indices)
                     src_rhs_coeff = tvm.arith.detect_linear_equation(rhs.indices[0], indices)
@@ -1123,6 +1129,10 @@ def InjectALUIntrin():
                         )
                     )
                 use_imm = int(use_imm)
+                alu_uop_modifier = (
+                    (alu_uop_variant << env.dev.ALU_UOP_VARIANT_SHIFT)
+                    | (alu_uop_rounding << env.dev.ALU_UOP_ROUNDING_SHIFT)
+                )
                 irb.emit(
                     tvm.tir.call_intrin(
                         "int32",
@@ -1131,7 +1141,7 @@ def InjectALUIntrin():
                         0,
                         dst_coeff[len(dst_coeff) - 1],
                         src_coeff[len(src_coeff) - 1],
-                        0,
+                        alu_uop_modifier,
                         alu_opcode,
                         use_imm,
                         imm_val,

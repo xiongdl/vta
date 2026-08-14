@@ -183,7 +183,8 @@ TVM_DLL void VTAStoreBuffer2D(VTACommandHandle cmd, uint32_t src_sram_index,
  * \param reset_out Resets the accum to 0.
  * \param dst_index The accum memory index.
  * \param src_index The input memory (gemm) / accum memory (alu) index.
- * \param wgt_index The weight memory index.
+ * \param wgt_index The weight memory index in GEMM mode; ALU-only operation
+ *        variant and rounding flags in ALU mode.
  * \param opcode The ALU opcode.
  * \param use_imm Use immediate in ALU mode if set to true.
  * \param imm_val Immediate value in ALU mode.

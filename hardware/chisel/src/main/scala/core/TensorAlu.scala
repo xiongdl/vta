@@ -28,33 +28,34 @@ class Alu(implicit p: Parameters) extends Module {
   val aluBits = p(CoreKey).accBits
   val io = IO(new Bundle {
     val opcode = Input(UInt(C_ALU_OP_BITS.W))
+    val variant = Input(UInt(ALU_UOP_VARIANT_BITS.W))
+    val rounding = Input(Bool())
     val a = Input(SInt(aluBits.W))
     val b = Input(SInt(aluBits.W))
-    val shift = Input(SInt(C_ALU_IMM_BITS.W))
     val y = Output(SInt(aluBits.W))
   })
 
-  // FIXME: the following three will change once we support properly SHR and SHL
   val ub = io.b.asUInt
-  val width = log2Ceil(aluBits)
-  val m = ~ub(width - 1, 0) + 1.U
-
-  val n = ub(width - 1, 0)
   val shiftWidth = log2Ceil(aluBits)
-  val leftShift = Mux(io.shift > 0.S, io.shift.asUInt(shiftWidth - 1, 0), 0.U(shiftWidth.W))
-  val rightShift = Mux(io.shift < 0.S, (-io.shift).asUInt(shiftWidth - 1, 0), 0.U(shiftWidth.W))
-  val shiftedValue = (io.a.asUInt << leftShift)(aluBits - 1, 0).asSInt
-  val product = shiftedValue * io.b
-  val highMul = ((product + (1L << 30).S((2 * aluBits).W)) >> 31)(aluBits - 1, 0).asSInt
+  val rightShift = ub(shiftWidth - 1, 0)
+  val leftShift = (-io.b).asUInt(shiftWidth - 1, 0)
+  val ordinaryShift = Mux(io.b < 0.S, io.a << leftShift, io.a >> rightShift)
   val remainderMask = (1.U(aluBits.W) << rightShift) - 1.U
-  val remainder = highMul.asUInt & remainderMask
-  val divided = highMul >> rightShift
+  val remainder = io.a.asUInt & remainderMask
+  val divided = io.a >> rightShift
   val threshold = (remainderMask >> 1) + Mux(divided < 0.S, 1.U, 0.U)
-  val requantized = divided + Mux(remainder > threshold, 1.S, 0.S)
+  val roundedShift = divided + Mux(remainder > threshold, 1.S, 0.S)
+  val shiftResult = Mux(io.rounding, roundedShift, ordinaryShift)
 
-  // opcode - min:0, max:1, add:2, shr:3, shl:4, requantize:5
+  val product = io.a * io.b
+  val roundingOffset = Mux(io.rounding, (1L << 30).S((2 * aluBits).W), 0.S((2 * aluBits).W))
+  val highProduct = ((product + roundingOffset) >> 31)(aluBits - 1, 0).asSInt
+  val lowProduct = product(aluBits - 1, 0).asSInt
+  val multiplyResult = Mux(io.variant === ALU_UOP_VARIANT_HIGH, highProduct, lowProduct)
+
+  // opcode - min:0, max:1, add:2, shift:3, multiply:4
   val fop = Seq(Mux(io.a < io.b, io.a, io.b), Mux(io.a < io.b, io.b, io.a),
-    io.a + io.b, io.a >> n, io.a << m, requantized)
+    io.a + io.b, shiftResult, multiplyResult)
 
   val opmux = Seq.tabulate(ALU_OP_NUM)(i => ALU_OP(i) -> fop(i))
   io.y := MuxLookup(io.opcode, io.a, opmux)
@@ -64,7 +65,8 @@ class Alu(implicit p: Parameters) extends Module {
 class AluReg(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
     val opcode = Input(UInt(C_ALU_OP_BITS.W))
-    val shift = Input(SInt(C_ALU_IMM_BITS.W))
+    val variant = Input(UInt(ALU_UOP_VARIANT_BITS.W))
+    val rounding = Input(Bool())
     val a = Flipped(ValidIO(UInt(p(CoreKey).accBits.W)))
     val b = Flipped(ValidIO(UInt(p(CoreKey).accBits.W)))
     val y = ValidIO(UInt(p(CoreKey).accBits.W))
@@ -72,10 +74,13 @@ class AluReg(implicit p: Parameters) extends Module {
   val alu = Module(new Alu)
   val rA = RegEnable(io.a.bits, io.a.valid)
   val rB = RegEnable(io.b.bits, io.b.valid)
+  val rVariant = RegEnable(io.variant, io.b.valid)
+  val rRounding = RegEnable(io.rounding, io.b.valid)
   val valid = RegNext(io.b.valid)
 
   alu.io.opcode := io.opcode
-  alu.io.shift := io.shift
+  alu.io.variant := rVariant
+  alu.io.rounding := rRounding
 
   // register input
   alu.io.a := rA.asSInt
@@ -90,7 +95,8 @@ class AluReg(implicit p: Parameters) extends Module {
 class AluVector(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
     val opcode = Input(UInt(C_ALU_OP_BITS.W))
-    val shift = Input(SInt(C_ALU_IMM_BITS.W))
+    val variant = Input(UInt(ALU_UOP_VARIANT_BITS.W))
+    val rounding = Input(Bool())
     val acc_a = new TensorMasterData(tensorType = "acc")
     val acc_b = new TensorMasterData(tensorType = "acc")
     val acc_y = new TensorClientData(tensorType = "acc")
@@ -101,7 +107,8 @@ class AluVector(implicit p: Parameters) extends Module {
   val valid = Wire(Vec(blockOut, Bool()))
   for (i <- 0 until blockOut) {
     f(i).io.opcode := io.opcode
-    f(i).io.shift := io.shift
+    f(i).io.variant := io.variant
+    f(i).io.rounding := io.rounding
     f(i).io.a.valid := io.acc_a.data.valid
     f(i).io.a.bits := io.acc_a.data.bits(0)(i)
     f(i).io.b.valid := io.acc_b.data.valid
@@ -274,10 +281,15 @@ class TensorAluPipelined(debug: Boolean = false)(implicit p: Parameters) extends
   val dst_offset = uop_data_r1.bits.u0
 
   val w = dst_offset.getWidth
-  val u2 = uop_data_r1.bits.u2.asTypeOf(UInt(w.W))
+  val u2 = uop_data_r1.bits.u2
   val s = log2Ceil(p(CoreKey).inpMemDepth)
   val u1 = uop_data_r1.bits.u1.asTypeOf(UInt(w.W))
-  val src_offset = (u2 << s) | u1
+  val srcExtBits = math.max(log2Ceil(p(CoreKey).accMemDepth) - s, 0)
+  val srcExt = if (srcExtBits == 0) 0.U else u2(srcExtBits - 1, 0)
+  val src_offset = (srcExt << s) | u1
+  val uopVariant = u2(ALU_UOP_VARIANT_SHIFT + ALU_UOP_VARIANT_BITS - 1,
+    ALU_UOP_VARIANT_SHIFT)
+  val uopRounding = u2(ALU_UOP_ROUNDING_SHIFT)
 
   // split registers of stage 2 by data groups
   val accRdIdxValid = valid_r1 || src_valid_r1
@@ -342,14 +354,9 @@ class TensorAluPipelined(debug: Boolean = false)(implicit p: Parameters) extends
     val tensorOpBits_piped = ShiftRegister(
     decSplit0(idx/(numVecUnits/decSplitNb0)).alu_op,
     if(aluDataReadPipeDelay < 2) aluDataReadPipeDelay else aluDataReadPipeDelay -1)
-    val isSHR = (tensorOpBits_piped === ALU_OP(3))
-    val neg_shift = isSHR & tensorImmBits_piped(C_ALU_IMM_BITS - 1)
-    val fixme_alu_op = Mux(
-      neg_shift,
-      ALU_OP(4), // use opcode = 4 for left shift
-      tensorOpBits_piped)
-    alu.io.opcode := fixme_alu_op
-    alu.io.shift := tensorImmBits_piped.asSInt
+    alu.io.opcode := tensorOpBits_piped
+    alu.io.variant := ShiftRegister(uopVariant, aluDataReadPipeDelay + 2)
+    alu.io.rounding := ShiftRegister(uopRounding, aluDataReadPipeDelay + 2)
 
     assert(!valid_r3 || io.acc.rd(idx).data.valid)
 
@@ -425,6 +432,8 @@ class TensorAluOrig(debug: Boolean = false)(implicit p: Parameters) extends Tens
   val uop_end = dec.uop_end
   val uop_dst = Reg(chiselTypeOf(io.uop.data.bits.u0)) // width can address entire acc
   val uop_src = Reg(chiselTypeOf(io.uop.data.bits.u0)) // width can address entire acc
+  val uop_variant = Reg(UInt(ALU_UOP_VARIANT_BITS.W))
+  val uop_rounding = Reg(Bool())
   val cnt_o = Reg(chiselTypeOf(dec.lp_0))
   val dst_o = Reg(chiselTypeOf(io.uop.data.bits.u0))
   val src_o = Reg(chiselTypeOf(io.uop.data.bits.u0))
@@ -510,8 +519,14 @@ class TensorAluOrig(debug: Boolean = false)(implicit p: Parameters) extends Tens
 
   when(state === sComputeIdx && io.uop.data.valid) {
     uop_dst := io.uop.data.bits.u0 + dst_i
-    uop_src := ((io.uop.data.bits.u2.asTypeOf(UInt(width = uop_dst.getWidth.W)) << log2Ceil(p(CoreKey).inpMemDepth))
+    val srcExtBits = math.max(
+      log2Ceil(p(CoreKey).accMemDepth) - log2Ceil(p(CoreKey).inpMemDepth), 0)
+    val srcExt = if (srcExtBits == 0) 0.U else io.uop.data.bits.u2(srcExtBits - 1, 0)
+    uop_src := ((srcExt << log2Ceil(p(CoreKey).inpMemDepth))
       | io.uop.data.bits.u1.asTypeOf(UInt(width = uop_dst.getWidth.W))) + src_i
+    uop_variant := io.uop.data.bits.u2(
+      ALU_UOP_VARIANT_SHIFT + ALU_UOP_VARIANT_BITS - 1, ALU_UOP_VARIANT_SHIFT)
+    uop_rounding := io.uop.data.bits.u2(ALU_UOP_ROUNDING_SHIFT)
   }
 
   // uop
@@ -538,12 +553,9 @@ class TensorAluOrig(debug: Boolean = false)(implicit p: Parameters) extends Tens
     }
 
     // alu
-    val isSHR = (dec.alu_op === ALU_OP(3))
-    val isSHL = isSHR & dec.alu_imm(C_ALU_IMM_BITS - 1)
-    // opcode - min:0, max:1, add:2, shr:3, shl:4
-    val fixme_alu_op = Mux(isSHL, ALU_OP(4), dec.alu_op)
-    alu.io.opcode := fixme_alu_op
-    alu.io.shift := dec.alu_imm.asSInt
+    alu.io.opcode := dec.alu_op
+    alu.io.variant := uop_variant
+    alu.io.rounding := uop_rounding
     alu.io.acc_a.data.valid := io.acc.rd(idx).data.valid & state === sReadTensorB
     alu.io.acc_a.data.bits <> io.acc.rd(idx).data.bits
     alu.io.acc_b.data.valid := Mux(dec.alu_use_imm,

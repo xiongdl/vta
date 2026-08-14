@@ -133,8 +133,25 @@
 #define VTA_ALU_OPCODE_SHR 3
 /*! ALU opcode: mul */
 #define VTA_ALU_OPCODE_MUL 4
-/*! ALU opcode: CMSIS-NN compatible Q31 requantize */
-#define VTA_ALU_OPCODE_REQUANTIZE 5
+/*! ALU uop variant: preserve the legacy operation semantics. */
+#define VTA_ALU_UOP_VARIANT_DEFAULT 0
+/*! ALU uop variant: signed Q31 high multiply when the instruction opcode is MUL. */
+#define VTA_ALU_UOP_VARIANT_HIGH 1
+/*! ALU uop variant field width in the high, ALU-only portion of wgt_idx. */
+#define VTA_ALU_UOP_VARIANT_BIT_WIDTH 2
+#if VTA_LOG_WGT_BUFF_DEPTH < (VTA_ALU_UOP_VARIANT_BIT_WIDTH + 1)
+#error "VTA ALU Uop modifiers require at least three wgt_idx bits"
+#endif
+/*! ALU uop variant starts below the top rounding bit of wgt_idx. */
+#define VTA_ALU_UOP_VARIANT_SHIFT \
+  (VTA_LOG_WGT_BUFF_DEPTH - VTA_ALU_UOP_VARIANT_BIT_WIDTH - 1)
+/*! ALU uop rounding flag occupies the top bit of wgt_idx. */
+#define VTA_ALU_UOP_ROUNDING_SHIFT (VTA_LOG_WGT_BUFF_DEPTH - 1)
+/*! Extract the ALU-only operation variant from a micro-op. */
+#define VTA_ALU_UOP_VARIANT(wgt_idx) \
+  (((wgt_idx) >> VTA_ALU_UOP_VARIANT_SHIFT) & ((1U << VTA_ALU_UOP_VARIANT_BIT_WIDTH) - 1))
+/*! Extract the ALU-only rounding flag from a micro-op. */
+#define VTA_ALU_UOP_ROUNDING(wgt_idx) (((wgt_idx) >> VTA_ALU_UOP_ROUNDING_SHIFT) & 1U)
 
 /*! Memory type field bitwidth */
 #define VTA_MEMOP_ID_BIT_WIDTH 3

@@ -29,6 +29,7 @@ cmake --build "${build_dir}" --parallel "${jobs}"
 
 python -c 'import vta; assert vta.get_env().TARGET == "sim"'
 pytest -q \
+  "${repo_dir}/tests/python/test_requantize.py" \
   "${repo_dir}/tests/python/test_relay_partition.py" \
   "${repo_dir}/tests/python/test_fsim_vector_add.py" \
   "${repo_dir}/tests/python/test_relay_dense_fsim.py" \

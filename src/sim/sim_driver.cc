@@ -492,6 +492,28 @@ class Device {
             return x * y;
           });
       }
+      case VTA_ALU_OPCODE_REQUANTIZE: {
+        CHECK(!use_imm) << "REQUANTIZE uses an accumulator Q31 multiplier operand";
+        const int shift = op->imm;
+        CHECK_GE(shift, -31);
+        CHECK_LE(shift, 30);
+        return RunALULoop<use_imm>(op, [shift](int32_t value, int32_t multiplier) {
+            if (shift > 0) {
+              value = static_cast<int32_t>(static_cast<uint32_t>(value) << shift);
+            }
+            const int64_t product = static_cast<int64_t>(value) * multiplier + (1LL << 30);
+            int32_t result = static_cast<int32_t>(product >> 31);
+            const int exponent = shift < 0 ? -shift : 0;
+            if (exponent != 0) {
+              const uint32_t mask = (uint32_t{1} << exponent) - 1;
+              const uint32_t remainder = static_cast<uint32_t>(result) & mask;
+              result >>= exponent;
+              const uint32_t threshold = (mask >> 1) + static_cast<uint32_t>(result < 0);
+              result += remainder > threshold;
+            }
+            return result;
+          });
+      }
       default: {
         LOG(FATAL) << "Unknown ALU code " << op->alu_opcode;
       }

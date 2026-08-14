@@ -6,7 +6,7 @@ from tvm import relay
 from tvm.relay.dataflow_pattern import is_constant, is_op, wildcard
 
 from ..config import VTAConfig
-from .quantization import fixed_point_ratio
+from .quantization import quantize_multiplier
 
 
 def _as_int(value):
@@ -74,7 +74,7 @@ def _check_common_qnn(call, config, dense=False):
         ))
         if dense and not np.allclose(shifts, 1.0):
             return False
-        [fixed_point_ratio(value, 1.0) for value in shifts.reshape(-1)]
+        [quantize_multiplier(value) for value in shifts.reshape(-1)]
     except (ValueError, TypeError):
         return False
     if any(

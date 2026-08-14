@@ -734,6 +734,8 @@ class InsnQueue : public BaseQueue<VTAGenericInsn> {
       return "shr";
     } else if (opcode == VTA_ALU_OPCODE_MUL) {
       return "mul";
+    } else if (opcode == VTA_ALU_OPCODE_REQUANTIZE) {
+      return "requantize";
     }
 
     return "unknown op";

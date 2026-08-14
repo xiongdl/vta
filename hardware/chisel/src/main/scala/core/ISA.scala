@@ -60,7 +60,7 @@ trait ISAConstants {
   val OP_A = 4.asUInt(OP_BITS.W)
   val OP_X = 5.asUInt(OP_BITS.W)
 
-  val ALU_OP_NUM = 5
+  val ALU_OP_NUM = 6
   val ALU_OP = Enum(ALU_OP_NUM)
 
   val M_ID_U = 0.asUInt(M_ID_BITS.W)

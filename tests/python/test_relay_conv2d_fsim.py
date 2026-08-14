@@ -10,7 +10,8 @@ import vta
 from vta.testing import simulator  # pylint: disable=unused-import
 
 
-def _run_conv2d(channels, out_channels, size, kernel_size, stride, padding):
+def _run_conv2d(channels, out_channels, size, kernel_size, stride, padding,
+                requant_input_scale=0.125, requant_output_scale=0.125):
     env = vta.get_env()
     batch = env.BATCH
     weight = np.random.randint(
@@ -34,9 +35,9 @@ def _run_conv2d(channels, out_channels, size, kernel_size, stride, padding):
     biased = relay.nn.bias_add(conv, relay.const(bias))
     requantized = relay.qnn.op.requantize(
         biased,
-        relay.const(0.125, "float32"),
+        relay.const(requant_input_scale, "float32"),
         relay.const(4, "int32"),
-        relay.const(0.125, "float32"),
+        relay.const(requant_output_scale, "float32"),
         relay.const(-2, "int32"),
         out_dtype="int8",
     )
@@ -80,7 +81,12 @@ def _run_conv2d(channels, out_channels, size, kernel_size, stride, padding):
     expected = conv2d_nchw_python(
         data.astype("int32"), weight.astype("int32"), stride, padding
     )
-    expected = np.clip(expected + bias.reshape(1, -1, 1, 1) - 4 - 2, -40, 39).astype("int8")
+    multiplier, shift = vta.quantize_multiplier(requant_input_scale / requant_output_scale)
+    requantize = np.vectorize(
+        lambda value: vta.cmsis_nn_requantize(value - 4, multiplier, shift), otypes=[np.int32]
+    )
+    expected = requantize(expected + bias.reshape(1, -1, 1, 1)) - 2
+    expected = np.clip(expected, -40, 39).astype("int8")
     np.testing.assert_equal(actual, expected)
 
 
@@ -91,6 +97,11 @@ def test_relay_qnn_conv2d_fsim():
 
 def test_relay_qnn_conv2d_stride2_unaligned_channels():
     _run_conv2d(3, 5, 7, 3, 2, 0)
+
+
+def test_relay_qnn_conv2d_non_power_of_two_requantize_fsim():
+    env = vta.get_env()
+    _run_conv2d(env.BLOCK_IN, env.BLOCK_OUT, 5, 3, 1, 1, 0.125, 0.2)
 
 
 def test_single_primfunc_conv_residual_acc8():

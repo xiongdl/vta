@@ -133,6 +133,8 @@
 #define VTA_ALU_OPCODE_SHR 3
 /*! ALU opcode: mul */
 #define VTA_ALU_OPCODE_MUL 4
+/*! ALU opcode: CMSIS-NN compatible Q31 requantize */
+#define VTA_ALU_OPCODE_REQUANTIZE 5
 
 /*! Memory type field bitwidth */
 #define VTA_MEMOP_ID_BIT_WIDTH 3

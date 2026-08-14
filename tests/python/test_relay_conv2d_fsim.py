@@ -7,6 +7,7 @@ from tvm.contrib import utils
 from tvm.topi.testing import conv2d_nchw_python
 
 import vta
+from vta.testing import simulator  # pylint: disable=unused-import
 
 
 def _run_conv2d(channels, out_channels, size, kernel_size, stride, padding):
@@ -90,3 +91,40 @@ def test_relay_qnn_conv2d_fsim():
 
 def test_relay_qnn_conv2d_stride2_unaligned_channels():
     _run_conv2d(3, 5, 7, 3, 2, 0)
+
+
+def test_single_primfunc_conv_residual_acc8():
+    """One PrimFunc containing GEMM, ACC_8BIT shortcut load and residual ALU."""
+    env = vta.get_env()
+    shape = (env.BATCH, env.BLOCK_IN, 1, 1)
+    data_var = relay.var("data", shape=shape, dtype="int8")
+    weight = np.zeros((env.BLOCK_OUT, env.BLOCK_IN, 1, 1), dtype="int8")
+    for channel in range(env.BLOCK_IN):
+        weight[channel, channel, 0, 0] = 1
+    conv = relay.qnn.op.conv2d(
+        data_var, relay.const(weight), relay.const(0, "int32"), relay.const(0, "int32"),
+        relay.const(1.0, "float32"), relay.const(1.0, "float32"), channels=env.BLOCK_OUT,
+        kernel_size=(1, 1), out_dtype="int32",
+    )
+    output = relay.qnn.op.requantize(
+        conv, relay.const(1.0, "float32"), relay.const(0, "int32"),
+        relay.const(1.0, "float32"), relay.const(0, "int32"), out_dtype="int8",
+    )
+    function = relay.Function([data_var], output)
+    from vta.compiler.conv2d import compile_qnn_conv2d
+    artifact = compile_qnn_conv2d(function, name="single_primfunc_residual", residual=True)
+    temp = utils.tempdir()
+    artifact.module.save(temp.relpath("single_primfunc_residual.o"))
+    remote = rpc.LocalSession()
+    remote.upload(temp.relpath("single_primfunc_residual.o"))
+    module = remote.load_module("single_primfunc_residual.o")
+    device = remote.ext_dev(0)
+    data = np.random.randint(-16, 17, shape).astype("int8")
+    packed = data.reshape(1, env.BATCH, 1, env.BLOCK_IN, 1, 1).transpose(0, 2, 4, 5, 1, 3)
+    result = tvm.nd.empty(artifact.packed_output_shape, "int8", device)
+    shortcut = packed.astype("int32") if env.TARGET == "tsim" else packed
+    module(
+        tvm.nd.array(packed, device), tvm.nd.array(artifact.packed_weight, device),
+        tvm.nd.array(artifact.packed_bias, device), tvm.nd.array(shortcut, device), result,
+    )
+    np.testing.assert_equal(result.numpy(), (packed + packed).astype("int8"))

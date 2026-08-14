@@ -303,7 +303,9 @@ def _residual_conv_wrapper(function, symbol, functions):
     ) for index, item in enumerate(functions)]
     first, last = convs[0], convs[-1]
     if first.input_shape != last.output_shape or first.packed_input_shape != last.packed_output_shape:
-        raise ValueError("Fused VTA residual currently requires an identity shortcut shape")
+        if len(functions) == 3:
+            return _projection_residual_wrapper(function, symbol, functions)
+        raise ValueError("Fused VTA residual requires identity or three-Conv projection shape")
     if any(
         left.packed_output_shape != right.packed_input_shape
         for left, right in zip(convs, convs[1:])
@@ -312,6 +314,9 @@ def _residual_conv_wrapper(function, symbol, functions):
     n, channels, height, width = first.input_shape
     pn, pc, _, _, pb, pi = first.packed_input_shape
     packed_bytes = int(np.prod(first.packed_input_shape))
+    tsim_widen_shortcut = env.TARGET == "tsim"
+    shortcut_buffer = "skip_acc" if tsim_widen_shortcut else "skip"
+    shortcut_dtype = "kDLInt,32,1" if tsim_widen_shortcut else "kDLInt,8,1"
     constants, declarations, init, calls = [], [], [], []
     for index, item in enumerate(convs):
         constants += [_c_array(f"rw{index}", item.packed_weight, "int8_t"),
@@ -332,7 +337,7 @@ def _residual_conv_wrapper(function, symbol, functions):
         ws = ",".join(str(int(x)) for x in item.packed_weight.shape)
         os = ",".join(str(int(x)) for x in item.packed_output_shape)
         shortcut_tensor = (
-            f",{{skip,dev,6,{{kDLInt,8,1}},ros{index},0,0}}" if index == len(convs) - 1 else ""
+            f",{{{shortcut_buffer},dev,6,{{{shortcut_dtype}}},ros{index},0,0}}" if index == len(convs) - 1 else ""
         )
         argument_count = 5 if index == len(convs) - 1 else 4
         calls.append(f"""
@@ -342,30 +347,34 @@ def _residual_conv_wrapper(function, symbol, functions):
     {{rbbuf{index},dev,6,{{kDLInt,32,1}},ros{index},0,0}}{shortcut_tensor},
     {{{output_buffer},dev,6,{{kDLInt,8,1}},ros{index},0,0}}}};
   for(int i=0;i<{argument_count};++i)ka[i].v_handle=&rts{index}[i];
-  if(!rc)rc={symbol}_conv_{index}(ka,kt5,{argument_count},ret,ret_tcode,resource);VTARuntimeShutdown();
+  if(!rc)rc={symbol}_conv_{index}(ka,kt5,{argument_count},ret,ret_tcode,resource);
+  {"if(!rc)rc=TVMSynchronize(kDLExtDev,0,NULL);" if index != len(convs) - 1 else ""}
 """)
     source = f'''
 {_C_HEADER}
 {''.join(constants)}
 {''.join(declarations)}
-static void *skip=0,*branch=0,*mid0=0,*mid1=0;static int ready=0;
+static void *skip=0,*skip_acc=0,*branch=0,*mid0=0,*mid1=0;static int ready=0;
 static int host_bridge_count=0;
 static pthread_mutex_t residual_lock=PTHREAD_MUTEX_INITIALIZER;
 __attribute__((destructor))static void residual_release(void){{
- if(skip)VTABufferFree(skip);if(branch)VTABufferFree(branch);
+ if(skip)VTABufferFree(skip);if(skip_acc)VTABufferFree(skip_acc);if(branch)VTABufferFree(branch);
  if(mid0)VTABufferFree(mid0);if(mid1)VTABufferFree(mid1);
  {''.join(f'if(rwbuf{i})VTABufferFree(rwbuf{i});if(rbbuf{i})VTABufferFree(rbbuf{i});' for i in range(len(convs)))}}}
 TVM_DLL int {symbol}(TVMValue* args,int* tcodes,int nargs,TVMValue* ret,int* ret_tcode,void* resource){{
  if(nargs!=2)return -1;pthread_mutex_lock(&residual_lock);
  if(!ready){{skip=VTABufferAlloc({packed_bytes});branch=VTABufferAlloc({packed_bytes});
   mid0=VTABufferAlloc({packed_bytes});mid1=VTABufferAlloc({packed_bytes});
+  {f'skip_acc=VTABufferAlloc({packed_bytes * 4});' if tsim_widen_shortcut else ''}
   {''.join(init)}ready=1;}}
  int8_t hi[{packed_bytes}],ho[{packed_bytes}];for(int i=0;i<{packed_bytes};++i)hi[i]=0;
  int8_t* src=(int8_t*)((DLTensor*)args[0].v_handle)->data;
  for(int b=0;b<{n};++b)for(int c=0;c<{channels};++c)for(int y=0;y<{height};++y)for(int x=0;x<{width};++x){{
   int bo=b/{env.BATCH},bi=b%{env.BATCH},co=c/{env.BLOCK_IN},ci=c%{env.BLOCK_IN};
   hi[(((((bo*{pc}+co)*{height}+y)*{width}+x)*{env.BATCH}+bi)*{env.BLOCK_IN}+ci)]=src[((b*{channels}+c)*{height}+y)*{width}+x];}}
- VTABufferCopy(hi,0,skip,0,{packed_bytes},1);DLDevice dev={{kDLExtDev,0}};TVMValue ka[5];
+ VTABufferCopy(hi,0,skip,0,{packed_bytes},1);
+ {f'int32_t hskip_acc[{packed_bytes}];for(int i=0;i<{packed_bytes};++i)hskip_acc[i]=hi[i];VTABufferCopy(hskip_acc,0,skip_acc,0,{packed_bytes * 4},1);' if tsim_widen_shortcut else ''}
+ DLDevice dev={{kDLExtDev,0}};TVMValue ka[5];
  int kt5[5]={{kTVMDLTensorHandle,kTVMDLTensorHandle,kTVMDLTensorHandle,kTVMDLTensorHandle,kTVMDLTensorHandle}};int rc=0;
 {''.join(calls)}
  if(!rc)VTABufferCopy(branch,0,ho,0,{packed_bytes},2);int8_t* dst=(int8_t*)((DLTensor*)args[1].v_handle)->data;
@@ -375,6 +384,104 @@ TVM_DLL int {symbol}(TVMValue* args,int* tcodes,int nargs,TVMValue* ret,int* ret
  pthread_mutex_unlock(&residual_lock);return rc;}}
 '''
     return _compile_wrapper(convs, source)
+
+
+def _projection_residual_wrapper(function, symbol, functions):
+    """Compile main1/main2/projection as one external module with packed boundaries."""
+    env = __import__("vta").get_env()
+    main1 = compile_qnn_conv2d(functions[0], name=f"{symbol}_main1")
+    main2 = compile_qnn_conv2d(functions[1], name=f"{symbol}_main2", residual=True)
+    projection = compile_qnn_conv2d(functions[2], name=f"{symbol}_projection")
+    if main1.packed_output_shape != main2.packed_input_shape:
+        raise ValueError("Projection residual main branch packed shapes do not match")
+    if projection.packed_input_shape != main1.packed_input_shape:
+        raise ValueError("Projection and main branch must consume the same packed input")
+    if projection.packed_output_shape != main2.packed_output_shape:
+        raise ValueError("Projection and main branch output packed shapes do not match")
+    artifacts = [main1, main2, projection]
+    n, channels, height, width = main1.input_shape
+    _, out_channels, out_height, out_width = main2.output_shape
+    pn, pic, _, _, pb, pi = main1.packed_input_shape
+    pon, poc, _, _, pob, po = main2.packed_output_shape
+    input_bytes = int(np.prod(main1.packed_input_shape))
+    middle_bytes = int(np.prod(main1.packed_output_shape))
+    output_bytes = int(np.prod(main2.packed_output_shape))
+    tsim_widen_shortcut = env.TARGET == "tsim"
+    projection_shortcut_buffer = "pshort_acc" if tsim_widen_shortcut else "pshort"
+    projection_shortcut_dtype = "kDLInt,32,1" if tsim_widen_shortcut else "kDLInt,8,1"
+    constants = []
+    declarations = []
+    initialization = []
+    releases = []
+    for index, item in enumerate(artifacts):
+        constants += [_c_array(f"pw{index}", item.packed_weight, "int8_t"),
+                      _c_array(f"pbias{index}", item.packed_bias, "int32_t")]
+        declarations.append(
+            f"static void *pwbuf{index}=0,*pbbuf{index}=0;"
+            f"extern int {symbol}_{('main1','main2','projection')[index]}"
+            "(TVMValue*,int*,int,TVMValue*,int*,void*);"
+        )
+        initialization.append(
+            f"pwbuf{index}=VTABufferAlloc({item.packed_weight.nbytes});"
+            f"pbbuf{index}=VTABufferAlloc({item.packed_bias.nbytes});"
+            f"VTABufferCopy(pw{index},0,pwbuf{index},0,{item.packed_weight.nbytes},1);"
+            f"VTABufferCopy(pbias{index},0,pbbuf{index},0,{item.packed_bias.nbytes},1);"
+        )
+        releases.append(f"if(pwbuf{index})VTABufferFree(pwbuf{index});if(pbbuf{index})VTABufferFree(pbbuf{index});")
+
+    def shape(item, packed_input=True):
+        value = item.packed_input_shape if packed_input else item.packed_output_shape
+        return ",".join(str(int(x)) for x in value)
+
+    def weight_shape(item):
+        return ",".join(str(int(x)) for x in item.packed_weight.shape)
+
+    source = f'''
+{_C_HEADER}
+{''.join(constants)}
+{''.join(declarations)}
+static void *pin=0,*pmid=0,*pshort=0,*pshort_acc=0,*pout=0;static int projection_ready=0;
+static pthread_mutex_t projection_lock=PTHREAD_MUTEX_INITIALIZER;
+__attribute__((destructor))static void projection_release(void){{
+ if(pin)VTABufferFree(pin);if(pmid)VTABufferFree(pmid);if(pshort)VTABufferFree(pshort);
+ if(pshort_acc)VTABufferFree(pshort_acc);if(pout)VTABufferFree(pout);
+ {''.join(releases)}}}
+TVM_DLL int {symbol}(TVMValue* args,int* tcodes,int nargs,TVMValue* ret,int* ret_tcode,void* resource){{
+ if(nargs!=2)return -1;pthread_mutex_lock(&projection_lock);
+ if(!projection_ready){{pin=VTABufferAlloc({input_bytes});pmid=VTABufferAlloc({middle_bytes});
+  pshort=VTABufferAlloc({output_bytes});pout=VTABufferAlloc({output_bytes});
+  {f'pshort_acc=VTABufferAlloc({output_bytes * 4});' if tsim_widen_shortcut else ''}
+  {''.join(initialization)}projection_ready=1;}}
+ int8_t hi[{input_bytes}],ho[{output_bytes}];for(int i=0;i<{input_bytes};++i)hi[i]=0;
+ int8_t* src=(int8_t*)((DLTensor*)args[0].v_handle)->data;
+ for(int b=0;b<{n};++b)for(int c=0;c<{channels};++c)for(int y=0;y<{height};++y)for(int x=0;x<{width};++x){{
+  int bo=b/{env.BATCH},bi=b%{env.BATCH},co=c/{env.BLOCK_IN},ci=c%{env.BLOCK_IN};
+  hi[(((((bo*{pic}+co)*{height}+y)*{width}+x)*{env.BATCH}+bi)*{env.BLOCK_IN}+ci)]=src[((b*{channels}+c)*{height}+y)*{width}+x];}}
+ VTABufferCopy(hi,0,pin,0,{input_bytes},1);DLDevice dev={{kDLExtDev,0}};TVMValue ka[5];
+ int kt[5]={{kTVMDLTensorHandle,kTVMDLTensorHandle,kTVMDLTensorHandle,kTVMDLTensorHandle,kTVMDLTensorHandle}};int rc=0;
+ int64_t pds[6]={{{shape(projection)}}},pws[6]={{{weight_shape(projection)}}},pos[6]={{{shape(projection,False)}}};
+ DLTensor pts[4]={{{{pin,dev,6,{{kDLInt,8,1}},pds,0,0}},{{pwbuf2,dev,6,{{kDLInt,8,1}},pws,0,0}},
+  {{pbbuf2,dev,6,{{kDLInt,32,1}},pos,0,0}},{{pshort,dev,6,{{kDLInt,8,1}},pos,0,0}}}};
+ for(int i=0;i<4;++i)ka[i].v_handle=&pts[i];if(!rc)rc={symbol}_projection(ka,kt,4,ret,ret_tcode,resource);
+ if(!rc)rc=TVMSynchronize(kDLExtDev,0,NULL);
+ {f'int8_t hpshort[{output_bytes}];int32_t hpshort_acc[{output_bytes}];if(!rc)VTABufferCopy(pshort,0,hpshort,0,{output_bytes},2);if(!rc){{for(int i=0;i<{output_bytes};++i)hpshort_acc[i]=hpshort[i];VTABufferCopy(hpshort_acc,0,pshort_acc,0,{output_bytes * 4},1);}}' if tsim_widen_shortcut else ''}
+ int64_t d1[6]={{{shape(main1)}}},w1[6]={{{weight_shape(main1)}}},o1[6]={{{shape(main1,False)}}};
+ DLTensor t1[4]={{{{pin,dev,6,{{kDLInt,8,1}},d1,0,0}},{{pwbuf0,dev,6,{{kDLInt,8,1}},w1,0,0}},
+  {{pbbuf0,dev,6,{{kDLInt,32,1}},o1,0,0}},{{pmid,dev,6,{{kDLInt,8,1}},o1,0,0}}}};
+ for(int i=0;i<4;++i)ka[i].v_handle=&t1[i];if(!rc)rc={symbol}_main1(ka,kt,4,ret,ret_tcode,resource);
+ if(!rc)rc=TVMSynchronize(kDLExtDev,0,NULL);
+ int64_t d2[6]={{{shape(main2)}}},w2[6]={{{weight_shape(main2)}}},o2[6]={{{shape(main2,False)}}};
+ DLTensor t2[5]={{{{pmid,dev,6,{{kDLInt,8,1}},d2,0,0}},{{pwbuf1,dev,6,{{kDLInt,8,1}},w2,0,0}},
+  {{pbbuf1,dev,6,{{kDLInt,32,1}},o2,0,0}},{{{projection_shortcut_buffer},dev,6,{{{projection_shortcut_dtype}}},o2,0,0}},
+  {{pout,dev,6,{{kDLInt,8,1}},o2,0,0}}}};
+ for(int i=0;i<5;++i)ka[i].v_handle=&t2[i];if(!rc)rc={symbol}_main2(ka,kt,5,ret,ret_tcode,resource);
+ if(!rc)VTABufferCopy(pout,0,ho,0,{output_bytes},2);int8_t* dst=(int8_t*)((DLTensor*)args[1].v_handle)->data;
+ if(!rc)for(int b=0;b<{n};++b)for(int c=0;c<{out_channels};++c)for(int y=0;y<{out_height};++y)for(int x=0;x<{out_width};++x){{
+  int bo=b/{env.BATCH},bi=b%{env.BATCH},co=c/{env.BLOCK_OUT},ci=c%{env.BLOCK_OUT};
+  dst[((b*{out_channels}+c)*{out_height}+y)*{out_width}+x]=ho[(((((bo*{poc}+co)*{out_height}+y)*{out_width}+x)*{env.BATCH}+bi)*{env.BLOCK_OUT}+ci)];}}
+ pthread_mutex_unlock(&projection_lock);return rc;}}
+'''
+    return _compile_wrapper(artifacts, source)
 
 
 def _add_wrapper(function, symbol):

@@ -132,7 +132,11 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d", residual=False):
     data = te.placeholder(data_shape, name="data", dtype=env.inp_dtype)
     weight = te.placeholder(weight_shape, name="weight", dtype=env.wgt_dtype)
     bias = te.placeholder(output_shape, name="bias", dtype=env.acc_dtype)
-    shortcut = te.placeholder(output_shape, name="shortcut", dtype=env.inp_dtype) if residual else None
+    # Chisel currently has no decoder/data path for VTA_MEM_ID_ACC_8BIT (5).
+    # TSIM therefore consumes an explicitly widened accumulator shortcut;
+    # FSIM retains the native packed int8 shortcut path.
+    shortcut_dtype = env.acc_dtype if env.TARGET == "tsim" else env.inp_dtype
+    shortcut = te.placeholder(output_shape, name="shortcut", dtype=shortcut_dtype) if residual else None
     data_buf = topi.nn.pad(
         data, [0, 0, pad_top, pad_left, 0, 0], [0, 0, pad_bottom, pad_right, 0, 0],
         name="data_buf",
@@ -154,26 +158,18 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d", residual=False):
         name="accum",
     )
     biased = te.compute(output_shape, lambda *idx: accum(*idx) + bias(*idx), name="biased")
-    residual_sum = biased
-    if residual:
-        shortcut_buf = te.compute(output_shape, lambda *idx: shortcut(*idx), name="shortcut_buf")
-        residual_sum = te.compute(
-            output_shape,
-            lambda *idx: biased(*idx) + shortcut_buf(*idx),
-            name="residual_add",
-        )
-    scaled = residual_sum
+    scaled = biased
     if requant_shift > 0:
         scaled = te.compute(
             output_shape,
-            lambda *idx: residual_sum(*idx) * tvm.tir.const(1 << requant_shift, env.acc_dtype),
+            lambda *idx: biased(*idx) * tvm.tir.const(1 << requant_shift, env.acc_dtype),
             name="requantize_shift",
         )
     elif requant_shift < 0:
         rounding = 1 << (-requant_shift - 1)
         rounded = te.compute(
             output_shape,
-            lambda *idx: residual_sum(*idx) + tvm.tir.const(rounding, env.acc_dtype),
+            lambda *idx: biased(*idx) + tvm.tir.const(rounding, env.acc_dtype),
             name="requantize_round",
         )
         scaled = te.compute(
@@ -199,7 +195,15 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d", residual=False):
         lambda *idx: tvm.te.max(clipped_max(*idx), tvm.tir.const(clip_min, env.acc_dtype)),
         name="clip_min",
     )
-    output = te.compute(output_shape, lambda *idx: narrowed(*idx).astype(env.out_dtype), name="output")
+    final_value = narrowed
+    if residual:
+        shortcut_buf = te.compute(output_shape, lambda *idx: shortcut(*idx), name="shortcut_buf")
+        final_value = te.compute(
+            output_shape,
+            lambda *idx: narrowed(*idx) + shortcut_buf(*idx),
+            name="residual_add",
+        )
+    output = te.compute(output_shape, lambda *idx: final_value(*idx).astype(env.out_dtype), name="output")
 
     schedule = te.create_schedule(output.op)
     schedule[data_buf].set_scope(env.inp_scope)
@@ -207,8 +211,8 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d", residual=False):
     accumulator_stages = (accum, biased, clipped_max, narrowed)
     alu_stages = (biased, clipped_max, narrowed)
     if residual:
-        accumulator_stages += (shortcut_buf, residual_sum)
-        alu_stages += (residual_sum,)
+        accumulator_stages += (shortcut_buf, final_value)
+        alu_stages += (final_value,)
     if requant_shift:
         accumulator_stages += (scaled,)
         alu_stages += (scaled,)

@@ -1,6 +1,7 @@
 """Standard Relay GraphExecutor using the out-of-tree VTA external compiler."""
 
 import numpy as np
+import os
 import time
 import pytest
 import tvm
@@ -355,6 +356,23 @@ def test_fused_resnet_basic_block_keeps_packed_residual():
     np.testing.assert_equal(runtime.get_output(0).numpy(), (data + data).astype("int8"))
 
 
+def test_fused_resnet_basic_block_tiny_for_tsim():
+    """Minimal fused residual used by the cycle-accurate TSIM smoke test."""
+    env = vta.get_env()
+    shape = (1, env.BLOCK_IN, 1, 1)
+    data_var = relay.var("data", shape=shape, dtype="int8")
+    identity = np.zeros((env.BLOCK_OUT, env.BLOCK_IN, 1, 1), dtype="int8")
+    for channel in range(env.BLOCK_IN):
+        identity[channel, channel, 0, 0] = 1
+    result = relay.add(_conv2d(_conv2d(data_var, identity), identity), data_var)
+    mod = tvm.IRModule.from_expr(relay.Function([data_var], result))
+    runtime = _build_runtime(mod)
+    data = np.random.randint(-16, 17, shape).astype("int8")
+    runtime.set_input("data", data)
+    runtime.run()
+    np.testing.assert_equal(runtime.get_output(0).numpy(), (data + data).astype("int8"))
+
+
 def test_resnet_stage_with_stride2_downsample():
     """Two blocks including the ResNet stage-transition projection shortcut."""
     env = vta.get_env()
@@ -386,6 +404,37 @@ def test_resnet_stage_with_stride2_downsample():
     expected = np.zeros((1, out_channels, 4, 4), dtype="int8")
     expected[:, :env.BLOCK_IN] = (downsampled.astype("int16") * 4).astype("int8")
     np.testing.assert_equal(runtime.get_output(0).numpy(), expected)
+
+
+def test_projection_residual_is_one_external_region_and_keeps_packed_branches():
+    env = vta.get_env()
+    input_shape = (1, env.BLOCK_IN, 4, 4)
+    data_var = relay.var("data", shape=input_shape, dtype="int8")
+    out_channels = 2 * env.BLOCK_OUT
+    main1 = np.zeros((out_channels, env.BLOCK_IN, 3, 3), dtype="int8")
+    main2 = np.zeros((out_channels, out_channels, 3, 3), dtype="int8")
+    projection = np.zeros((out_channels, env.BLOCK_IN, 1, 1), dtype="int8")
+    for channel in range(env.BLOCK_IN):
+        main1[channel, channel, 1, 1] = 1
+        projection[channel, channel, 0, 0] = 1
+    for channel in range(out_channels):
+        main2[channel, channel, 1, 1] = 1
+    result = relay.add(
+        _conv2d(_conv2d(data_var, main1, stride=2, padding=1), main2, padding=1),
+        _conv2d(data_var, projection, stride=2),
+    )
+    mod = tvm.IRModule.from_expr(relay.Function([data_var], result))
+    partitioned = vta.partition_for_vta(mod)
+    regions = [
+        function for function in partitioned.functions.values()
+        if isinstance(function, relay.Function) and function.attrs
+        and function.attrs.get("Compiler") == "vta"
+    ]
+    assert len(regions) == 1
+    data = np.random.randint(-16, 17, input_shape).astype("int8")
+    expected = np.zeros((1, out_channels, 2, 2), dtype="int8")
+    expected[:, :env.BLOCK_IN] = (data[:, :, ::2, ::2].astype("int16") * 2).astype("int8")
+    np.testing.assert_equal(_run(mod, data), expected)
 
 
 def test_resnet18_four_block_subgraph_and_profiler_metrics():
@@ -510,3 +559,26 @@ def test_complete_resnet18_mixed_graph_executor_fsim():
     output = runtime.get_output(0).numpy()
     assert output.shape == (1, 4)
     assert np.isfinite(output).all()
+
+
+def test_official_torchvision_resnet18_basic_block_weights_fsim():
+    """Compile and execute one block using torchvision's official int8 weights."""
+    archive_path = os.environ.get("VTA_RESNET18_NPZ")
+    if not archive_path:
+        pytest.skip("set VTA_RESNET18_NPZ to the portable official-weight archive")
+    archive = np.load(archive_path, allow_pickle=False)
+    first_weight = archive["layer1.0.conv1.weight"].astype("int8")
+    second_weight = archive["layer1.0.conv2.weight"].astype("int8")
+    assert first_weight.shape == second_weight.shape == (64, 64, 3, 3)
+    data_var = relay.var("data", shape=(1, 64, 1, 1), dtype="int8")
+    result = relay.add(
+        _conv2d(_conv2d(data_var, first_weight, padding=1), second_weight, padding=1),
+        data_var,
+    )
+    mod = tvm.IRModule.from_expr(relay.Function([data_var], result))
+    data = np.random.randint(-1, 2, (1, 64, 1, 1)).astype("int8")
+    first = conv2d_nchw_python(data.astype("int32"), first_weight.astype("int32"), 1, 1)
+    first = np.clip(first, -128, 127).astype("int8")
+    second = conv2d_nchw_python(first.astype("int32"), second_weight.astype("int32"), 1, 1)
+    expected = (np.clip(second, -128, 127).astype("int8") + data).astype("int8")
+    np.testing.assert_equal(_run(mod, data), expected)

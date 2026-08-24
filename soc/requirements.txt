@@ -1,0 +1,11 @@
+litex==2024.12
+litex-boards==2023.12
+litedram==2024.12
+migen==0.9.2
+liteeth==2024.12
+liteiclink==2025.4
+litescope==2024.12
+pythondata-cpu-vexriscv==1.0.1.post407
+pythondata-software-compiler-rt==0.0.post6206
+pythondata-software-picolibc==1.7.9.post181
+pythondata-misc-tapcfg==0.0.post517

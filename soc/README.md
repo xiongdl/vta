@@ -73,6 +73,10 @@ Vivado project without running Vivado with:
 
 The APB32 firmware driver and standalone AHB32-to-APB32 bridge are present.
 The 32-bit simulation system has executed the LiteX BIOS banner under
-Verilator. AHB VCR insertion into LiteX, VTA workload execution, AHB/AXI32 memory
+Verilator. On macOS, `make sim-run` applies the pinned LiteX compatibility patch,
+builds with the local RISC-V toolchain and system clang++, and starts the BIOS.
+After a model has been built, `make vcr-smoke` writes and reads VTA register
+offset `0x08` through the CPU and checks the exact value. AHB VCR insertion into
+LiteX, VTA workload execution, AHB/AXI32 memory
 variants, NN package loading and the actual ZCU104 bitstream remain required
 before the system can be described as inference-ready.

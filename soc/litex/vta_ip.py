@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from migen import ClockSignal, Constant, FSM, If, Instance, Module, NextState, ResetSignal, Signal
+from migen import ClockSignal, Constant, FSM, If, Instance, Module, NextState, NextValue, ResetSignal, Signal
 from litex.soc.interconnect import axi, wishbone
 
 
@@ -26,11 +26,13 @@ class WishboneToAPB32(Module):
         self.submodules.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
             If(self.wb.cyc & self.wb.stb,
-                self.paddr.eq(self.wb.adr[: max(0, address_width - 2)] << 2),
-                self.pwrite.eq(self.wb.we),
-                self.pwdata.eq(self.wb.dat_w),
-                self.pstrb.eq(self.wb.sel),
-                self.pprot.eq(0),
+                # APB request fields must remain stable through SETUP and
+                # ACCESS, after the originating Wishbone request is accepted.
+                NextValue(self.paddr, self.wb.adr[: max(0, address_width - 2)] << 2),
+                NextValue(self.pwrite, self.wb.we),
+                NextValue(self.pwdata, self.wb.dat_w),
+                NextValue(self.pstrb, self.wb.sel),
+                NextValue(self.pprot, 0),
                 NextState("SETUP")))
         fsm.act("SETUP", self.psel.eq(1), NextState("ACCESS"))
         fsm.act("ACCESS",

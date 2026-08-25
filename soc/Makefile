@@ -2,7 +2,7 @@ PYTHON ?= python3
 CONFIG ?= config/sim_default.json
 BUILD_DIR ?= build
 
-.PHONY: check generate test sim zcu104
+.PHONY: check generate test sim sim-run vcr-smoke zcu104
 
 check:
 	$(PYTHON) tools/soc_config.py check --config $(CONFIG)
@@ -16,6 +16,11 @@ test:
 sim: check generate
 	$(PYTHON) litex/vta_soc.py --config $(CONFIG) --build-dir $(BUILD_DIR)/sim --sim
 
+sim-run:
+	./scripts/sim_run_macos.sh
+
+vcr-smoke:
+	$(PYTHON) tools/vcr_smoke.py --gateware $(BUILD_DIR)/sim/gateware
+
 zcu104: check generate
 	$(PYTHON) litex/vta_soc.py --config $(CONFIG) --build-dir $(BUILD_DIR)/zcu104 --target zcu104 --build
-

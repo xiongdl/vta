@@ -86,6 +86,14 @@ class VirtualMemoryManager {
    * \param size The size of memory
    */
   void MemCopyToHost(void* dst, const void * src, size_t size);
+  /*!
+   * \brief Dump all live simulated DRAM allocations for an offline VTA case.
+   *
+   * This diagnostic hook is intentionally implemented at the simulated
+   * physical-memory boundary so FSIM and TSIM produce the same raw format.
+   */
+  void DumpCase(const char* directory, const char* phase,
+                vta_phy_addr_t insn_phy_addr, uint32_t insn_count);
   static VirtualMemoryManager* Global();
 
  private:

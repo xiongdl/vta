@@ -34,7 +34,10 @@ def read_until(fd: int, marker: bytes, timeout: float) -> bytes:
             raise TimeoutError(bytes(data[-500:]))
         ready, _, _ = select.select([fd], [], [], remaining)
         if ready:
-            data.extend(os.read(fd, 4096))
+            chunk = os.read(fd, 4096)
+            if not chunk:
+                raise RuntimeError(f"simulation console closed before {marker!r}: {bytes(data[-500:])!r}")
+            data.extend(chunk)
     return bytes(data)
 
 

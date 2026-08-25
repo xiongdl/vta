@@ -30,6 +30,7 @@
 #include <map>
 #include <unordered_map>
 #include <cstring>
+#include <cstdlib>
 #include <sstream>
 
 #include "../vmem/virtual_memory.h"
@@ -619,8 +620,16 @@ int VTADeviceRun(VTADeviceHandle handle,
                  vta_phy_addr_t insn_phy_addr,
                  uint32_t insn_count,
                  uint32_t wait_cycles) {
-  return static_cast<vta::sim::Device*>(handle)->Run(
+  const char* case_dir = std::getenv("VTA_CASE_DUMP_DIR");
+  if (case_dir != nullptr && case_dir[0] != '\0') {
+    vta::sim::DRAM::Global()->DumpCase(case_dir, "before", insn_phy_addr, insn_count);
+  }
+  int status = static_cast<vta::sim::Device*>(handle)->Run(
       insn_phy_addr, insn_count, wait_cycles);
+  if (case_dir != nullptr && case_dir[0] != '\0') {
+    vta::sim::DRAM::Global()->DumpCase(case_dir, "after", insn_phy_addr, insn_count);
+  }
+  return status;
 }
 
 void VTAProgram(const char* bitstream) {

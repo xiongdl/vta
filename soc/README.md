@@ -80,3 +80,45 @@ offset `0x08` through the CPU and checks the exact value. AHB VCR insertion into
 LiteX, VTA workload execution, AHB/AXI32 memory
 variants, NN package loading and the actual ZCU104 bitstream remain required
 before the system can be described as inference-ready.
+
+## FSIM/TSIM case export and SoC replay
+
+The simulator drivers have an opt-in raw DRAM export hook. Set
+`VTA_CASE_DUMP_DIR` before a workload, or call `VTAExportCase()` immediately
+before and after `VTADeviceRun()`. FSIM and TSIM then emit the same
+`before_manifest.json`/`after_manifest.json` plus allocation binaries. Normal
+execution is unchanged when the variable is absent.
+
+Convert a raw dump into a relocatable SoC package with:
+
+```bash
+.venv/bin/python tools/vta_case.py pack /path/to/raw /path/to/case
+.venv/bin/python tools/vta_case.py validate /path/to/case
+```
+
+The packer uses the active `vta_config.json` and a helper compiled against
+`include/vta/hw_spec.h`; it does not duplicate or change the instruction ABI.
+It rewrites only `VTAMemInsn.dram_base`, changing simulator absolute element
+addresses into offsets relative to the VCR base for each memory type. ACC and
+ACC-8 loads share one aligned `acc.bin`, so bias and per-channel ALU parameter
+allocations (for example multiplier and shift planes) are delivered as one
+array without requiring an RTL or `hw_spec.h` field change. `manifest.json`
+records every access, section hash and expected post-run output.
+
+A minimal direct-FSIM capture, useful for checking the export path independently
+of TVM's dynamic-library search order, is:
+
+```bash
+python tools/fsim_case_smoke.py /tmp/vta-raw \
+  --library ../build-standalone-fsim-case/libvta_fsim_case.dylib
+python tools/vta_case.py pack /tmp/vta-raw /tmp/vta-case
+```
+
+Replay a package through an existing LiteX model with:
+
+```bash
+make case-run CASE=/tmp/vta-case BUILD_DIR=build
+```
+
+The runner loads all manifest sections, flushes CPU/L2 caches, programs the
+seven VCR workload registers, starts VTA and checks every expected output span.

@@ -33,8 +33,14 @@
 #include <utility>
 #include <iterator>
 #include <unordered_map>
+#include <vta/hw_spec.h>
 #include <map>
 #include <mutex>
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <string>
+#include <vector>
 
 namespace vta {
 namespace vmem {
@@ -140,6 +146,71 @@ void VirtualMemoryManager::MemCopyToHost(void* dst, const void * src, size_t siz
   memcpy(dst, addr, size);
 }
 
+void VirtualMemoryManager::DumpCase(const char* directory, const char* phase,
+                                    vta_phy_addr_t insn_phy_addr,
+                                    uint32_t insn_count) {
+  struct Region {
+    uint64_t phy_addr;
+    size_t size;
+    const void* data;
+  };
+  std::vector<Region> regions;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    regions.reserve(pmap_.size());
+    for (const auto& entry : pmap_) {
+      const Page* page = entry.second.get();
+      regions.push_back({
+          static_cast<uint64_t>((page->ptable_begin + 1) << kPageBits),
+          page->num_pages << kPageBits,
+          page->data});
+    }
+  }
+  std::sort(regions.begin(), regions.end(),
+            [](const Region& a, const Region& b) { return a.phy_addr < b.phy_addr; });
+
+  const std::string prefix = std::string(directory) + "/" + phase;
+  const std::string manifest_path = prefix + "_manifest.json";
+  FILE* manifest = std::fopen(manifest_path.c_str(), "w");
+  if (manifest == nullptr) {
+    std::perror(manifest_path.c_str());
+    std::abort();
+  }
+  std::fprintf(manifest,
+      "{\n  \"format\": \"vta-raw-case-v1\",\n"
+      "  \"phase\": \"%s\",\n  \"insn_phy_addr\": %llu,\n"
+      "  \"insn_count\": %u,\n"
+      "  \"abi\": {\"insn_bytes\": %d, \"uop_bytes\": %d, "
+      "\"inp_elem_bytes\": %d, \"wgt_elem_bytes\": %d, "
+      "\"acc_elem_bytes\": %d, \"out_elem_bytes\": %d},\n"
+      "  \"allocations\": [\n",
+      phase, static_cast<unsigned long long>(insn_phy_addr), insn_count,
+      VTA_INS_ELEM_BYTES, VTA_UOP_ELEM_BYTES, VTA_INP_ELEM_BYTES,
+      VTA_WGT_ELEM_BYTES, VTA_ACC_ELEM_BYTES, VTA_OUT_ELEM_BYTES);
+  for (size_t index = 0; index < regions.size(); ++index) {
+    char filename[64];
+    std::snprintf(filename, sizeof(filename), "%s_alloc_%04zu.bin", phase, index);
+    const std::string path = std::string(directory) + "/" + filename;
+    FILE* output = std::fopen(path.c_str(), "wb");
+    if (output == nullptr ||
+        std::fwrite(regions[index].data, 1, regions[index].size, output) != regions[index].size ||
+        std::fclose(output) != 0) {
+      std::perror(path.c_str());
+      std::abort();
+    }
+    std::fprintf(manifest,
+        "    {\"phy_addr\": %llu, \"size\": %zu, \"file\": \"%s\"}%s\n",
+        static_cast<unsigned long long>(regions[index].phy_addr),
+        regions[index].size, filename,
+        index + 1 == regions.size() ? "" : ",");
+  }
+  std::fprintf(manifest, "  ]\n}\n");
+  if (std::fclose(manifest) != 0) {
+    std::perror(manifest_path.c_str());
+    std::abort();
+  }
+}
+
 VirtualMemoryManager* VirtualMemoryManager::Global() {
   static VirtualMemoryManager inst;
   return &inst;
@@ -147,3 +218,9 @@ VirtualMemoryManager* VirtualMemoryManager::Global() {
 
 }  // namespace vmem
 }  // namespace vta
+
+void VTAExportCase(const char* directory, const char* phase,
+                   vta_phy_addr_t insn_phy_addr, uint32_t insn_count) {
+  vta::vmem::VirtualMemoryManager::Global()->DumpCase(
+      directory, phase, insn_phy_addr, insn_count);
+}

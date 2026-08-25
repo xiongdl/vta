@@ -10,6 +10,7 @@ set(TVM_BUILD_DIR "" CACHE PATH "Path containing libtvm_runtime")
 set(VTA_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/config/vta_config.json" CACHE FILEPATH
     "VTA hardware configuration")
 set(VTA_RUNTIME "sim" CACHE STRING "Runtime to build: sim or tsim")
+set(VTA_OUTPUT_NAME "" CACHE STRING "Optional runtime library basename")
 set_property(CACHE VTA_RUNTIME PROPERTY STRINGS sim tsim)
 
 if(NOT EXISTS "${TVM_SOURCE_DIR}/include/tvm/runtime/c_runtime_api.h")
@@ -53,6 +54,9 @@ else()
 endif()
 
 add_library(${VTA_TARGET_NAME} SHARED ${VTA_COMMON_SOURCES})
+if(VTA_OUTPUT_NAME)
+  set_target_properties(${VTA_TARGET_NAME} PROPERTIES OUTPUT_NAME "${VTA_OUTPUT_NAME}")
+endif()
 target_include_directories(${VTA_TARGET_NAME} PRIVATE
   "${CMAKE_CURRENT_SOURCE_DIR}/include"
   "${CMAKE_CURRENT_SOURCE_DIR}/runtime"

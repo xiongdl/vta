@@ -141,6 +141,10 @@ void VTAFlushCache(void* vir_addr, vta_phy_addr_t phy_addr, int size);
  */
 void VTAInvalidateCache(void* vir_addr, vta_phy_addr_t phy_addr, int size);
 
+/*! \brief Export simulator DRAM for an offline replay case (FSIM/TSIM only). */
+void VTAExportCase(const char* directory, const char* phase,
+                   vta_phy_addr_t insn_phy_addr, uint32_t insn_count);
+
 #ifdef __cplusplus
 }
 #endif

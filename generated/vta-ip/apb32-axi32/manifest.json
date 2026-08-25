@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "variant": "apb32-axi32",
+  "top": "VTAShellAPB",
+  "host_protocol": "apb4",
+  "host_data_width": 32,
+  "memory_protocol": "axi4",
+  "memory_data_width": 32,
+  "memory_address_width": 32,
+  "rtl_sha256": "47cd7bc21a273570cd7e8c42b4daa9684a9a1826d768da887ed337e451b874ec",
+  "vta_config_sha256": "1719baccd9c9073140260c163463f082d539a5fdad86b9b18ae5dcc25bfdbf4d",
+  "source_commit": "f243284224d764e87a246bb4a00e4d5c75d19aea",
+  "generator": "vta.socgen.APBHostSim32",
+  "source_policy": "pre-generated RTL; SoC builds must not invoke Chisel"
+}

@@ -45,12 +45,25 @@ python3 tools/soc_config.py generate \
 gateware also requires a Linux host with AMD Vivado; the macOS development host
 can run configuration tests and Verilator once LiteX dependencies are present.
 
+For an offline installation, cache every package in `requirements.txt`, including
+`meson` and `ninja`. LiteX uses them to configure and build Picolibc before the
+RISC-V BIOS is linked; generating the RTL alone does not exercise this dependency.
+The local `.venv` is created with the Python 3.10 interpreter from the
+`tvm_py310` Conda environment. On macOS, LiteX simulation also needs the native
+`libevent` and `json-c` libraries; this workspace obtains them from the same
+Conda environment as Verilator.
+
 ## Implemented baseline
 
 The current baseline imports a frozen `VTAShellAPB` APB32 + AXI64 package and
 elaborates a ZCU104 design containing VexRiscv, 64 KiB ROM, 512 KiB on-chip
-SRAM, UART, timer, ZCU104 DDR and VTA. VTA is a native master on the 64-bit AXI
-interconnect. Generate the Vivado project without running Vivado with:
+SRAM, UART, timer, ZCU104 DDR and VTA. The simulation target keeps the RV32/CSR
+AXI path at 32 bits: with the pinned LiteX version, a 64-bit AXI system bus
+turns RV32 accesses to CSR offsets such as `+4` into unsupported/misaligned
+64-bit transactions. VTA remains a native AXI64 master and LiteX inserts a
+width converter on the simulation target. The ZCU104 target retains a native
+64-bit system/memory interconnect for performance validation. Generate the
+Vivado project without running Vivado with:
 
 ```bash
 .venv/bin/python litex/vta_soc.py \
@@ -59,6 +72,7 @@ interconnect. Generate the Vivado project without running Vivado with:
 ```
 
 The APB32 firmware driver and standalone AHB32-to-APB32 bridge are present.
-Verilator full-SoC execution, AHB VCR insertion into LiteX, AHB/AXI32 memory
+The 32-bit simulation system has executed the LiteX BIOS banner under
+Verilator. AHB VCR insertion into LiteX, VTA workload execution, AHB/AXI32 memory
 variants, NN package loading and the actual ZCU104 bitstream remain required
 before the system can be described as inference-ready.

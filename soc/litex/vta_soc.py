@@ -58,7 +58,11 @@ class SimVTASoC(SimSoC):
             sdram_data_width=config["ddr"]["data_width"],
             cpu_type=config["soc"]["cpu"],
             bus_standard="axi",
-            bus_data_width=config["vta"]["memory_data_width"],
+            # Keep the RV32 CPU/CSR path at 32 bits.  A 64-bit AXI system bus
+            # turns 32-bit CSR accesses at address +4 into misaligned 64-bit
+            # transactions with the current LiteX AXI-to-CSR bridge.
+            # LiteX inserts a width converter for the native VTA AXI master.
+            bus_data_width=32,
             bus_address_width=config["soc"]["address_width"],
             integrated_rom_size=SOC_CONFIG.number(config["rom"]["size"]),
             integrated_sram_size=SOC_CONFIG.number(config["sram"]["size"]),

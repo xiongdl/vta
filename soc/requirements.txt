@@ -2,6 +2,8 @@ litex==2024.12
 litex-boards==2023.12
 litedram==2024.12
 migen==0.9.2
+meson==1.7.2
+ninja==1.11.1.4
 liteeth==2024.12
 liteiclink==2025.4
 litescope==2024.12

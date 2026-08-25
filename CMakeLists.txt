@@ -100,9 +100,5 @@ foreach(VTA_DEF IN LISTS VTA_DEFS)
   endif()
 endforeach()
 
-if(APPLE)
-  set_target_properties(${VTA_TARGET_NAME} PROPERTIES INSTALL_RPATH "@loader_path")
-endif()
-
 install(TARGETS ${VTA_TARGET_NAME} LIBRARY DESTINATION lib)
 install(DIRECTORY include/ DESTINATION include)

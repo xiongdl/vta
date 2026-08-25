@@ -5,29 +5,23 @@ repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
 workspace_dir="$(cd "${repo_dir}/.." && pwd)"
 tvm_source_dir="${TVM_SOURCE_DIR:-${workspace_dir}/tvm}"
 tvm_build_dir="${TVM_BUILD_DIR:-${tvm_source_dir}/build}"
-config_json="${VTA_CONFIG:-${repo_dir}/config/vta_config_fsim.json}"
-build_dir="${VTA_FSIM_BUILD_DIR:-${repo_dir}/build-fsim}"
+config_json="${VTA_FSIM_CONFIG:-${repo_dir}/config/vta_config_fsim.json}"
+build_dir="${repo_dir}/build/fsim"
 jobs="${VTA_BUILD_JOBS:-$(sysctl -n hw.logicalcpu 2>/dev/null || echo 4)}"
+tvm_status_before="$(git -C "${tvm_source_dir}" status --short)"
 
 export TVM_SOURCE_DIR="${tvm_source_dir}"
 export TVM_BUILD_DIR="${tvm_build_dir}"
 export VTA_CONFIG="${config_json}"
-export VTA_LIBRARY_PATH="${build_dir}"
+export VTA_LIBRARY_PATH="${repo_dir}/build/lib"
 export VTA_HW_PATH="${repo_dir}"
 export TVM_LIBRARY_PATH="${tvm_build_dir}"
 export PYTHONPATH="${repo_dir}/python:${tvm_source_dir}/python${PYTHONPATH:+:${PYTHONPATH}}"
 
-cmake -S "${repo_dir}" -B "${build_dir}" \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_C_COMPILER="${VTA_HOST_CC:-/usr/bin/clang}" \
-  -DCMAKE_CXX_COMPILER="${VTA_HOST_CXX:-/usr/bin/clang++}" \
-  -DTVM_SOURCE_DIR="${tvm_source_dir}" \
-  -DTVM_BUILD_DIR="${tvm_build_dir}" \
-  -DVTA_CONFIG="${config_json}" \
-  -DVTA_RUNTIME=sim
-cmake --build "${build_dir}" --parallel "${jobs}"
+"${repo_dir}/scripts/build_simulators.sh" sim
 
 python -c 'import vta; assert vta.get_env().TARGET == "sim"'
+python "${repo_dir}/scripts/verify_isolation.py"
 pytest -q \
   "${repo_dir}/tests/python/test_requantize.py" \
   "${repo_dir}/tests/python/test_relay_partition.py" \
@@ -37,8 +31,8 @@ pytest -q \
   "${repo_dir}/tests/python/test_execution_plan_fsim.py" \
   "${repo_dir}/tests/python/test_external_codegen_fsim.py"
 
-if [[ -n "$(git -C "${tvm_source_dir}" status --short)" ]]; then
-  echo "TVM source tree is not clean after standalone VTA regression" >&2
+if [[ "$(git -C "${tvm_source_dir}" status --short)" != "${tvm_status_before}" ]]; then
+  echo "standalone VTA regression changed the TVM source tree" >&2
   git -C "${tvm_source_dir}" status --short >&2
   exit 1
 fi

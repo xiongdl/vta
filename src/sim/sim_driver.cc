@@ -31,7 +31,12 @@
 #include <unordered_map>
 #include <cstring>
 #include <cstdlib>
+#include <cerrno>
+#include <cstdio>
+#include <atomic>
+#include <sys/stat.h>
 #include <sstream>
+#include <string>
 
 #include "../vmem/virtual_memory.h"
 
@@ -621,13 +626,22 @@ int VTADeviceRun(VTADeviceHandle handle,
                  uint32_t insn_count,
                  uint32_t wait_cycles) {
   const char* case_dir = std::getenv("VTA_CASE_DUMP_DIR");
+  std::string run_dir;
   if (case_dir != nullptr && case_dir[0] != '\0') {
-    vta::sim::DRAM::Global()->DumpCase(case_dir, "before", insn_phy_addr, insn_count);
+    static std::atomic<uint32_t> run_index{0};
+    char suffix[32];
+    std::snprintf(suffix, sizeof(suffix), "run_%04u", run_index.fetch_add(1));
+    run_dir = std::string(case_dir) + "/" + suffix;
+    if (mkdir(run_dir.c_str(), 0755) != 0 && errno != EEXIST) {
+      std::perror(run_dir.c_str());
+      std::abort();
+    }
+    vta::sim::DRAM::Global()->DumpCase(run_dir.c_str(), "before", insn_phy_addr, insn_count);
   }
   int status = static_cast<vta::sim::Device*>(handle)->Run(
       insn_phy_addr, insn_count, wait_cycles);
   if (case_dir != nullptr && case_dir[0] != '\0') {
-    vta::sim::DRAM::Global()->DumpCase(case_dir, "after", insn_phy_addr, insn_count);
+    vta::sim::DRAM::Global()->DumpCase(run_dir.c_str(), "after", insn_phy_addr, insn_count);
   }
   return status;
 }

@@ -51,7 +51,17 @@ def allocation_for(manifest: dict, address: int) -> dict:
     raise ValueError(f"address 0x{address:x} is outside all dumped allocations")
 
 
+def discover_raw(raw: Path) -> Path:
+    if (raw / "before_manifest.json").is_file():
+        return raw
+    runs = sorted(path for path in raw.glob("run_*") if (path / "before_manifest.json").is_file())
+    if not runs:
+        raise ValueError(f"no raw VTA case found under {raw}")
+    return runs[-1]
+
+
 def pack(raw: Path, output: Path, repo: Path) -> None:
+    raw = discover_raw(raw)
     before = json.loads((raw / "before_manifest.json").read_text())
     after = json.loads((raw / "after_manifest.json").read_text())
     config = json.loads((repo / "config/vta_config.json").read_text())

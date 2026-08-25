@@ -58,21 +58,20 @@ def find_libvta(lib_vta, optional=False):
     optional : bool
         Enable error check
     """
-    curr_path = os.path.dirname(os.path.abspath(os.path.expanduser(__file__)))
-    tvm_library_path = os.environ.get("VTA_LIBRARY_PATH", None)
-    if tvm_library_path is None:
-        tvm_library_path = os.path.join(
-            curr_path,
-            os.pardir,
-            os.pardir,
-            os.pardir,
-            "build",
-        )
-
-    lib_search = [tvm_library_path, os.path.join(get_vta_hw_path(), "build")]
+    vta_root = os.path.realpath(get_vta_hw_path())
+    configured = os.environ.get("VTA_LIBRARY_PATH")
+    if configured:
+        lib_search = [os.path.realpath(path) for path in configured.split(os.pathsep) if path]
+    else:
+        lib_search = [os.path.join(vta_root, "build", "lib")]
+    for path in lib_search:
+        if os.path.commonpath([vta_root, path]) != vta_root:
+            raise RuntimeError(
+                "VTA_LIBRARY_PATH must stay under the tvm-vta workspace: " + path
+            )
     lib_name = _get_lib_name(lib_vta)
     lib_path = [os.path.join(x, lib_name) for x in lib_search]
-    lib_found = [x for x in lib_path if os.path.exists(x)]
+    lib_found = [os.path.realpath(x) for x in lib_path if os.path.exists(x)]
     if not lib_found and not optional:
         raise RuntimeError(
             "Cannot find the files.\n" + "List of candidates:\n" + str("\n".join(lib_path))

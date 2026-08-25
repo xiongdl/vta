@@ -14,6 +14,7 @@ from litex.tools.litex_sim import SimSoC
 from litex_boards.targets.xilinx_zcu104 import BaseSoC
 from litedram.frontend.axi import LiteDRAMAXI2Native
 
+from ahb import LiteDRAMAHB2Native
 from vta_ip import FrozenVTA
 
 
@@ -52,8 +53,6 @@ class ZCU104VTASoC(BaseSoC):
 
 class SimVTASoC(SimSoC):
     def __init__(self, config):
-        if config["vta"]["vcr_frontend"] != "apb32":
-            raise ValueError("the first simulation target supports vcr_frontend=apb32")
         super().__init__(
             with_sdram=True,
             sdram_data_width=config["ddr"]["data_width"],
@@ -71,18 +70,27 @@ class SimVTASoC(SimSoC):
             uart_name="sim",
             with_timer=True,
         )
-        self.submodules.vta = vta = FrozenVTA(self.platform, config["_vta_ip_dir"], sim_debug=True)
+        self.submodules.vta = vta = FrozenVTA(
+            self.platform, config["_vta_ip_dir"],
+            host_frontend=config["vta"]["vcr_frontend"], sim_debug=True)
         self.bus.add_slave("vta_vcr", vta.control.wb, SoCRegion(
             origin=SOC_CONFIG.number(config["vta"]["vcr_base"]),
             size=SOC_CONFIG.number(config["vta"]["vcr_size"]),
             cached=False))
-        # Give the AXI64 VTA a native-width, burst-preserving LiteDRAM path.
+        # Give VTA a native-width, burst-preserving LiteDRAM path.
         # The RV32 system bus remains 32-bit for CPU/CSR correctness.
-        vta_port = self.sdram.crossbar.get_port(data_width=64)
-        self.submodules.vta_axi2native = LiteDRAMAXI2Native(
-            axi=vta.axi,
-            port=vta_port,
-            base_address=SOC_CONFIG.number(config["ddr"]["base"]))
+        vta_port = self.sdram.crossbar.get_port(
+            data_width=config["vta"]["memory_data_width"])
+        if config["vta"]["memory_protocol"] == "axi4":
+            self.submodules.vta_axi2native = LiteDRAMAXI2Native(
+                axi=vta.axi,
+                port=vta_port,
+                base_address=SOC_CONFIG.number(config["ddr"]["base"]))
+        else:
+            self.submodules.vta_ahb2native = LiteDRAMAHB2Native(
+                ahb=vta.ahb,
+                port=vta_port,
+                base_address=SOC_CONFIG.number(config["ddr"]["base"]))
         self.add_constant("VTA_VCR_BASE", SOC_CONFIG.number(config["vta"]["vcr_base"]))
         self.add_constant("VTA_MEMORY_DATA_WIDTH", config["vta"]["memory_data_width"])
 

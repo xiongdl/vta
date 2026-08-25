@@ -11,8 +11,8 @@ only a frozen generated-RTL package with a checked manifest and SHA-256 digest.
 - UART, timer and interrupt support supplied by LiteX.
 - Native VTA APB4 32-bit control port.
 - Optional AHB-Lite 32-bit VCR access through `rtl/amba/ahb32_to_apb32.sv`.
-- Selectable native VTA memory port: AHB-Lite 32/64-bit or AXI4 32/64-bit.
-- AXI4 64-bit is the first complete SIM/ZCU104 path.
+- Selectable native VTA memory port: AHB-Lite or AXI4 at 32/64/128-bit.
+- All 12 Host/Memory SIM combinations are validated; ZCU104 uses AXI4 64-bit.
 
 ## Build boundary
 
@@ -55,13 +55,13 @@ Conda environment as Verilator.
 
 ## Implemented baseline
 
-The current baseline imports a frozen `VTAShellAPB` APB32 + AXI64 package and
-elaborates a ZCU104 design containing VexRiscv, 64 KiB ROM, 512 KiB on-chip
+The current baseline imports frozen APB32-host AXI/AHB 32/64/128-bit packages.
+It elaborates a ZCU104 design containing VexRiscv, 64 KiB ROM, 512 KiB on-chip
 SRAM, UART, timer, ZCU104 DDR and VTA. The simulation target keeps the RV32/CSR
 AXI path at 32 bits: with the pinned LiteX version, a 64-bit AXI system bus
 turns RV32 accesses to CSR offsets such as `+4` into unsupported/misaligned
-64-bit transactions. VTA remains a native AXI64 master and uses a dedicated
-native-width LiteDRAM port in simulation. The ZCU104 target retains a native
+64-bit transactions. VTA uses a dedicated, configuration-selected 32/64/128-bit
+native LiteDRAM port in simulation. The ZCU104 target retains a native
 64-bit system/memory interconnect for performance validation. Generate the
 Vivado project without running Vivado with:
 
@@ -71,18 +71,19 @@ Vivado project without running Vivado with:
   --build-dir build/zcu104-axi64
 ```
 
-The APB32 firmware driver and standalone AHB32-to-APB32 bridge are present.
+The APB32 firmware driver and AHB32-to-APB32 host path are integrated.
 The 32-bit simulation system has executed the LiteX BIOS banner under
 Verilator. On macOS, `make sim-run` applies the pinned LiteX compatibility patch,
 builds with the local RISC-V toolchain and system clang++, and starts the BIOS.
 After a model has been built, `make vcr-smoke` writes and reads VTA register
-offset `0x08` through the CPU and checks the exact value. AHB VCR insertion into
-LiteX, the remaining AHB memory variants, NN package loading and the actual
-ZCU104 bitstream remain required before the system can be described as
-inference-ready.
+offset `0x08` through the CPU and checks the exact value. NN package loading and
+the actual ZCU104 bitstream remain required before the system can be described
+as inference-ready.
 
 The validated simulation topology keeps the CPU/CSR system AXI bus at 32 bits
-and connects the frozen AXI64 VTA to a dedicated 64-bit LiteDRAM native port.
+and connects the frozen AXI/AHB 32/64/128-bit VTA to a matching native LiteDRAM
+port. AHB memory beats are serialized onto native commands while HREADY stalls
+the VTA master; AXI connects through LiteDRAM's native adapter.
 This preserves VTA bursts without routing them through LiteX's 64-to-32 AXI
 converter.  The current VME registers ARVALID and its payload until handshake,
 so `litex/vta_ip.py` connects it directly without the former legacy AR
@@ -97,9 +98,13 @@ make case-run CASE=/path/to/packed-conv2d-case
 ```
 
 Frozen manifests record the RTL hash, VTA configuration hash, source commit,
-and offline generator.  `soc/generator/APBHostSim32.scala` provides an external
-offline AXI32 generator entry without modifying `hardware/chisel`; the accepted
-GEMM/Conv2D simulation baseline uses AXI64.
+and offline generator. `soc/generator/SoCVariant.scala` generates every memory
+protocol/width package outside the SoC build boundary. Configurations are named
+`sim_<host>_<memory><width>.json` (with the original `sim_default.json` and
+`sim_axi32.json` retained). Every matrix entry has passed the 7-instruction GEMM
+and 31-instruction Conv2D case with expected-output comparison. The AXI wrapper
+preserves the full 8-bit `ARLEN/AWLEN`; VMEAHB splits commands longer than 16
+beats into legal fixed AHB bursts.
 
 ## FSIM/TSIM case export and SoC replay
 

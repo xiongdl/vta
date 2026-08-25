@@ -101,18 +101,26 @@ class VMEAHBBoundaryTester(c: VMEAHB) extends PeekPokeTester(c) {
   // An INCR16 ending at 0x3f8 stays entirely inside the 1KB region.
   runRead(0x380, Seq(16))
 
-  expect(c.io.perf.counters(VMEPerf.readRequests), 3)
-  expect(c.io.perf.counters(VMEPerf.readBeats), 36)
+  // A command longer than one fixed AHB burst must be split, not rejected or
+  // truncated.  This is the command shape used by narrow 32-bit Fetch.
+  runRead(0x500, Seq(16, 16))
+
+  expect(c.io.perf.counters(VMEPerf.readRequests), 4)
+  expect(c.io.perf.counters(VMEPerf.readBeats), 68)
   expect(c.io.perf.counters(VMEPerf.singleBursts), 1)
   expect(c.io.perf.counters(VMEPerf.incr4Bursts), 2)
   expect(c.io.perf.counters(VMEPerf.incr8Bursts), 1)
-  expect(c.io.perf.counters(VMEPerf.incr16Bursts), 1)
+  expect(c.io.perf.counters(VMEPerf.incr16Bursts), 3)
   expect(c.io.perf.counters(VMEPerf.incrBursts), 1)
   expect(c.io.perf.counters(VMEPerf.boundarySplits), 2)
 }
 
 class VMEAHBBoundaryTest extends AnyFlatSpec with ChiselScalatestTester {
-  implicit val p: Parameters = new TestDe10Config
+  implicit val p: Parameters = new Config((site, here, up) => {
+    case ShellKey =>
+      val shell = up(ShellKey)
+      shell.copy(memParams = shell.memParams.copy(lenBits = 8))
+  }) ++ new TestDe10Config
 
   behavior of "VMEAHBBoundaryTest"
   it should "split fixed bursts at 1KB boundaries" in {

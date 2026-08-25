@@ -4,11 +4,16 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
 
-ALLOWED_MEMORY = {("ahb-lite", 32), ("ahb-lite", 64), ("axi4", 32), ("axi4", 64)}
+ALLOWED_MEMORY = {
+    (protocol, width)
+    for protocol in ("ahb-lite", "axi4")
+    for width in (32, 64, 128)
+}
 
 
 def number(value):
@@ -19,8 +24,24 @@ def number(value):
     raise ValueError(f"expected integer or integer string, got {value!r}")
 
 
-def load_config(path: Path):
+def _merge(base, override):
+    result = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(result.get(key), dict):
+            result[key] = _merge(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+def load_config(path: Path, parents=()):
+    path = path.resolve()
+    if path in parents:
+        raise ValueError(f"configuration inheritance cycle at {path}")
     data = json.loads(path.read_text())
+    parent = data.pop("extends", None)
+    if parent is not None:
+        data = _merge(load_config(path.parent / parent, parents + (path,)), data)
     data["_config_path"] = path.resolve()
     return data
 
@@ -39,17 +60,17 @@ def validate(data, require_ip=True):
         raise ValueError("schema_version must be 1")
     if data["soc"]["address_width"] != 32:
         raise ValueError("the first release supports a 32-bit address space")
-    if data["vta"]["host_protocol"] != "apb4" or data["vta"]["host_data_width"] != 32:
-        raise ValueError("the frozen VTA host interface must be APB4 32-bit")
+    if data["vta"]["host_protocol"] not in {"apb4", "ahb-lite"} or data["vta"]["host_data_width"] != 32:
+        raise ValueError("the VTA system host interface must be APB4/AHB-Lite 32-bit")
     if data["vta"]["vcr_frontend"] not in {"apb32", "ahb32"}:
         raise ValueError("vta.vcr_frontend must be apb32 or ahb32")
     mem = (data["vta"]["memory_protocol"], data["vta"]["memory_data_width"])
     if mem not in ALLOWED_MEMORY:
-        raise ValueError("VTA memory must be ahb-lite/axi4 with 32/64-bit data")
-    if data["sram"]["data_width"] not in {32, 64}:
-        raise ValueError("sram.data_width must be 32 or 64")
-    if data["ddr"]["data_width"] not in {32, 64}:
-        raise ValueError("ddr.data_width must be 32 or 64")
+        raise ValueError("VTA memory must be ahb-lite/axi4 with 32/64/128-bit data")
+    if data["sram"]["data_width"] not in {32, 64, 128}:
+        raise ValueError("sram.data_width must be 32, 64 or 128")
+    if data["ddr"]["data_width"] not in {32, 64, 128}:
+        raise ValueError("ddr.data_width must be 32, 64 or 128")
 
     regions = [region("rom", data["rom"]), region("sram", data["sram"])]
     regions.append(("vta-vcr", number(data["vta"]["vcr_base"]), number(data["vta"]["vcr_size"])))
@@ -69,9 +90,19 @@ def validate(data, require_ip=True):
         if not manifest_path.is_file():
             raise ValueError(f"frozen VTA manifest not found: {manifest_path}")
         manifest = json.loads(manifest_path.read_text())
+        rtl_path = ip_dir / "rtl" / "vta.v"
+        rtl_digest = hashlib.sha256(rtl_path.read_bytes()).hexdigest()
+        if rtl_digest != manifest.get("rtl_sha256"):
+            raise ValueError(f"frozen VTA RTL hash mismatch: {rtl_path}")
+        vta_config_path = ip_dir / "vta_config.json"
+        config_digest = hashlib.sha256(vta_config_path.read_bytes()).hexdigest()
+        if config_digest != manifest.get("vta_config_sha256"):
+            raise ValueError(f"frozen VTA config hash mismatch: {vta_config_path}")
+        # AHB32 is a system-side bridge in front of the frozen native APB32
+        # VCR port; the frozen IP manifest therefore remains APB4.
         expected = {
-            "host_protocol": data["vta"]["host_protocol"],
-            "host_data_width": data["vta"]["host_data_width"],
+            "host_protocol": "apb4",
+            "host_data_width": 32,
             "memory_protocol": data["vta"]["memory_protocol"],
             "memory_data_width": data["vta"]["memory_data_width"],
         }

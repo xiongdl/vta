@@ -1,0 +1,4 @@
+{
+  "extends": "sim_default.json",
+  "vta": {"vcr_frontend": "ahb32", "host_protocol": "ahb-lite"}
+}

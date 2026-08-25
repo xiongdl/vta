@@ -176,6 +176,10 @@ perf
 .bash_history
 *.json
 !config/vta_config_fsim.json
+!soc/config/sim_*.json
+!soc/config/vta_*_config.json
+!generated/vta-ip/*/manifest.json
+!generated/vta-ip/*/vta_config.json
 *.params
 *.onnx
 *.h5

@@ -29,8 +29,10 @@ class VMEAHB(implicit p: Parameters) extends Module {
   private val mp = p(ShellKey).memParams
   private val ap = AHBParams(addrBits = mp.addrBits, dataBits = mp.dataBits)
   private val nReadClients = p(ShellKey).vmeParams.nReadClients
-  require(mp.lenBits <= 4,
-    "VMEAHB supports at most 16 beats per VME command")
+  // A VME command may be longer than an AHB fixed burst.  The state machine
+  // below splits it into INCR16/8/4 (and final INCR) bursts at 1KB boundaries.
+  require(mp.lenBits > 0 && mp.lenBits <= 8,
+    "VMEAHB supports VME command lengths of up to 256 beats")
 
   val io = IO(new Bundle {
     val mem = new AHBMaster(ap)

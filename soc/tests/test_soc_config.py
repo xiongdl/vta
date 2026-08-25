@@ -30,7 +30,7 @@ class SoCConfigTest(unittest.TestCase):
 
     def test_rejects_unsupported_memory_width(self):
         cfg = self.base()
-        cfg["vta"]["memory_data_width"] = 128
+        cfg["vta"]["memory_data_width"] = 256
         with self.assertRaisesRegex(ValueError, "VTA memory"):
             SOC_CONFIG.validate(cfg, require_ip=False)
 
@@ -47,6 +47,29 @@ class SoCConfigTest(unittest.TestCase):
         manifest = json.loads((ip_dir / "manifest.json").read_text())
         digest = hashlib.sha256((ip_dir / "rtl" / "vta.v").read_bytes()).hexdigest()
         self.assertEqual(digest, manifest["rtl_sha256"])
+
+    def test_axi32_simulation_config_matches_frozen_ip(self):
+        path = Path(__file__).parents[1] / "config" / "sim_axi32.json"
+        cfg = SOC_CONFIG.validate(SOC_CONFIG.load_config(path), require_ip=True)
+        self.assertEqual(cfg["vta"]["memory_protocol"], "axi4")
+        self.assertEqual(cfg["vta"]["memory_data_width"], 32)
+
+    def test_complete_simulation_matrix_matches_frozen_ip(self):
+        config_dir = Path(__file__).parents[1] / "config"
+        for host in ("apb32", "ahb32"):
+            for memory in ("axi", "ahb"):
+                for width in (32, 64, 128):
+                    with self.subTest(host=host, memory=memory, width=width):
+                        name = f"sim_{host}_{memory}{width}.json"
+                        # Keep compatibility with the two original APB/AXI names.
+                        if host == "apb32" and memory == "axi" and width == 32:
+                            name = "sim_axi32.json"
+                        elif host == "apb32" and memory == "axi" and width == 64:
+                            name = "sim_default.json"
+                        cfg = SOC_CONFIG.validate(
+                            SOC_CONFIG.load_config(config_dir / name), require_ip=True)
+                        self.assertEqual(cfg["vta"]["vcr_frontend"], host)
+                        self.assertEqual(cfg["vta"]["memory_data_width"], width)
 
 
 if __name__ == "__main__":

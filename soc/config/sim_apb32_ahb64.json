@@ -1,0 +1,7 @@
+{
+  "extends": "sim_default.json",
+  "vta": {
+    "ip_dir": "../../generated/vta-ip/apb32-ahb64",
+    "memory_protocol": "ahb-lite"
+  }
+}

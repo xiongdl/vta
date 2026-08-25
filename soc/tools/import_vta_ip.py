@@ -15,8 +15,10 @@ from pathlib import Path
 VARIANTS = {
     "apb32-ahb32": ("VTAShellAPBAHB", "apb4", 32, "ahb-lite", 32),
     "apb32-ahb64": ("VTAShellAPBAHB", "apb4", 32, "ahb-lite", 64),
+    "apb32-ahb128": ("VTAShellAPBAHB", "apb4", 32, "ahb-lite", 128),
     "apb32-axi32": ("VTAShellAPB", "apb4", 32, "axi4", 32),
     "apb32-axi64": ("VTAShellAPB", "apb4", 32, "axi4", 64),
+    "apb32-axi128": ("VTAShellAPB", "apb4", 32, "axi4", 128),
 }
 
 

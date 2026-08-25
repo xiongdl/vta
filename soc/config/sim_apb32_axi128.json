@@ -1,0 +1,8 @@
+{
+  "extends": "sim_default.json",
+  "ddr": {"data_width": 128},
+  "vta": {
+    "ip_dir": "../../generated/vta-ip/apb32-axi128",
+    "memory_data_width": 128
+  }
+}

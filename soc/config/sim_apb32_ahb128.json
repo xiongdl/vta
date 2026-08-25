@@ -1,0 +1,7 @@
+{
+  "extends": "sim_apb32_axi128.json",
+  "vta": {
+    "ip_dir": "../../generated/vta-ip/apb32-ahb128",
+    "memory_protocol": "ahb-lite"
+  }
+}

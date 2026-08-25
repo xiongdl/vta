@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "variant": "apb32-ahb128",
+  "top": "VTAShellAPBAHB",
+  "host_protocol": "apb4",
+  "host_data_width": 32,
+  "memory_protocol": "ahb-lite",
+  "memory_data_width": 128,
+  "memory_address_width": 32,
+  "rtl_sha256": "5fd7146a0103c905b2cd625a68160ff094808c5d3038b66fe0a14dacf0393d1b",
+  "vta_config_sha256": "52b4fdb2210874881a47ac2e0da8b2d4c93fd7beb5c5ca2cc1d3becba561b267",
+  "source_commit": "2d96a9cfab52e200fd7d13dd0f3d6fd7d53cc659",
+  "generator": "vta.socgen.SoCVariant",
+  "source_policy": "pre-generated RTL; SoC builds must not invoke Chisel"
+}

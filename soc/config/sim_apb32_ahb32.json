@@ -1,0 +1,7 @@
+{
+  "extends": "sim_axi32.json",
+  "vta": {
+    "ip_dir": "../../generated/vta-ip/apb32-ahb32",
+    "memory_protocol": "ahb-lite"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "soc": {
+    "cpu": "vexriscv",
+    "clock_hz": 50000000,
+    "address_width": 32
+  },
+  "rom": {
+    "base": "0x00000000",
+    "size": "0x00010000"
+  },
+  "sram": {
+    "base": "0x10000000",
+    "size": "0x00080000",
+    "data_width": 64
+  },
+  "ddr": {
+    "enabled": true,
+    "base": "0x40000000",
+    "size": "0x40000000",
+    "data_width": 64
+  },
+  "vta": {
+    "ip_dir": "../../generated/vta-ip/apb32-axi64",
+    "vcr_base": "0xf1000000",
+    "vcr_size": "0x00010000",
+    "vcr_frontend": "apb32",
+    "host_protocol": "apb4",
+    "host_data_width": 32,
+    "memory_protocol": "axi4",
+    "memory_data_width": 64
+  }
+}

@@ -6,6 +6,8 @@ from pathlib import Path
 from migen import ClockSignal, Constant, Display, FSM, If, Instance, Module, NextState, NextValue, ResetSignal, Signal
 from litex.soc.interconnect import axi, wishbone
 
+from ahb import AHBInterface
+
 
 class WishboneToAPB32(Module):
     """Single-request Wishbone to APB4 bridge used for the VTA VCR."""
@@ -44,39 +46,102 @@ class WishboneToAPB32(Module):
                 NextState("IDLE")))
 
 
+class WishboneToAHB32ToAPB32(Module):
+    """Wishbone slave whose VTA-side request traverses AHB32 then APB32."""
+
+    def __init__(self, platform, address_width=16):
+        self.wb = wishbone.Interface(data_width=32, adr_width=30, addressing="word")
+        self.paddr = Signal(address_width)
+        self.psel = Signal()
+        self.penable = Signal()
+        self.pwrite = Signal()
+        self.pwdata = Signal(32)
+        self.pstrb = Signal(4)
+        self.pprot = Signal(3)
+        self.prdata = Signal(32)
+        self.pready = Signal()
+        self.pslverr = Signal()
+
+        haddr = Signal(address_width)
+        htrans = Signal(2)
+        hwrite = Signal()
+        hwdata = Signal(32)
+        hrdata = Signal(32)
+        hready = Signal()
+        hresp = Signal()
+
+        request_addr = Signal(address_width)
+        request_write = Signal()
+        request_data = Signal(32)
+        self.submodules.fsm = fsm = FSM(reset_state="IDLE")
+        fsm.act("IDLE",
+            If(self.wb.cyc & self.wb.stb,
+                NextValue(request_addr, self.wb.adr[: max(0, address_width - 2)] << 2),
+                NextValue(request_write, self.wb.we),
+                NextValue(request_data, self.wb.dat_w),
+                NextState("ADDRESS")))
+        fsm.act("ADDRESS",
+            haddr.eq(request_addr),
+            htrans.eq(2),  # NONSEQ
+            hwrite.eq(request_write),
+            If(hready, NextState("DATA")))
+        fsm.act("DATA",
+            hwdata.eq(request_data),
+            If(hready,
+                self.wb.dat_r.eq(hrdata),
+                self.wb.ack.eq(~hresp),
+                self.wb.err.eq(hresp),
+                NextState("IDLE")))
+
+        platform.add_source(str(Path(__file__).parents[1] / "rtl" / "amba" / "ahb32_to_apb32.sv"))
+        self.specials += Instance("ahb32_to_apb32",
+            p_ADDR_WIDTH=address_width,
+            i_clk=ClockSignal("sys"),
+            i_rst_n=~ResetSignal("sys"),
+            i_haddr=haddr,
+            i_htrans=htrans,
+            i_hwrite=hwrite,
+            i_hsize=2,
+            i_hwdata=hwdata,
+            o_hrdata=hrdata,
+            o_hready=hready,
+            o_hresp=hresp,
+            o_paddr=self.paddr,
+            o_psel=self.psel,
+            o_penable=self.penable,
+            o_pwrite=self.pwrite,
+            o_pwdata=self.pwdata,
+            o_pstrb=self.pstrb,
+            o_pprot=self.pprot,
+            i_prdata=self.prdata,
+            i_pready=self.pready,
+            i_pslverr=self.pslverr)
+
+
 class FrozenVTA(Module):
-    def __init__(self, platform, ip_dir, sim_debug=False):
+    def __init__(self, platform, ip_dir, host_frontend="apb32", sim_debug=False):
         ip_dir = Path(ip_dir)
         manifest = json.loads((ip_dir / "manifest.json").read_text())
         if manifest["host_protocol"] != "apb4" or manifest["host_data_width"] != 32:
             raise ValueError("FrozenVTA requires an APB4 32-bit host package")
-        if manifest["memory_protocol"] != "axi4":
-            raise ValueError("the first LiteX integration supports native AXI4 VTA memory")
+        if manifest["memory_protocol"] not in ("axi4", "ahb-lite"):
+            raise ValueError("FrozenVTA supports native AXI4/AHB-Lite memory")
         width = manifest["memory_data_width"]
-        if width not in (32, 64):
-            raise ValueError("VTA AXI data width must be 32 or 64")
+        if width not in (32, 64, 128):
+            raise ValueError("VTA memory data width must be 32, 64 or 128")
 
         for entry in (ip_dir / "filelist.f").read_text().splitlines():
             entry = entry.strip()
             if entry and not entry.startswith("#"):
                 platform.add_source(str(ip_dir / entry))
 
-        self.submodules.control = control = WishboneToAPB32(address_width=16)
-        # The current VME registers AR and holds VALID/payload until READY, so
-        # the frozen IP can connect directly to the LiteX AXI interconnect.
-        self.axi = raw = a = axi.AXIInterface(
-            data_width=width, address_width=32, id_width=8)
-        aw_len = Signal(4)
-        ar_len = Signal(4)
-        aw_lock = Signal(2)
-        ar_lock = Signal(2)
-        self.comb += [
-            raw.aw.len.eq(aw_len),
-            raw.ar.len.eq(ar_len),
-            raw.aw.lock.eq(aw_lock[0]),
-            raw.ar.lock.eq(ar_lock[0]),
-        ]
-
+        if host_frontend == "apb32":
+            control = WishboneToAPB32(address_width=16)
+        elif host_frontend == "ahb32":
+            control = WishboneToAHB32ToAPB32(platform, address_width=16)
+        else:
+            raise ValueError("host_frontend must be apb32 or ahb32")
+        self.submodules.control = control
         params = dict(
             i_clock=ClockSignal("sys"),
             i_reset=ResetSignal("sys"),
@@ -90,6 +155,40 @@ class FrozenVTA(Module):
             o_io_host_prdata=control.prdata,
             o_io_host_pready=control.pready,
             o_io_host_pslverr=control.pslverr,
+        )
+        if manifest["memory_protocol"] == "ahb-lite":
+            self.ahb = a = AHBInterface(data_width=width)
+            params.update(dict(
+                o_io_mem_haddr=a.addr,
+                o_io_mem_hburst=a.burst,
+                o_io_mem_hprot=a.prot,
+                o_io_mem_hsize=a.size,
+                o_io_mem_htrans=a.trans,
+                o_io_mem_hwdata=a.wdata,
+                o_io_mem_hwrite=a.write,
+                i_io_mem_hrdata=a.rdata,
+                i_io_mem_hready=a.ready,
+                i_io_mem_hresp=a.resp,
+            ))
+            self.specials += Instance(manifest["top"], **params)
+            return
+
+        self.axi = raw = a = axi.AXIInterface(
+            data_width=width, address_width=32, id_width=8)
+        # AXI4 LEN is eight bits.  Keeping only four bits silently truncates
+        # legal 16--256 beat bursts (notably 32-bit instruction fetches).
+        aw_len = Signal(8)
+        ar_len = Signal(8)
+        aw_lock = Signal(2)
+        ar_lock = Signal(2)
+        self.comb += [
+            raw.aw.len.eq(aw_len),
+            raw.ar.len.eq(ar_len),
+            raw.aw.lock.eq(aw_lock[0]),
+            raw.ar.lock.eq(ar_lock[0]),
+        ]
+
+        params.update(dict(
             i_io_mem_aw_ready=raw.aw.ready,
             o_io_mem_aw_valid=raw.aw.valid,
             o_io_mem_aw_bits_addr=raw.aw.addr,
@@ -128,7 +227,7 @@ class FrozenVTA(Module):
             i_io_mem_r_bits_resp=raw.r.resp,
             i_io_mem_r_bits_last=raw.r.last,
             i_io_mem_r_bits_id=raw.r.id,
-        )
+        ))
         # Chisel's coherent/user fields are constants for VTA and are not
         # represented by LiteX's generic AXI interface.
         for name in ("aw", "w", "ar"):

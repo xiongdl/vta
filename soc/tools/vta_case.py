@@ -60,7 +60,7 @@ def discover_raw(raw: Path) -> Path:
     return runs[-1]
 
 
-def pack(raw: Path, output: Path, repo: Path) -> None:
+def pack(raw: Path, output: Path, repo: Path, address_offset: int = 0) -> None:
     raw = discover_raw(raw)
     before = json.loads((raw / "before_manifest.json").read_text())
     after = json.loads((raw / "after_manifest.json").read_text())
@@ -146,7 +146,7 @@ def pack(raw: Path, output: Path, repo: Path) -> None:
                 post_data = (raw / post["file"]).read_bytes()
                 expected_offset = len(expected_out)
                 expected_out.extend(post_data[region_offset:region_offset + span])
-                expected_outputs.append({"address": DEFAULT_BASES["out"] + relocated_byte,
+                expected_outputs.append({"address": DEFAULT_BASES["out"] + address_offset + relocated_byte,
                                          "size": span, "expected_offset": expected_offset})
         patch_file = Path(temporary) / "patches.txt"
         patch_file.write_text("".join(f"{i} {base}\n" for i, base in patches))
@@ -158,9 +158,9 @@ def pack(raw: Path, output: Path, repo: Path) -> None:
         (output / f"{name}.bin").write_bytes(data)
     (output / "expected_out.bin").write_bytes(expected_out)
     original_insn.unlink()
-    sections = {"insn": {"file": "insn.bin", "address": DEFAULT_BASES["insn"]}}
+    sections = {"insn": {"file": "insn.bin", "address": DEFAULT_BASES["insn"] + address_offset}}
     for name in arenas:
-        sections[name] = {"file": f"{name}.bin", "address": DEFAULT_BASES[name]}
+        sections[name] = {"file": f"{name}.bin", "address": DEFAULT_BASES[name] + address_offset}
     sections["expected_out"] = {"file": "expected_out.bin"}
     for section in sections.values():
         path = output / section["file"]
@@ -199,11 +199,13 @@ def main() -> None:
     pack_parser.add_argument("raw", type=Path)
     pack_parser.add_argument("output", type=Path)
     pack_parser.add_argument("--repo", type=Path, default=Path(__file__).resolve().parents[2])
+    pack_parser.add_argument("--address-offset", type=lambda value: int(value, 0), default=0,
+                             help="signed offset applied to all load addresses (for example -0x30000000 for SRAM)")
     validate_parser = sub.add_parser("validate")
     validate_parser.add_argument("case", type=Path)
     args = parser.parse_args()
     if args.command == "pack":
-        pack(args.raw.resolve(), args.output.resolve(), args.repo.resolve())
+        pack(args.raw.resolve(), args.output.resolve(), args.repo.resolve(), args.address_offset)
         validate(args.output.resolve())
     else:
         validate(args.case.resolve())

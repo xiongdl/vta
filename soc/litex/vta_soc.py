@@ -12,6 +12,7 @@ from litex.soc.integration.soc import SoCRegion
 from litex.build.sim.config import SimConfig
 from litex.tools.litex_sim import SimSoC
 from litex_boards.targets.xilinx_zcu104 import BaseSoC
+from litedram.frontend.axi import LiteDRAMAXI2Native
 
 from vta_ip import FrozenVTA
 
@@ -70,12 +71,18 @@ class SimVTASoC(SimSoC):
             uart_name="sim",
             with_timer=True,
         )
-        self.submodules.vta = vta = FrozenVTA(self.platform, config["_vta_ip_dir"])
+        self.submodules.vta = vta = FrozenVTA(self.platform, config["_vta_ip_dir"], sim_debug=True)
         self.bus.add_slave("vta_vcr", vta.control.wb, SoCRegion(
             origin=SOC_CONFIG.number(config["vta"]["vcr_base"]),
             size=SOC_CONFIG.number(config["vta"]["vcr_size"]),
             cached=False))
-        self.bus.add_master("vta_dma", vta.axi)
+        # Give the AXI64 VTA a native-width, burst-preserving LiteDRAM path.
+        # The RV32 system bus remains 32-bit for CPU/CSR correctness.
+        vta_port = self.sdram.crossbar.get_port(data_width=64)
+        self.submodules.vta_axi2native = LiteDRAMAXI2Native(
+            axi=vta.axi,
+            port=vta_port,
+            base_address=SOC_CONFIG.number(config["ddr"]["base"]))
         self.add_constant("VTA_VCR_BASE", SOC_CONFIG.number(config["vta"]["vcr_base"]))
         self.add_constant("VTA_MEMORY_DATA_WIDTH", config["vta"]["memory_data_width"])
 

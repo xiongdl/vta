@@ -75,14 +75,19 @@ def main() -> None:
         for name, register in VCR_POINTERS.items():
             address = manifest["sections"].get(name, {}).get("address", 0)
             command(master, f"mem_write 0x{VCR + 4 * register:08x} 0x{address:08x}", args.timeout)
-        command(master, f"mem_write 0x{VCR:08x} 0x00000001", args.timeout)
+        launch_log = command(master, f"mem_write 0x{VCR:08x} 0x00000001", args.timeout)
         status = b""
+        poll_log = bytearray()
         for _ in range(100):
             status = command(master, f"mem_read 0x{VCR:08x} 0x8", args.timeout)
+            poll_log.extend(status)
             if b"02 00 00 00" in status:
                 break
         if b"02 00 00 00" not in status:
-            raise RuntimeError(f"VTA case did not finish: {status[-500:]!r}")
+            axi_lines = [line for line in launch_log.splitlines() + bytes(poll_log).splitlines()
+                         if b"[vta-axi]" in line]
+            raise RuntimeError(f"VTA case did not finish; AXI events={axi_lines[-20:]!r}; "
+                               f"status={status[-500:]!r}")
         expected = (case / manifest["sections"]["expected_out"]["file"]).read_bytes()
         for check in manifest["expected_outputs"]:
             for offset in range(0, check["size"], 16):

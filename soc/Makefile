@@ -2,7 +2,7 @@ PYTHON ?= python3
 CONFIG ?= config/sim_default.json
 BUILD_DIR ?= build
 
-.PHONY: check generate test sim sim-run vcr-smoke gemm-smoke case-validate case-run zcu104
+.PHONY: check generate test sim sim-run frozen-vta-smoke vcr-smoke gemm-smoke case-validate case-run zcu104
 
 check:
 	$(PYTHON) tools/soc_config.py check --config $(CONFIG)
@@ -18,6 +18,9 @@ sim: check generate
 
 sim-run:
 	./scripts/sim_run_macos.sh
+
+frozen-vta-smoke:
+	./scripts/frozen_vta_smoke.sh
 
 vcr-smoke:
 	$(PYTHON) tools/vcr_smoke.py --gateware $(BUILD_DIR)/sim/gateware

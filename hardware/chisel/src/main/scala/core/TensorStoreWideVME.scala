@@ -68,8 +68,8 @@ class TensorStoreWideVME(tensorType: String = "none", debug: Boolean = false)(
   cmdGen.io.start := localStart
   cmdGen.io.isBusy := state =/= sIdle
   cmdGen.io.baddr := io.baddr
-  cmdGen.io.updateState := state === sWriteCmd
-  cmdGen.io.canSendCmd := cmdGen.io.updateState
+  cmdGen.io.updateState := io.vme_wr.cmd.fire
+  cmdGen.io.canSendCmd := state === sWriteCmd
   io.vme_wr.cmd <> cmdGen.io.vmeCmd
   val commandsDone =  cmdGen.io.done
 
@@ -105,8 +105,6 @@ class TensorStoreWideVME(tensorType: String = "none", debug: Boolean = false)(
   val xcnt = Reg(chiselTypeOf(io.vme_wr.cmd.bits.len))
   xcnt := xcnt
   // control
-  val updateState = Wire(Bool())
-  updateState := false.B
   switch(state) {
     is(sIdle) {
       when (localStart) {
@@ -116,7 +114,6 @@ class TensorStoreWideVME(tensorType: String = "none", debug: Boolean = false)(
     is(sWriteCmd) {
       when(io.vme_wr.cmd.fire) {
         state := sWriteData
-        updateState := true.B
         xcnt := 0.U
       }
     }

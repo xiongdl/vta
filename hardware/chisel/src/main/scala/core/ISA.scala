@@ -107,7 +107,8 @@ object ISA {
     HashMap(("minpool", "000"),
       ("maxpool", "001"),
       ("add", "010"),
-      ("shift", "011"))
+      ("shift", "011"),
+      ("multiply", "100"))
 
   private def dontCare(bits: Int): String = "?" * bits
 
@@ -154,5 +155,6 @@ object ISA {
   def VMAX = alu("maxpool")
   def VADD = alu("add")
   def VSHX = alu("shift")
+  def VMUL = alu("multiply")
   def FNSH = finish
 }

@@ -95,6 +95,10 @@ class FetchInstMemCore(debug: Boolean = false)(implicit p: Parameters) extends M
   val instructionWrite = io.write.fire
 
   when(io.write.valid) {
+    when(!knownInstruction) {
+      printf("[FetchInstMem] unknown instruction=%x opcode=%x\n",
+        io.write.bits, io.write.bits(2, 0))
+    }
     assert(knownInstruction, "-F- FetchInstMem: unknown instruction type")
   }
 
@@ -302,6 +306,10 @@ class FetchInstMemNarrow(debug: Boolean = false)(implicit p: Parameters) extends
       instBeat := instBeat + 1.U
     }
     beatsLeft := beatsLeft - 1.U
+    when(io.vme_rd.data.bits.last =/= (beatsLeft === 1.U)) {
+      printf("[FetchInstMemNarrow] malformed addr=%x selected=%d left=%d last=%d\n",
+        address, selectedBeats, beatsLeft, io.vme_rd.data.bits.last)
+    }
     assert(io.vme_rd.data.bits.last === (beatsLeft === 1.U),
       "-F- FetchInstMemNarrow: malformed VME burst")
   }

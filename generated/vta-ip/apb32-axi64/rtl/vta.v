@@ -452,6 +452,177 @@ end // initial
 `endif
 `endif // SYNTHESIS
 endmodule
+module Queue_5(
+  input         clock,
+  input         reset,
+  output        io_enq_ready,
+  input         io_enq_valid,
+  input  [63:0] io_enq_bits_data,
+  input  [20:0] io_enq_bits_tag,
+  input         io_enq_bits_last,
+  input         io_deq_ready,
+  output        io_deq_valid,
+  output [63:0] io_deq_bits_data,
+  output [20:0] io_deq_bits_tag,
+  output        io_deq_bits_last
+);
+`ifdef RANDOMIZE_MEM_INIT
+  reg [63:0] _RAND_0;
+  reg [31:0] _RAND_1;
+  reg [31:0] _RAND_2;
+`endif // RANDOMIZE_MEM_INIT
+`ifdef RANDOMIZE_REG_INIT
+  reg [31:0] _RAND_3;
+  reg [31:0] _RAND_4;
+  reg [31:0] _RAND_5;
+`endif // RANDOMIZE_REG_INIT
+  reg [63:0] ram_data [0:15]; // @[Decoupled.scala 259:95]
+  wire  ram_data_io_deq_bits_MPORT_en; // @[Decoupled.scala 259:95]
+  wire [3:0] ram_data_io_deq_bits_MPORT_addr; // @[Decoupled.scala 259:95]
+  wire [63:0] ram_data_io_deq_bits_MPORT_data; // @[Decoupled.scala 259:95]
+  wire [63:0] ram_data_MPORT_data; // @[Decoupled.scala 259:95]
+  wire [3:0] ram_data_MPORT_addr; // @[Decoupled.scala 259:95]
+  wire  ram_data_MPORT_mask; // @[Decoupled.scala 259:95]
+  wire  ram_data_MPORT_en; // @[Decoupled.scala 259:95]
+  reg [20:0] ram_tag [0:15]; // @[Decoupled.scala 259:95]
+  wire  ram_tag_io_deq_bits_MPORT_en; // @[Decoupled.scala 259:95]
+  wire [3:0] ram_tag_io_deq_bits_MPORT_addr; // @[Decoupled.scala 259:95]
+  wire [20:0] ram_tag_io_deq_bits_MPORT_data; // @[Decoupled.scala 259:95]
+  wire [20:0] ram_tag_MPORT_data; // @[Decoupled.scala 259:95]
+  wire [3:0] ram_tag_MPORT_addr; // @[Decoupled.scala 259:95]
+  wire  ram_tag_MPORT_mask; // @[Decoupled.scala 259:95]
+  wire  ram_tag_MPORT_en; // @[Decoupled.scala 259:95]
+  reg  ram_last [0:15]; // @[Decoupled.scala 259:95]
+  wire  ram_last_io_deq_bits_MPORT_en; // @[Decoupled.scala 259:95]
+  wire [3:0] ram_last_io_deq_bits_MPORT_addr; // @[Decoupled.scala 259:95]
+  wire  ram_last_io_deq_bits_MPORT_data; // @[Decoupled.scala 259:95]
+  wire  ram_last_MPORT_data; // @[Decoupled.scala 259:95]
+  wire [3:0] ram_last_MPORT_addr; // @[Decoupled.scala 259:95]
+  wire  ram_last_MPORT_mask; // @[Decoupled.scala 259:95]
+  wire  ram_last_MPORT_en; // @[Decoupled.scala 259:95]
+  reg [3:0] enq_ptr_value; // @[Counter.scala 62:40]
+  reg [3:0] deq_ptr_value; // @[Counter.scala 62:40]
+  reg  maybe_full; // @[Decoupled.scala 262:27]
+  wire  ptr_match = enq_ptr_value == deq_ptr_value; // @[Decoupled.scala 263:33]
+  wire  empty = ptr_match & ~maybe_full; // @[Decoupled.scala 264:25]
+  wire  full = ptr_match & maybe_full; // @[Decoupled.scala 265:24]
+  wire  do_enq = io_enq_ready & io_enq_valid; // @[Decoupled.scala 50:35]
+  wire  do_deq = io_deq_ready & io_deq_valid; // @[Decoupled.scala 50:35]
+  wire [3:0] _value_T_1 = enq_ptr_value + 4'h1; // @[Counter.scala 78:24]
+  wire [3:0] _value_T_3 = deq_ptr_value + 4'h1; // @[Counter.scala 78:24]
+  assign ram_data_io_deq_bits_MPORT_en = 1'h1;
+  assign ram_data_io_deq_bits_MPORT_addr = deq_ptr_value;
+  assign ram_data_io_deq_bits_MPORT_data = ram_data[ram_data_io_deq_bits_MPORT_addr]; // @[Decoupled.scala 259:95]
+  assign ram_data_MPORT_data = io_enq_bits_data;
+  assign ram_data_MPORT_addr = enq_ptr_value;
+  assign ram_data_MPORT_mask = 1'h1;
+  assign ram_data_MPORT_en = io_enq_ready & io_enq_valid;
+  assign ram_tag_io_deq_bits_MPORT_en = 1'h1;
+  assign ram_tag_io_deq_bits_MPORT_addr = deq_ptr_value;
+  assign ram_tag_io_deq_bits_MPORT_data = ram_tag[ram_tag_io_deq_bits_MPORT_addr]; // @[Decoupled.scala 259:95]
+  assign ram_tag_MPORT_data = io_enq_bits_tag;
+  assign ram_tag_MPORT_addr = enq_ptr_value;
+  assign ram_tag_MPORT_mask = 1'h1;
+  assign ram_tag_MPORT_en = io_enq_ready & io_enq_valid;
+  assign ram_last_io_deq_bits_MPORT_en = 1'h1;
+  assign ram_last_io_deq_bits_MPORT_addr = deq_ptr_value;
+  assign ram_last_io_deq_bits_MPORT_data = ram_last[ram_last_io_deq_bits_MPORT_addr]; // @[Decoupled.scala 259:95]
+  assign ram_last_MPORT_data = io_enq_bits_last;
+  assign ram_last_MPORT_addr = enq_ptr_value;
+  assign ram_last_MPORT_mask = 1'h1;
+  assign ram_last_MPORT_en = io_enq_ready & io_enq_valid;
+  assign io_enq_ready = ~full; // @[Decoupled.scala 289:19]
+  assign io_deq_valid = ~empty; // @[Decoupled.scala 288:19]
+  assign io_deq_bits_data = ram_data_io_deq_bits_MPORT_data; // @[Decoupled.scala 296:17]
+  assign io_deq_bits_tag = ram_tag_io_deq_bits_MPORT_data; // @[Decoupled.scala 296:17]
+  assign io_deq_bits_last = ram_last_io_deq_bits_MPORT_data; // @[Decoupled.scala 296:17]
+  always @(posedge clock) begin
+    if (ram_data_MPORT_en & ram_data_MPORT_mask) begin
+      ram_data[ram_data_MPORT_addr] <= ram_data_MPORT_data; // @[Decoupled.scala 259:95]
+    end
+    if (ram_tag_MPORT_en & ram_tag_MPORT_mask) begin
+      ram_tag[ram_tag_MPORT_addr] <= ram_tag_MPORT_data; // @[Decoupled.scala 259:95]
+    end
+    if (ram_last_MPORT_en & ram_last_MPORT_mask) begin
+      ram_last[ram_last_MPORT_addr] <= ram_last_MPORT_data; // @[Decoupled.scala 259:95]
+    end
+    if (reset) begin // @[Counter.scala 62:40]
+      enq_ptr_value <= 4'h0; // @[Counter.scala 62:40]
+    end else if (do_enq) begin // @[Decoupled.scala 272:16]
+      enq_ptr_value <= _value_T_1; // @[Counter.scala 78:15]
+    end
+    if (reset) begin // @[Counter.scala 62:40]
+      deq_ptr_value <= 4'h0; // @[Counter.scala 62:40]
+    end else if (do_deq) begin // @[Decoupled.scala 276:16]
+      deq_ptr_value <= _value_T_3; // @[Counter.scala 78:15]
+    end
+    if (reset) begin // @[Decoupled.scala 262:27]
+      maybe_full <= 1'h0; // @[Decoupled.scala 262:27]
+    end else if (do_enq != do_deq) begin // @[Decoupled.scala 279:27]
+      maybe_full <= do_enq; // @[Decoupled.scala 280:16]
+    end
+  end
+// Register and memory initialization
+`ifdef RANDOMIZE_GARBAGE_ASSIGN
+`define RANDOMIZE
+`endif
+`ifdef RANDOMIZE_INVALID_ASSIGN
+`define RANDOMIZE
+`endif
+`ifdef RANDOMIZE_REG_INIT
+`define RANDOMIZE
+`endif
+`ifdef RANDOMIZE_MEM_INIT
+`define RANDOMIZE
+`endif
+`ifndef RANDOM
+`define RANDOM $random
+`endif
+`ifdef RANDOMIZE_MEM_INIT
+  integer initvar;
+`endif
+`ifndef SYNTHESIS
+`ifdef FIRRTL_BEFORE_INITIAL
+`FIRRTL_BEFORE_INITIAL
+`endif
+initial begin
+  `ifdef RANDOMIZE
+    `ifdef INIT_RANDOM
+      `INIT_RANDOM
+    `endif
+    `ifndef VERILATOR
+      `ifdef RANDOMIZE_DELAY
+        #`RANDOMIZE_DELAY begin end
+      `else
+        #0.002 begin end
+      `endif
+    `endif
+`ifdef RANDOMIZE_MEM_INIT
+  _RAND_0 = {2{`RANDOM}};
+  for (initvar = 0; initvar < 16; initvar = initvar+1)
+    ram_data[initvar] = _RAND_0[63:0];
+  _RAND_1 = {1{`RANDOM}};
+  for (initvar = 0; initvar < 16; initvar = initvar+1)
+    ram_tag[initvar] = _RAND_1[20:0];
+  _RAND_2 = {1{`RANDOM}};
+  for (initvar = 0; initvar < 16; initvar = initvar+1)
+    ram_last[initvar] = _RAND_2[0:0];
+`endif // RANDOMIZE_MEM_INIT
+`ifdef RANDOMIZE_REG_INIT
+  _RAND_3 = {1{`RANDOM}};
+  enq_ptr_value = _RAND_3[3:0];
+  _RAND_4 = {1{`RANDOM}};
+  deq_ptr_value = _RAND_4[3:0];
+  _RAND_5 = {1{`RANDOM}};
+  maybe_full = _RAND_5[0:0];
+`endif // RANDOMIZE_REG_INIT
+  `endif // RANDOMIZE
+end // initial
+`ifdef FIRRTL_AFTER_INITIAL
+`FIRRTL_AFTER_INITIAL
+`endif
+`endif // SYNTHESIS
+endmodule
 module VME(
   input         clock,
   input         reset,
@@ -465,13 +636,17 @@ module VME(
   output        io_mem_w_bits_last,
   output        io_mem_b_ready,
   input         io_mem_b_valid,
+  input  [1:0]  io_mem_b_bits_resp,
+  input  [7:0]  io_mem_b_bits_id,
   input         io_mem_ar_ready,
   output        io_mem_ar_valid,
   output [31:0] io_mem_ar_bits_addr,
   output [7:0]  io_mem_ar_bits_id,
   output [3:0]  io_mem_ar_bits_len,
+  output        io_mem_r_ready,
   input         io_mem_r_valid,
   input  [63:0] io_mem_r_bits_data,
+  input  [1:0]  io_mem_r_bits_resp,
   input         io_mem_r_bits_last,
   input  [7:0]  io_mem_r_bits_id,
   output        io_vme_rd_0_cmd_ready,
@@ -524,136 +699,239 @@ module VME(
   input  [63:0] io_vme_wr_0_data_bits_data,
   output        io_vme_wr_0_ack
 );
-`ifdef RANDOMIZE_MEM_INIT
-  reg [31:0] _RAND_0;
-  reg [31:0] _RAND_3;
-`endif // RANDOMIZE_MEM_INIT
 `ifdef RANDOMIZE_REG_INIT
+  reg [31:0] _RAND_0;
   reg [31:0] _RAND_1;
   reg [31:0] _RAND_2;
+  reg [31:0] _RAND_3;
   reg [31:0] _RAND_4;
   reg [31:0] _RAND_5;
   reg [31:0] _RAND_6;
   reg [31:0] _RAND_7;
-  reg [63:0] _RAND_8;
+  reg [31:0] _RAND_8;
   reg [31:0] _RAND_9;
   reg [31:0] _RAND_10;
-  reg [63:0] _RAND_11;
+  reg [31:0] _RAND_11;
   reg [31:0] _RAND_12;
   reg [31:0] _RAND_13;
-  reg [63:0] _RAND_14;
+  reg [31:0] _RAND_14;
   reg [31:0] _RAND_15;
-  reg [63:0] _RAND_16;
+  reg [31:0] _RAND_16;
   reg [31:0] _RAND_17;
-  reg [63:0] _RAND_18;
+  reg [31:0] _RAND_18;
   reg [31:0] _RAND_19;
   reg [31:0] _RAND_20;
   reg [31:0] _RAND_21;
   reg [31:0] _RAND_22;
+  reg [31:0] _RAND_23;
+  reg [31:0] _RAND_24;
+  reg [31:0] _RAND_25;
+  reg [31:0] _RAND_26;
+  reg [31:0] _RAND_27;
+  reg [31:0] _RAND_28;
+  reg [31:0] _RAND_29;
+  reg [31:0] _RAND_30;
+  reg [31:0] _RAND_31;
+  reg [31:0] _RAND_32;
+  reg [31:0] _RAND_33;
+  reg [31:0] _RAND_34;
+  reg [31:0] _RAND_35;
+  reg [31:0] _RAND_36;
+  reg [31:0] _RAND_37;
+  reg [31:0] _RAND_38;
+  reg [31:0] _RAND_39;
+  reg [31:0] _RAND_40;
+  reg [31:0] _RAND_41;
+  reg [31:0] _RAND_42;
+  reg [31:0] _RAND_43;
+  reg [31:0] _RAND_44;
+  reg [31:0] _RAND_45;
+  reg [31:0] _RAND_46;
+  reg [31:0] _RAND_47;
+  reg [31:0] _RAND_48;
+  reg [31:0] _RAND_49;
+  reg [31:0] _RAND_50;
+  reg [31:0] _RAND_51;
+  reg [31:0] _RAND_52;
+  reg [31:0] _RAND_53;
+  reg [31:0] _RAND_54;
+  reg [31:0] _RAND_55;
+  reg [31:0] _RAND_56;
+  reg [31:0] _RAND_57;
 `endif // RANDOMIZE_REG_INIT
-  reg [2:0] vmeTag_array_client_id [0:15]; // @[VME.scala 220:33]
-  wire  vmeTag_array_client_id_localTag_out_MPORT_en; // @[VME.scala 220:33]
-  wire [3:0] vmeTag_array_client_id_localTag_out_MPORT_addr; // @[VME.scala 220:33]
-  wire [2:0] vmeTag_array_client_id_localTag_out_MPORT_data; // @[VME.scala 220:33]
-  wire [2:0] vmeTag_array_client_id_rdwrPort_data; // @[VME.scala 220:33]
-  wire [3:0] vmeTag_array_client_id_rdwrPort_addr; // @[VME.scala 220:33]
-  wire  vmeTag_array_client_id_rdwrPort_mask; // @[VME.scala 220:33]
-  wire  vmeTag_array_client_id_rdwrPort_en; // @[VME.scala 220:33]
-  reg  vmeTag_array_client_id_localTag_out_MPORT_en_pipe_0;
-  reg [3:0] vmeTag_array_client_id_localTag_out_MPORT_addr_pipe_0;
-  reg [20:0] vmeTag_array_client_tag [0:15]; // @[VME.scala 220:33]
-  wire  vmeTag_array_client_tag_localTag_out_MPORT_en; // @[VME.scala 220:33]
-  wire [3:0] vmeTag_array_client_tag_localTag_out_MPORT_addr; // @[VME.scala 220:33]
-  wire [20:0] vmeTag_array_client_tag_localTag_out_MPORT_data; // @[VME.scala 220:33]
-  wire [20:0] vmeTag_array_client_tag_rdwrPort_data; // @[VME.scala 220:33]
-  wire [3:0] vmeTag_array_client_tag_rdwrPort_addr; // @[VME.scala 220:33]
-  wire  vmeTag_array_client_tag_rdwrPort_mask; // @[VME.scala 220:33]
-  wire  vmeTag_array_client_tag_rdwrPort_en; // @[VME.scala 220:33]
-  reg  vmeTag_array_client_tag_localTag_out_MPORT_en_pipe_0;
-  reg [3:0] vmeTag_array_client_tag_localTag_out_MPORT_addr_pipe_0;
-  wire  VMEcmd_Qs_0_clock; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_0_reset; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_0_io_enq_ready; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_0_io_enq_valid; // @[VME.scala 247:45]
-  wire [31:0] VMEcmd_Qs_0_io_enq_bits_addr; // @[VME.scala 247:45]
-  wire [3:0] VMEcmd_Qs_0_io_enq_bits_len; // @[VME.scala 247:45]
-  wire [20:0] VMEcmd_Qs_0_io_enq_bits_tag; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_0_io_deq_ready; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_0_io_deq_valid; // @[VME.scala 247:45]
-  wire [31:0] VMEcmd_Qs_0_io_deq_bits_addr; // @[VME.scala 247:45]
-  wire [3:0] VMEcmd_Qs_0_io_deq_bits_len; // @[VME.scala 247:45]
-  wire [20:0] VMEcmd_Qs_0_io_deq_bits_tag; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_1_clock; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_1_reset; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_1_io_enq_ready; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_1_io_enq_valid; // @[VME.scala 247:45]
-  wire [31:0] VMEcmd_Qs_1_io_enq_bits_addr; // @[VME.scala 247:45]
-  wire [3:0] VMEcmd_Qs_1_io_enq_bits_len; // @[VME.scala 247:45]
-  wire [20:0] VMEcmd_Qs_1_io_enq_bits_tag; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_1_io_deq_ready; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_1_io_deq_valid; // @[VME.scala 247:45]
-  wire [31:0] VMEcmd_Qs_1_io_deq_bits_addr; // @[VME.scala 247:45]
-  wire [3:0] VMEcmd_Qs_1_io_deq_bits_len; // @[VME.scala 247:45]
-  wire [20:0] VMEcmd_Qs_1_io_deq_bits_tag; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_2_clock; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_2_reset; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_2_io_enq_ready; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_2_io_enq_valid; // @[VME.scala 247:45]
-  wire [31:0] VMEcmd_Qs_2_io_enq_bits_addr; // @[VME.scala 247:45]
-  wire [3:0] VMEcmd_Qs_2_io_enq_bits_len; // @[VME.scala 247:45]
-  wire [20:0] VMEcmd_Qs_2_io_enq_bits_tag; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_2_io_deq_ready; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_2_io_deq_valid; // @[VME.scala 247:45]
-  wire [31:0] VMEcmd_Qs_2_io_deq_bits_addr; // @[VME.scala 247:45]
-  wire [3:0] VMEcmd_Qs_2_io_deq_bits_len; // @[VME.scala 247:45]
-  wire [20:0] VMEcmd_Qs_2_io_deq_bits_tag; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_3_clock; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_3_reset; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_3_io_enq_ready; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_3_io_enq_valid; // @[VME.scala 247:45]
-  wire [31:0] VMEcmd_Qs_3_io_enq_bits_addr; // @[VME.scala 247:45]
-  wire [3:0] VMEcmd_Qs_3_io_enq_bits_len; // @[VME.scala 247:45]
-  wire [20:0] VMEcmd_Qs_3_io_enq_bits_tag; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_3_io_deq_ready; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_3_io_deq_valid; // @[VME.scala 247:45]
-  wire [31:0] VMEcmd_Qs_3_io_deq_bits_addr; // @[VME.scala 247:45]
-  wire [3:0] VMEcmd_Qs_3_io_deq_bits_len; // @[VME.scala 247:45]
-  wire [20:0] VMEcmd_Qs_3_io_deq_bits_tag; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_4_clock; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_4_reset; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_4_io_enq_ready; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_4_io_enq_valid; // @[VME.scala 247:45]
-  wire [31:0] VMEcmd_Qs_4_io_enq_bits_addr; // @[VME.scala 247:45]
-  wire [3:0] VMEcmd_Qs_4_io_enq_bits_len; // @[VME.scala 247:45]
-  wire [20:0] VMEcmd_Qs_4_io_enq_bits_tag; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_4_io_deq_ready; // @[VME.scala 247:45]
-  wire  VMEcmd_Qs_4_io_deq_valid; // @[VME.scala 247:45]
-  wire [31:0] VMEcmd_Qs_4_io_deq_bits_addr; // @[VME.scala 247:45]
-  wire [3:0] VMEcmd_Qs_4_io_deq_bits_len; // @[VME.scala 247:45]
-  wire [20:0] VMEcmd_Qs_4_io_deq_bits_tag; // @[VME.scala 247:45]
-  reg [15:0] availableEntries; // @[VME.scala 228:33]
-  wire  oneHotIdx_0 = availableEntries[0]; // @[VME.scala 255:11]
-  wire  oneHotIdx_1 = availableEntries[1] & ~(|oneHotIdx_0); // @[VME.scala 258:20]
-  wire  oneHotIdx_2 = availableEntries[2] & ~(|availableEntries[1:0]); // @[VME.scala 258:20]
-  wire  oneHotIdx_3 = availableEntries[3] & ~(|availableEntries[2:0]); // @[VME.scala 258:20]
-  wire  oneHotIdx_4 = availableEntries[4] & ~(|availableEntries[3:0]); // @[VME.scala 258:20]
-  wire  oneHotIdx_5 = availableEntries[5] & ~(|availableEntries[4:0]); // @[VME.scala 258:20]
-  wire  oneHotIdx_6 = availableEntries[6] & ~(|availableEntries[5:0]); // @[VME.scala 258:20]
-  wire  oneHotIdx_7 = availableEntries[7] & ~(|availableEntries[6:0]); // @[VME.scala 258:20]
-  wire  oneHotIdx_8 = availableEntries[8] & ~(|availableEntries[7:0]); // @[VME.scala 258:20]
-  wire  oneHotIdx_9 = availableEntries[9] & ~(|availableEntries[8:0]); // @[VME.scala 258:20]
-  wire  oneHotIdx_10 = availableEntries[10] & ~(|availableEntries[9:0]); // @[VME.scala 258:20]
-  wire  oneHotIdx_11 = availableEntries[11] & ~(|availableEntries[10:0]); // @[VME.scala 258:20]
-  wire  oneHotIdx_12 = availableEntries[12] & ~(|availableEntries[11:0]); // @[VME.scala 258:20]
-  wire  oneHotIdx_13 = availableEntries[13] & ~(|availableEntries[12:0]); // @[VME.scala 258:20]
-  wire  oneHotIdx_14 = availableEntries[14] & ~(|availableEntries[13:0]); // @[VME.scala 258:20]
-  wire  oneHotIdx_15 = availableEntries[15] & ~(|availableEntries[14:0]); // @[VME.scala 258:20]
+  wire  VMEcmd_Qs_0_clock; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_0_reset; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_0_io_enq_ready; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_0_io_enq_valid; // @[VME.scala 243:11]
+  wire [31:0] VMEcmd_Qs_0_io_enq_bits_addr; // @[VME.scala 243:11]
+  wire [3:0] VMEcmd_Qs_0_io_enq_bits_len; // @[VME.scala 243:11]
+  wire [20:0] VMEcmd_Qs_0_io_enq_bits_tag; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_0_io_deq_ready; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_0_io_deq_valid; // @[VME.scala 243:11]
+  wire [31:0] VMEcmd_Qs_0_io_deq_bits_addr; // @[VME.scala 243:11]
+  wire [3:0] VMEcmd_Qs_0_io_deq_bits_len; // @[VME.scala 243:11]
+  wire [20:0] VMEcmd_Qs_0_io_deq_bits_tag; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_1_clock; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_1_reset; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_1_io_enq_ready; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_1_io_enq_valid; // @[VME.scala 243:11]
+  wire [31:0] VMEcmd_Qs_1_io_enq_bits_addr; // @[VME.scala 243:11]
+  wire [3:0] VMEcmd_Qs_1_io_enq_bits_len; // @[VME.scala 243:11]
+  wire [20:0] VMEcmd_Qs_1_io_enq_bits_tag; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_1_io_deq_ready; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_1_io_deq_valid; // @[VME.scala 243:11]
+  wire [31:0] VMEcmd_Qs_1_io_deq_bits_addr; // @[VME.scala 243:11]
+  wire [3:0] VMEcmd_Qs_1_io_deq_bits_len; // @[VME.scala 243:11]
+  wire [20:0] VMEcmd_Qs_1_io_deq_bits_tag; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_2_clock; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_2_reset; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_2_io_enq_ready; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_2_io_enq_valid; // @[VME.scala 243:11]
+  wire [31:0] VMEcmd_Qs_2_io_enq_bits_addr; // @[VME.scala 243:11]
+  wire [3:0] VMEcmd_Qs_2_io_enq_bits_len; // @[VME.scala 243:11]
+  wire [20:0] VMEcmd_Qs_2_io_enq_bits_tag; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_2_io_deq_ready; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_2_io_deq_valid; // @[VME.scala 243:11]
+  wire [31:0] VMEcmd_Qs_2_io_deq_bits_addr; // @[VME.scala 243:11]
+  wire [3:0] VMEcmd_Qs_2_io_deq_bits_len; // @[VME.scala 243:11]
+  wire [20:0] VMEcmd_Qs_2_io_deq_bits_tag; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_3_clock; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_3_reset; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_3_io_enq_ready; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_3_io_enq_valid; // @[VME.scala 243:11]
+  wire [31:0] VMEcmd_Qs_3_io_enq_bits_addr; // @[VME.scala 243:11]
+  wire [3:0] VMEcmd_Qs_3_io_enq_bits_len; // @[VME.scala 243:11]
+  wire [20:0] VMEcmd_Qs_3_io_enq_bits_tag; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_3_io_deq_ready; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_3_io_deq_valid; // @[VME.scala 243:11]
+  wire [31:0] VMEcmd_Qs_3_io_deq_bits_addr; // @[VME.scala 243:11]
+  wire [3:0] VMEcmd_Qs_3_io_deq_bits_len; // @[VME.scala 243:11]
+  wire [20:0] VMEcmd_Qs_3_io_deq_bits_tag; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_4_clock; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_4_reset; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_4_io_enq_ready; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_4_io_enq_valid; // @[VME.scala 243:11]
+  wire [31:0] VMEcmd_Qs_4_io_enq_bits_addr; // @[VME.scala 243:11]
+  wire [3:0] VMEcmd_Qs_4_io_enq_bits_len; // @[VME.scala 243:11]
+  wire [20:0] VMEcmd_Qs_4_io_enq_bits_tag; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_4_io_deq_ready; // @[VME.scala 243:11]
+  wire  VMEcmd_Qs_4_io_deq_valid; // @[VME.scala 243:11]
+  wire [31:0] VMEcmd_Qs_4_io_deq_bits_addr; // @[VME.scala 243:11]
+  wire [3:0] VMEcmd_Qs_4_io_deq_bits_len; // @[VME.scala 243:11]
+  wire [20:0] VMEcmd_Qs_4_io_deq_bits_tag; // @[VME.scala 243:11]
+  wire  responseQs_0_clock; // @[VME.scala 329:11]
+  wire  responseQs_0_reset; // @[VME.scala 329:11]
+  wire  responseQs_0_io_enq_ready; // @[VME.scala 329:11]
+  wire  responseQs_0_io_enq_valid; // @[VME.scala 329:11]
+  wire [63:0] responseQs_0_io_enq_bits_data; // @[VME.scala 329:11]
+  wire [20:0] responseQs_0_io_enq_bits_tag; // @[VME.scala 329:11]
+  wire  responseQs_0_io_enq_bits_last; // @[VME.scala 329:11]
+  wire  responseQs_0_io_deq_ready; // @[VME.scala 329:11]
+  wire  responseQs_0_io_deq_valid; // @[VME.scala 329:11]
+  wire [63:0] responseQs_0_io_deq_bits_data; // @[VME.scala 329:11]
+  wire [20:0] responseQs_0_io_deq_bits_tag; // @[VME.scala 329:11]
+  wire  responseQs_0_io_deq_bits_last; // @[VME.scala 329:11]
+  wire  responseQs_1_clock; // @[VME.scala 329:11]
+  wire  responseQs_1_reset; // @[VME.scala 329:11]
+  wire  responseQs_1_io_enq_ready; // @[VME.scala 329:11]
+  wire  responseQs_1_io_enq_valid; // @[VME.scala 329:11]
+  wire [63:0] responseQs_1_io_enq_bits_data; // @[VME.scala 329:11]
+  wire [20:0] responseQs_1_io_enq_bits_tag; // @[VME.scala 329:11]
+  wire  responseQs_1_io_enq_bits_last; // @[VME.scala 329:11]
+  wire  responseQs_1_io_deq_ready; // @[VME.scala 329:11]
+  wire  responseQs_1_io_deq_valid; // @[VME.scala 329:11]
+  wire [63:0] responseQs_1_io_deq_bits_data; // @[VME.scala 329:11]
+  wire [20:0] responseQs_1_io_deq_bits_tag; // @[VME.scala 329:11]
+  wire  responseQs_1_io_deq_bits_last; // @[VME.scala 329:11]
+  wire  responseQs_2_clock; // @[VME.scala 329:11]
+  wire  responseQs_2_reset; // @[VME.scala 329:11]
+  wire  responseQs_2_io_enq_ready; // @[VME.scala 329:11]
+  wire  responseQs_2_io_enq_valid; // @[VME.scala 329:11]
+  wire [63:0] responseQs_2_io_enq_bits_data; // @[VME.scala 329:11]
+  wire [20:0] responseQs_2_io_enq_bits_tag; // @[VME.scala 329:11]
+  wire  responseQs_2_io_enq_bits_last; // @[VME.scala 329:11]
+  wire  responseQs_2_io_deq_ready; // @[VME.scala 329:11]
+  wire  responseQs_2_io_deq_valid; // @[VME.scala 329:11]
+  wire [63:0] responseQs_2_io_deq_bits_data; // @[VME.scala 329:11]
+  wire [20:0] responseQs_2_io_deq_bits_tag; // @[VME.scala 329:11]
+  wire  responseQs_2_io_deq_bits_last; // @[VME.scala 329:11]
+  wire  responseQs_3_clock; // @[VME.scala 329:11]
+  wire  responseQs_3_reset; // @[VME.scala 329:11]
+  wire  responseQs_3_io_enq_ready; // @[VME.scala 329:11]
+  wire  responseQs_3_io_enq_valid; // @[VME.scala 329:11]
+  wire [63:0] responseQs_3_io_enq_bits_data; // @[VME.scala 329:11]
+  wire [20:0] responseQs_3_io_enq_bits_tag; // @[VME.scala 329:11]
+  wire  responseQs_3_io_enq_bits_last; // @[VME.scala 329:11]
+  wire  responseQs_3_io_deq_ready; // @[VME.scala 329:11]
+  wire  responseQs_3_io_deq_valid; // @[VME.scala 329:11]
+  wire [63:0] responseQs_3_io_deq_bits_data; // @[VME.scala 329:11]
+  wire [20:0] responseQs_3_io_deq_bits_tag; // @[VME.scala 329:11]
+  wire  responseQs_3_io_deq_bits_last; // @[VME.scala 329:11]
+  wire  responseQs_4_clock; // @[VME.scala 329:11]
+  wire  responseQs_4_reset; // @[VME.scala 329:11]
+  wire  responseQs_4_io_enq_ready; // @[VME.scala 329:11]
+  wire  responseQs_4_io_enq_valid; // @[VME.scala 329:11]
+  wire [63:0] responseQs_4_io_enq_bits_data; // @[VME.scala 329:11]
+  wire [20:0] responseQs_4_io_enq_bits_tag; // @[VME.scala 329:11]
+  wire  responseQs_4_io_enq_bits_last; // @[VME.scala 329:11]
+  wire  responseQs_4_io_deq_ready; // @[VME.scala 329:11]
+  wire  responseQs_4_io_deq_valid; // @[VME.scala 329:11]
+  wire [63:0] responseQs_4_io_deq_bits_data; // @[VME.scala 329:11]
+  wire [20:0] responseQs_4_io_deq_bits_tag; // @[VME.scala 329:11]
+  wire  responseQs_4_io_deq_bits_last; // @[VME.scala 329:11]
+  reg [2:0] vmeTag_array_0_client_id; // @[VME.scala 233:25]
+  reg [20:0] vmeTag_array_0_client_tag; // @[VME.scala 233:25]
+  reg [2:0] vmeTag_array_1_client_id; // @[VME.scala 233:25]
+  reg [20:0] vmeTag_array_1_client_tag; // @[VME.scala 233:25]
+  reg [2:0] vmeTag_array_2_client_id; // @[VME.scala 233:25]
+  reg [20:0] vmeTag_array_2_client_tag; // @[VME.scala 233:25]
+  reg [2:0] vmeTag_array_3_client_id; // @[VME.scala 233:25]
+  reg [20:0] vmeTag_array_3_client_tag; // @[VME.scala 233:25]
+  reg [2:0] vmeTag_array_4_client_id; // @[VME.scala 233:25]
+  reg [20:0] vmeTag_array_4_client_tag; // @[VME.scala 233:25]
+  reg [2:0] vmeTag_array_5_client_id; // @[VME.scala 233:25]
+  reg [20:0] vmeTag_array_5_client_tag; // @[VME.scala 233:25]
+  reg [2:0] vmeTag_array_6_client_id; // @[VME.scala 233:25]
+  reg [20:0] vmeTag_array_6_client_tag; // @[VME.scala 233:25]
+  reg [2:0] vmeTag_array_7_client_id; // @[VME.scala 233:25]
+  reg [20:0] vmeTag_array_7_client_tag; // @[VME.scala 233:25]
+  reg [2:0] vmeTag_array_8_client_id; // @[VME.scala 233:25]
+  reg [20:0] vmeTag_array_8_client_tag; // @[VME.scala 233:25]
+  reg [2:0] vmeTag_array_9_client_id; // @[VME.scala 233:25]
+  reg [20:0] vmeTag_array_9_client_tag; // @[VME.scala 233:25]
+  reg [2:0] vmeTag_array_10_client_id; // @[VME.scala 233:25]
+  reg [20:0] vmeTag_array_10_client_tag; // @[VME.scala 233:25]
+  reg [2:0] vmeTag_array_11_client_id; // @[VME.scala 233:25]
+  reg [20:0] vmeTag_array_11_client_tag; // @[VME.scala 233:25]
+  reg [2:0] vmeTag_array_12_client_id; // @[VME.scala 233:25]
+  reg [20:0] vmeTag_array_12_client_tag; // @[VME.scala 233:25]
+  reg [2:0] vmeTag_array_13_client_id; // @[VME.scala 233:25]
+  reg [20:0] vmeTag_array_13_client_tag; // @[VME.scala 233:25]
+  reg [2:0] vmeTag_array_14_client_id; // @[VME.scala 233:25]
+  reg [20:0] vmeTag_array_14_client_tag; // @[VME.scala 233:25]
+  reg [2:0] vmeTag_array_15_client_id; // @[VME.scala 233:25]
+  reg [20:0] vmeTag_array_15_client_tag; // @[VME.scala 233:25]
+  reg [15:0] availableEntries; // @[VME.scala 239:33]
+  wire  oneHotIdx_0 = availableEntries[0]; // @[VME.scala 252:11]
+  wire  oneHotIdx_1 = availableEntries[1] & ~(|oneHotIdx_0); // @[VME.scala 255:20]
+  wire  oneHotIdx_2 = availableEntries[2] & ~(|availableEntries[1:0]); // @[VME.scala 255:20]
+  wire  oneHotIdx_3 = availableEntries[3] & ~(|availableEntries[2:0]); // @[VME.scala 255:20]
+  wire  oneHotIdx_4 = availableEntries[4] & ~(|availableEntries[3:0]); // @[VME.scala 255:20]
+  wire  oneHotIdx_5 = availableEntries[5] & ~(|availableEntries[4:0]); // @[VME.scala 255:20]
+  wire  oneHotIdx_6 = availableEntries[6] & ~(|availableEntries[5:0]); // @[VME.scala 255:20]
+  wire  oneHotIdx_7 = availableEntries[7] & ~(|availableEntries[6:0]); // @[VME.scala 255:20]
+  wire  oneHotIdx_8 = availableEntries[8] & ~(|availableEntries[7:0]); // @[VME.scala 255:20]
+  wire  oneHotIdx_9 = availableEntries[9] & ~(|availableEntries[8:0]); // @[VME.scala 255:20]
+  wire  oneHotIdx_10 = availableEntries[10] & ~(|availableEntries[9:0]); // @[VME.scala 255:20]
+  wire  oneHotIdx_11 = availableEntries[11] & ~(|availableEntries[10:0]); // @[VME.scala 255:20]
+  wire  oneHotIdx_12 = availableEntries[12] & ~(|availableEntries[11:0]); // @[VME.scala 255:20]
+  wire  oneHotIdx_13 = availableEntries[13] & ~(|availableEntries[12:0]); // @[VME.scala 255:20]
+  wire  oneHotIdx_14 = availableEntries[14] & ~(|availableEntries[13:0]); // @[VME.scala 255:20]
+  wire  oneHotIdx_15 = availableEntries[15] & ~(|availableEntries[14:0]); // @[VME.scala 255:20]
   wire [7:0] oHot_lo = {oneHotIdx_7,oneHotIdx_6,oneHotIdx_5,oneHotIdx_4,oneHotIdx_3,oneHotIdx_2,oneHotIdx_1,oneHotIdx_0}
-    ; // @[VME.scala 261:35]
+    ; // @[VME.scala 258:35]
   wire [15:0] resetEntry = {oneHotIdx_15,oneHotIdx_14,oneHotIdx_13,oneHotIdx_12,oneHotIdx_11,oneHotIdx_10,oneHotIdx_9,
-    oneHotIdx_8,oHot_lo}; // @[VME.scala 261:35]
-  wire [15:0] _newVec_T = ~resetEntry; // @[VME.scala 262:22]
-  wire [15:0] newEntry = availableEntries & _newVec_T; // @[VME.scala 262:20]
+    oneHotIdx_8,oHot_lo}; // @[VME.scala 258:35]
   wire [3:0] _bitPostn_T = oneHotIdx_14 ? 4'he : 4'hf; // @[Mux.scala 47:70]
   wire [3:0] _bitPostn_T_1 = oneHotIdx_13 ? 4'hd : _bitPostn_T; // @[Mux.scala 47:70]
   wire [3:0] _bitPostn_T_2 = oneHotIdx_12 ? 4'hc : _bitPostn_T_1; // @[Mux.scala 47:70]
@@ -669,90 +947,207 @@ module VME(
   wire [3:0] _bitPostn_T_12 = oneHotIdx_2 ? 4'h2 : _bitPostn_T_11; // @[Mux.scala 47:70]
   wire [3:0] _bitPostn_T_13 = oneHotIdx_1 ? 4'h1 : _bitPostn_T_12; // @[Mux.scala 47:70]
   wire [3:0] firstPostn = oneHotIdx_0 ? 4'h0 : _bitPostn_T_13; // @[Mux.scala 47:70]
-  wire  _T = io_mem_r_bits_last & io_mem_r_valid; // @[VME.scala 232:27]
-  wire [7:0] updateEntry_lo = {8'h7 == io_mem_r_bits_id,8'h6 == io_mem_r_bits_id,8'h5 == io_mem_r_bits_id,8'h4 ==
-    io_mem_r_bits_id,8'h3 == io_mem_r_bits_id,8'h2 == io_mem_r_bits_id,8'h1 == io_mem_r_bits_id,8'h0 == io_mem_r_bits_id
-    }; // @[VME.scala 244:108]
-  wire [15:0] _updateEntry_T_16 = {8'hf == io_mem_r_bits_id,8'he == io_mem_r_bits_id,8'hd == io_mem_r_bits_id,8'hc ==
-    io_mem_r_bits_id,8'hb == io_mem_r_bits_id,8'ha == io_mem_r_bits_id,8'h9 == io_mem_r_bits_id,8'h8 == io_mem_r_bits_id
-    ,updateEntry_lo}; // @[VME.scala 244:108]
-  wire [15:0] updateEntry = reset ? 16'h0 : _updateEntry_T_16; // @[VME.scala 239:21 241:15 244:15]
-  wire [15:0] _availableEntriesNext_T = updateEntry | availableEntries; // @[VME.scala 233:39]
-  wire  _T_1 = availableEntries != 16'h0; // @[VME.scala 234:53]
-  wire  any_cmd_valid = VMEcmd_Qs_0_io_deq_valid | VMEcmd_Qs_1_io_deq_valid | VMEcmd_Qs_2_io_deq_valid |
-    VMEcmd_Qs_3_io_deq_valid | VMEcmd_Qs_4_io_deq_valid; // @[VME.scala 274:69]
-  wire  availableEntriesEn = io_mem_ar_ready & any_cmd_valid; // @[VME.scala 275:41]
-  wire  _T_4 = ~_T; // @[VME.scala 234:64]
   wire [2:0] _vme_select_T = VMEcmd_Qs_4_io_deq_valid ? 3'h4 : 3'h5; // @[Mux.scala 47:70]
   wire [2:0] _vme_select_T_1 = VMEcmd_Qs_3_io_deq_valid ? 3'h3 : _vme_select_T; // @[Mux.scala 47:70]
   wire [2:0] _vme_select_T_2 = VMEcmd_Qs_2_io_deq_valid ? 3'h2 : _vme_select_T_1; // @[Mux.scala 47:70]
   wire [2:0] _vme_select_T_3 = VMEcmd_Qs_1_io_deq_valid ? 3'h1 : _vme_select_T_2; // @[Mux.scala 47:70]
   wire [2:0] vme_select = VMEcmd_Qs_0_io_deq_valid ? 3'h0 : _vme_select_T_3; // @[Mux.scala 47:70]
-  wire  _VMEcmd_Qs_0_io_deq_ready_T = vme_select == 3'h0; // @[VME.scala 281:17]
-  wire  _VMEcmd_Qs_0_io_deq_ready_T_1 = io_mem_ar_ready & _VMEcmd_Qs_0_io_deq_ready_T; // @[VME.scala 280:50]
-  wire  _VMEcmd_Qs_1_io_deq_ready_T = vme_select == 3'h1; // @[VME.scala 281:17]
-  wire  _VMEcmd_Qs_1_io_deq_ready_T_1 = io_mem_ar_ready & _VMEcmd_Qs_1_io_deq_ready_T; // @[VME.scala 280:50]
-  wire  _VMEcmd_Qs_2_io_deq_ready_T = vme_select == 3'h2; // @[VME.scala 281:17]
-  wire  _VMEcmd_Qs_2_io_deq_ready_T_1 = io_mem_ar_ready & _VMEcmd_Qs_2_io_deq_ready_T; // @[VME.scala 280:50]
-  wire  _VMEcmd_Qs_3_io_deq_ready_T = vme_select == 3'h3; // @[VME.scala 281:17]
-  wire  _VMEcmd_Qs_3_io_deq_ready_T_1 = io_mem_ar_ready & _VMEcmd_Qs_3_io_deq_ready_T; // @[VME.scala 280:50]
-  wire  _VMEcmd_Qs_4_io_deq_ready_T = vme_select == 3'h4; // @[VME.scala 281:17]
-  wire  _VMEcmd_Qs_4_io_deq_ready_T_1 = io_mem_ar_ready & _VMEcmd_Qs_4_io_deq_ready_T; // @[VME.scala 280:50]
-  wire  _any_cmd_ready_T_3 = VMEcmd_Qs_0_io_deq_ready | VMEcmd_Qs_1_io_deq_ready | VMEcmd_Qs_2_io_deq_ready |
-    VMEcmd_Qs_3_io_deq_ready; // @[VME.scala 290:69]
-  wire [20:0] _GEN_16 = VMEcmd_Qs_4_io_deq_ready ? VMEcmd_Qs_4_io_deq_bits_tag : 21'h0; // @[VME.scala 303:24 307:36 313:39]
-  wire [20:0] _GEN_23 = VMEcmd_Qs_3_io_deq_ready ? VMEcmd_Qs_3_io_deq_bits_tag : _GEN_16; // @[VME.scala 307:36 313:39]
-  wire [20:0] _GEN_30 = VMEcmd_Qs_2_io_deq_ready ? VMEcmd_Qs_2_io_deq_bits_tag : _GEN_23; // @[VME.scala 307:36 313:39]
-  wire [20:0] _GEN_37 = VMEcmd_Qs_1_io_deq_ready ? VMEcmd_Qs_1_io_deq_bits_tag : _GEN_30; // @[VME.scala 307:36 313:39]
-  wire [2:0] _GEN_15 = VMEcmd_Qs_4_io_deq_ready ? 3'h4 : 3'h0; // @[VME.scala 303:24 307:36 312:39]
-  wire [2:0] _GEN_22 = VMEcmd_Qs_3_io_deq_ready ? 3'h3 : _GEN_15; // @[VME.scala 307:36 312:39]
-  wire [2:0] _GEN_29 = VMEcmd_Qs_2_io_deq_ready ? 3'h2 : _GEN_22; // @[VME.scala 307:36 312:39]
-  wire [2:0] _GEN_36 = VMEcmd_Qs_1_io_deq_ready ? 3'h1 : _GEN_29; // @[VME.scala 307:36 312:39]
-  wire [31:0] _GEN_11 = VMEcmd_Qs_4_io_deq_ready ? VMEcmd_Qs_4_io_deq_bits_addr : 32'h0; // @[VME.scala 299:23 307:36 308:27]
-  wire [3:0] _GEN_12 = VMEcmd_Qs_4_io_deq_ready ? VMEcmd_Qs_4_io_deq_bits_len : 4'h0; // @[VME.scala 300:23 307:36 309:27]
-  wire  _GEN_13 = VMEcmd_Qs_4_io_deq_ready & VMEcmd_Qs_4_io_deq_valid; // @[VME.scala 301:23 307:36 310:27]
-  wire [3:0] _GEN_14 = VMEcmd_Qs_4_io_deq_ready ? firstPostn : 4'h0; // @[VME.scala 302:23 307:36 311:27]
-  wire [31:0] _GEN_18 = VMEcmd_Qs_3_io_deq_ready ? VMEcmd_Qs_3_io_deq_bits_addr : _GEN_11; // @[VME.scala 307:36 308:27]
-  wire [3:0] _GEN_19 = VMEcmd_Qs_3_io_deq_ready ? VMEcmd_Qs_3_io_deq_bits_len : _GEN_12; // @[VME.scala 307:36 309:27]
-  wire  _GEN_20 = VMEcmd_Qs_3_io_deq_ready ? VMEcmd_Qs_3_io_deq_valid : _GEN_13; // @[VME.scala 307:36 310:27]
-  wire [3:0] _GEN_21 = VMEcmd_Qs_3_io_deq_ready ? firstPostn : _GEN_14; // @[VME.scala 307:36 311:27]
-  wire [31:0] _GEN_25 = VMEcmd_Qs_2_io_deq_ready ? VMEcmd_Qs_2_io_deq_bits_addr : _GEN_18; // @[VME.scala 307:36 308:27]
-  wire [3:0] _GEN_26 = VMEcmd_Qs_2_io_deq_ready ? VMEcmd_Qs_2_io_deq_bits_len : _GEN_19; // @[VME.scala 307:36 309:27]
-  wire  _GEN_27 = VMEcmd_Qs_2_io_deq_ready ? VMEcmd_Qs_2_io_deq_valid : _GEN_20; // @[VME.scala 307:36 310:27]
-  wire [3:0] _GEN_28 = VMEcmd_Qs_2_io_deq_ready ? firstPostn : _GEN_21; // @[VME.scala 307:36 311:27]
-  wire [31:0] _GEN_32 = VMEcmd_Qs_1_io_deq_ready ? VMEcmd_Qs_1_io_deq_bits_addr : _GEN_25; // @[VME.scala 307:36 308:27]
-  wire [3:0] _GEN_33 = VMEcmd_Qs_1_io_deq_ready ? VMEcmd_Qs_1_io_deq_bits_len : _GEN_26; // @[VME.scala 307:36 309:27]
-  wire  _GEN_34 = VMEcmd_Qs_1_io_deq_ready ? VMEcmd_Qs_1_io_deq_valid : _GEN_27; // @[VME.scala 307:36 310:27]
-  wire [3:0] _GEN_35 = VMEcmd_Qs_1_io_deq_ready ? firstPostn : _GEN_28; // @[VME.scala 307:36 311:27]
-  wire [3:0] _GEN_42 = VMEcmd_Qs_0_io_deq_ready ? firstPostn : _GEN_35; // @[VME.scala 307:36 311:27]
-  reg  io_vme_rd_0_data_valid_REG; // @[VME.scala 328:41]
-  wire [2:0] localTag_out_client_id = vmeTag_array_client_id_localTag_out_MPORT_data; // @[VME.scala 225:27 324:24]
-  wire  _io_vme_rd_0_data_valid_T_1 = io_vme_rd_0_data_valid_REG & localTag_out_client_id == 3'h0; // @[VME.scala 328:75]
-  reg [63:0] io_vme_rd_0_data_bits_data_REG; // @[VME.scala 332:43]
-  reg  io_vme_rd_0_data_bits_last_REG; // @[VME.scala 333:43]
-  reg  io_vme_rd_1_data_valid_REG; // @[VME.scala 328:41]
-  reg [63:0] io_vme_rd_1_data_bits_data_REG; // @[VME.scala 332:43]
-  reg  io_vme_rd_1_data_bits_last_REG; // @[VME.scala 333:43]
-  reg  io_vme_rd_2_data_valid_REG; // @[VME.scala 328:41]
-  reg [63:0] io_vme_rd_2_data_bits_data_REG; // @[VME.scala 332:43]
-  reg  io_vme_rd_3_data_valid_REG; // @[VME.scala 328:41]
-  reg [63:0] io_vme_rd_3_data_bits_data_REG; // @[VME.scala 332:43]
-  reg  io_vme_rd_4_data_valid_REG; // @[VME.scala 328:41]
-  reg [63:0] io_vme_rd_4_data_bits_data_REG; // @[VME.scala 332:43]
-  reg [3:0] wr_len; // @[VME.scala 338:23]
-  reg [31:0] wr_addr; // @[VME.scala 339:24]
-  reg [1:0] wstate; // @[VME.scala 341:23]
-  reg [3:0] wr_cnt; // @[VME.scala 342:23]
-  wire  _io_vme_wr_0_cmd_ready_T = wstate == 2'h0; // @[VME.scala 343:36]
-  wire  _io_vme_wr_0_data_ready_T = wstate == 2'h2; // @[VME.scala 345:37]
-  wire  _io_mem_w_bits_last_T = wr_cnt == wr_len; // @[VME.scala 353:32]
-  wire  _T_32 = io_vme_wr_0_cmd_ready & io_vme_wr_0_cmd_valid; // @[Decoupled.scala 50:35]
-  wire  _T_34 = io_mem_w_ready & io_mem_w_valid; // @[Decoupled.scala 50:35]
-  wire [3:0] _wr_cnt_T_1 = wr_cnt + 4'h1; // @[VME.scala 364:22]
-  wire [1:0] _GEN_52 = io_vme_wr_0_data_valid & io_mem_w_ready & _io_mem_w_bits_last_T ? 2'h3 : wstate; // @[VME.scala 378:76 379:16 341:23]
-  wire [1:0] _GEN_53 = io_mem_b_valid ? 2'h0 : wstate; // @[VME.scala 383:28 384:16 341:23]
-  wire [1:0] _GEN_54 = 2'h3 == wstate ? _GEN_53 : wstate; // @[VME.scala 366:17 341:23]
-  Queue VMEcmd_Qs_0 ( // @[VME.scala 247:45]
+  wire  any_cmd_valid = VMEcmd_Qs_0_io_deq_valid | VMEcmd_Qs_1_io_deq_valid | VMEcmd_Qs_2_io_deq_valid |
+    VMEcmd_Qs_3_io_deq_valid | VMEcmd_Qs_4_io_deq_valid; // @[VME.scala 270:69]
+  reg  arPending; // @[VME.scala 271:26]
+  reg [31:0] arAddr; // @[VME.scala 272:19]
+  reg [3:0] arLen; // @[VME.scala 273:18]
+  reg [3:0] arId; // @[VME.scala 274:17]
+  wire  issueRead = ~arPending & any_cmd_valid & |availableEntries; // @[VME.scala 275:47]
+  wire  _VMEcmd_Qs_0_io_deq_ready_T = vme_select == 3'h0; // @[VME.scala 279:59]
+  wire  _VMEcmd_Qs_1_io_deq_ready_T = vme_select == 3'h1; // @[VME.scala 279:59]
+  wire  _VMEcmd_Qs_2_io_deq_ready_T = vme_select == 3'h2; // @[VME.scala 279:59]
+  wire  _VMEcmd_Qs_3_io_deq_ready_T = vme_select == 3'h3; // @[VME.scala 279:59]
+  wire  _VMEcmd_Qs_4_io_deq_ready_T = vme_select == 3'h4; // @[VME.scala 279:59]
+  wire [20:0] _GEN_68 = _VMEcmd_Qs_4_io_deq_ready_T & any_cmd_valid ? VMEcmd_Qs_4_io_deq_bits_tag : 21'h0; // @[VME.scala 296:24 302:46 304:39]
+  wire [20:0] _GEN_76 = _VMEcmd_Qs_3_io_deq_ready_T & any_cmd_valid ? VMEcmd_Qs_3_io_deq_bits_tag : _GEN_68; // @[VME.scala 302:46 304:39]
+  wire [20:0] _GEN_84 = _VMEcmd_Qs_2_io_deq_ready_T & any_cmd_valid ? VMEcmd_Qs_2_io_deq_bits_tag : _GEN_76; // @[VME.scala 302:46 304:39]
+  wire [2:0] _GEN_67 = _VMEcmd_Qs_4_io_deq_ready_T & any_cmd_valid ? 3'h4 : 3'h0; // @[VME.scala 296:24 302:46 303:39]
+  wire [2:0] _GEN_75 = _VMEcmd_Qs_3_io_deq_ready_T & any_cmd_valid ? 3'h3 : _GEN_67; // @[VME.scala 302:46 303:39]
+  wire [2:0] _GEN_83 = _VMEcmd_Qs_2_io_deq_ready_T & any_cmd_valid ? 3'h2 : _GEN_75; // @[VME.scala 302:46 303:39]
+  wire [31:0] _GEN_64 = issueRead ? VMEcmd_Qs_4_io_deq_bits_addr : arAddr; // @[VME.scala 305:23 306:16 272:19]
+  wire [3:0] _GEN_65 = issueRead ? VMEcmd_Qs_4_io_deq_bits_len : arLen; // @[VME.scala 305:23 307:15 273:18]
+  wire [3:0] _GEN_66 = issueRead ? firstPostn : arId; // @[VME.scala 305:23 308:14 274:17]
+  wire [31:0] _GEN_69 = _VMEcmd_Qs_4_io_deq_ready_T & any_cmd_valid ? _GEN_64 : arAddr; // @[VME.scala 272:19 302:46]
+  wire [3:0] _GEN_70 = _VMEcmd_Qs_4_io_deq_ready_T & any_cmd_valid ? _GEN_65 : arLen; // @[VME.scala 273:18 302:46]
+  wire [3:0] _GEN_71 = _VMEcmd_Qs_4_io_deq_ready_T & any_cmd_valid ? _GEN_66 : arId; // @[VME.scala 274:17 302:46]
+  wire [31:0] _GEN_72 = issueRead ? VMEcmd_Qs_3_io_deq_bits_addr : _GEN_69; // @[VME.scala 305:23 306:16]
+  wire [3:0] _GEN_73 = issueRead ? VMEcmd_Qs_3_io_deq_bits_len : _GEN_70; // @[VME.scala 305:23 307:15]
+  wire [3:0] _GEN_74 = issueRead ? firstPostn : _GEN_71; // @[VME.scala 305:23 308:14]
+  wire [31:0] _GEN_77 = _VMEcmd_Qs_3_io_deq_ready_T & any_cmd_valid ? _GEN_72 : _GEN_69; // @[VME.scala 302:46]
+  wire [3:0] _GEN_78 = _VMEcmd_Qs_3_io_deq_ready_T & any_cmd_valid ? _GEN_73 : _GEN_70; // @[VME.scala 302:46]
+  wire [3:0] _GEN_79 = _VMEcmd_Qs_3_io_deq_ready_T & any_cmd_valid ? _GEN_74 : _GEN_71; // @[VME.scala 302:46]
+  wire [31:0] _GEN_80 = issueRead ? VMEcmd_Qs_2_io_deq_bits_addr : _GEN_77; // @[VME.scala 305:23 306:16]
+  wire [3:0] _GEN_81 = issueRead ? VMEcmd_Qs_2_io_deq_bits_len : _GEN_78; // @[VME.scala 305:23 307:15]
+  wire [3:0] _GEN_82 = issueRead ? firstPostn : _GEN_79; // @[VME.scala 305:23 308:14]
+  wire [31:0] _GEN_85 = _VMEcmd_Qs_2_io_deq_ready_T & any_cmd_valid ? _GEN_80 : _GEN_77; // @[VME.scala 302:46]
+  wire [3:0] _GEN_86 = _VMEcmd_Qs_2_io_deq_ready_T & any_cmd_valid ? _GEN_81 : _GEN_78; // @[VME.scala 302:46]
+  wire [3:0] _GEN_87 = _VMEcmd_Qs_2_io_deq_ready_T & any_cmd_valid ? _GEN_82 : _GEN_79; // @[VME.scala 302:46]
+  wire [31:0] _GEN_88 = issueRead ? VMEcmd_Qs_1_io_deq_bits_addr : _GEN_85; // @[VME.scala 305:23 306:16]
+  wire [3:0] _GEN_89 = issueRead ? VMEcmd_Qs_1_io_deq_bits_len : _GEN_86; // @[VME.scala 305:23 307:15]
+  wire [3:0] _GEN_90 = issueRead ? firstPostn : _GEN_87; // @[VME.scala 305:23 308:14]
+  wire [31:0] _GEN_93 = _VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid ? _GEN_88 : _GEN_85; // @[VME.scala 302:46]
+  wire [3:0] _GEN_94 = _VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid ? _GEN_89 : _GEN_86; // @[VME.scala 302:46]
+  wire [3:0] _GEN_95 = _VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid ? _GEN_90 : _GEN_87; // @[VME.scala 302:46]
+  wire  _GEN_104 = issueRead | arPending; // @[VME.scala 312:19 271:26 312:31]
+  wire  _T_10 = io_mem_ar_ready & io_mem_ar_valid; // @[Decoupled.scala 50:35]
+  wire  ridInRange = io_mem_r_bits_id < 8'h10; // @[VME.scala 318:37]
+  wire [3:0] ridIndex = io_mem_r_bits_id[3:0]; // @[VME.scala 319:34]
+  wire [2:0] _GEN_108 = 4'h1 == ridIndex ? vmeTag_array_1_client_id : vmeTag_array_0_client_id; // @[VME.scala 321:{22,22}]
+  wire [20:0] _GEN_109 = 4'h1 == ridIndex ? vmeTag_array_1_client_tag : vmeTag_array_0_client_tag; // @[VME.scala 321:{22,22}]
+  wire [2:0] _GEN_110 = 4'h2 == ridIndex ? vmeTag_array_2_client_id : _GEN_108; // @[VME.scala 321:{22,22}]
+  wire [20:0] _GEN_111 = 4'h2 == ridIndex ? vmeTag_array_2_client_tag : _GEN_109; // @[VME.scala 321:{22,22}]
+  wire [2:0] _GEN_112 = 4'h3 == ridIndex ? vmeTag_array_3_client_id : _GEN_110; // @[VME.scala 321:{22,22}]
+  wire [20:0] _GEN_113 = 4'h3 == ridIndex ? vmeTag_array_3_client_tag : _GEN_111; // @[VME.scala 321:{22,22}]
+  wire [2:0] _GEN_114 = 4'h4 == ridIndex ? vmeTag_array_4_client_id : _GEN_112; // @[VME.scala 321:{22,22}]
+  wire [20:0] _GEN_115 = 4'h4 == ridIndex ? vmeTag_array_4_client_tag : _GEN_113; // @[VME.scala 321:{22,22}]
+  wire [2:0] _GEN_116 = 4'h5 == ridIndex ? vmeTag_array_5_client_id : _GEN_114; // @[VME.scala 321:{22,22}]
+  wire [20:0] _GEN_117 = 4'h5 == ridIndex ? vmeTag_array_5_client_tag : _GEN_115; // @[VME.scala 321:{22,22}]
+  wire [2:0] _GEN_118 = 4'h6 == ridIndex ? vmeTag_array_6_client_id : _GEN_116; // @[VME.scala 321:{22,22}]
+  wire [20:0] _GEN_119 = 4'h6 == ridIndex ? vmeTag_array_6_client_tag : _GEN_117; // @[VME.scala 321:{22,22}]
+  wire [2:0] _GEN_120 = 4'h7 == ridIndex ? vmeTag_array_7_client_id : _GEN_118; // @[VME.scala 321:{22,22}]
+  wire [20:0] _GEN_121 = 4'h7 == ridIndex ? vmeTag_array_7_client_tag : _GEN_119; // @[VME.scala 321:{22,22}]
+  wire [2:0] _GEN_122 = 4'h8 == ridIndex ? vmeTag_array_8_client_id : _GEN_120; // @[VME.scala 321:{22,22}]
+  wire [20:0] _GEN_123 = 4'h8 == ridIndex ? vmeTag_array_8_client_tag : _GEN_121; // @[VME.scala 321:{22,22}]
+  wire [2:0] _GEN_124 = 4'h9 == ridIndex ? vmeTag_array_9_client_id : _GEN_122; // @[VME.scala 321:{22,22}]
+  wire [20:0] _GEN_125 = 4'h9 == ridIndex ? vmeTag_array_9_client_tag : _GEN_123; // @[VME.scala 321:{22,22}]
+  wire [2:0] _GEN_126 = 4'ha == ridIndex ? vmeTag_array_10_client_id : _GEN_124; // @[VME.scala 321:{22,22}]
+  wire [20:0] _GEN_127 = 4'ha == ridIndex ? vmeTag_array_10_client_tag : _GEN_125; // @[VME.scala 321:{22,22}]
+  wire [2:0] _GEN_128 = 4'hb == ridIndex ? vmeTag_array_11_client_id : _GEN_126; // @[VME.scala 321:{22,22}]
+  wire [20:0] _GEN_129 = 4'hb == ridIndex ? vmeTag_array_11_client_tag : _GEN_127; // @[VME.scala 321:{22,22}]
+  wire [2:0] _GEN_130 = 4'hc == ridIndex ? vmeTag_array_12_client_id : _GEN_128; // @[VME.scala 321:{22,22}]
+  wire [20:0] _GEN_131 = 4'hc == ridIndex ? vmeTag_array_12_client_tag : _GEN_129; // @[VME.scala 321:{22,22}]
+  wire [2:0] _GEN_132 = 4'hd == ridIndex ? vmeTag_array_13_client_id : _GEN_130; // @[VME.scala 321:{22,22}]
+  wire [20:0] _GEN_133 = 4'hd == ridIndex ? vmeTag_array_13_client_tag : _GEN_131; // @[VME.scala 321:{22,22}]
+  wire [2:0] _GEN_134 = 4'he == ridIndex ? vmeTag_array_14_client_id : _GEN_132; // @[VME.scala 321:{22,22}]
+  wire [20:0] _GEN_135 = 4'he == ridIndex ? vmeTag_array_14_client_tag : _GEN_133; // @[VME.scala 321:{22,22}]
+  wire [2:0] _GEN_136 = 4'hf == ridIndex ? vmeTag_array_15_client_id : _GEN_134; // @[VME.scala 321:{22,22}]
+  wire [20:0] _GEN_137 = 4'hf == ridIndex ? vmeTag_array_15_client_tag : _GEN_135; // @[VME.scala 321:{22,22}]
+  wire [2:0] localTag_out_client_id = ridInRange ? _GEN_136 : 3'h0; // @[VME.scala 321:22]
+  wire [15:0] allocatedEntries = ~availableEntries; // @[VME.scala 322:26]
+  reg [15:0] issuedEntries; // @[VME.scala 323:30]
+  wire [15:0] _slotAllocated_T = allocatedEntries >> ridIndex; // @[VME.scala 324:53]
+  wire  slotAllocated = ridInRange & _slotAllocated_T[0]; // @[VME.scala 324:34]
+  wire  issuingSameSlot = _T_10 & arId == ridIndex; // @[VME.scala 325:40]
+  wire [15:0] _slotIssued_T = issuedEntries >> ridIndex; // @[VME.scala 326:48]
+  wire  slotIssued = ridInRange & (_slotIssued_T[0] | issuingSameSlot); // @[VME.scala 326:31]
+  wire  clientInRange = localTag_out_client_id < 3'h5; // @[VME.scala 327:46]
+  wire  _responseQs_0_io_enq_valid_T_2 = localTag_out_client_id == 3'h0; // @[VME.scala 333:30]
+  wire  _responseQs_1_io_enq_valid_T_2 = localTag_out_client_id == 3'h1; // @[VME.scala 333:30]
+  wire  _responseQs_2_io_enq_valid_T_2 = localTag_out_client_id == 3'h2; // @[VME.scala 333:30]
+  wire  _responseQs_3_io_enq_valid_T_2 = localTag_out_client_id == 3'h3; // @[VME.scala 333:30]
+  wire  _responseQs_4_io_enq_valid_T_2 = localTag_out_client_id == 3'h4; // @[VME.scala 333:30]
+  wire  _io_mem_r_ready_T_5 = 3'h1 == localTag_out_client_id ? responseQs_1_io_enq_ready : 3'h0 ==
+    localTag_out_client_id & responseQs_0_io_enq_ready; // @[Mux.scala 81:58]
+  wire  _io_mem_r_ready_T_7 = 3'h2 == localTag_out_client_id ? responseQs_2_io_enq_ready : _io_mem_r_ready_T_5; // @[Mux.scala 81:58]
+  wire  _io_mem_r_ready_T_9 = 3'h3 == localTag_out_client_id ? responseQs_3_io_enq_ready : _io_mem_r_ready_T_7; // @[Mux.scala 81:58]
+  wire  _io_mem_r_ready_T_11 = 3'h4 == localTag_out_client_id ? responseQs_4_io_enq_ready : _io_mem_r_ready_T_9; // @[Mux.scala 81:58]
+  wire [15:0] allocatedEntry = issueRead ? resetEntry : 16'h0; // @[VME.scala 343:27]
+  wire  _freedEntry_T = io_mem_r_ready & io_mem_r_valid; // @[Decoupled.scala 50:35]
+  wire [15:0] _freedEntry_T_2 = 16'h1 << ridIndex; // @[OneHot.scala 64:12]
+  wire [15:0] freedEntry = _freedEntry_T & io_mem_r_bits_last ? _freedEntry_T_2 : 16'h0; // @[VME.scala 344:23]
+  wire [15:0] _availableEntries_T = availableEntries | freedEntry; // @[VME.scala 346:41]
+  wire [15:0] _availableEntries_T_1 = ~allocatedEntry; // @[VME.scala 346:57]
+  wire [15:0] _availableEntries_T_2 = _availableEntries_T & _availableEntries_T_1; // @[VME.scala 346:55]
+  wire [15:0] _issuedEntry_T_1 = 16'h1 << arId; // @[OneHot.scala 64:12]
+  wire [15:0] issuedEntry = _T_10 ? _issuedEntry_T_1 : 16'h0; // @[VME.scala 347:24]
+  wire [15:0] _issuedEntries_T = issuedEntries | issuedEntry; // @[VME.scala 348:35]
+  wire [15:0] _issuedEntries_T_1 = ~freedEntry; // @[VME.scala 348:52]
+  wire [15:0] _issuedEntries_T_2 = _issuedEntries_T & _issuedEntries_T_1; // @[VME.scala 348:50]
+  reg [4:0] beatsRemaining_0; // @[VME.scala 350:27]
+  reg [4:0] beatsRemaining_1; // @[VME.scala 350:27]
+  reg [4:0] beatsRemaining_2; // @[VME.scala 350:27]
+  reg [4:0] beatsRemaining_3; // @[VME.scala 350:27]
+  reg [4:0] beatsRemaining_4; // @[VME.scala 350:27]
+  reg [4:0] beatsRemaining_5; // @[VME.scala 350:27]
+  reg [4:0] beatsRemaining_6; // @[VME.scala 350:27]
+  reg [4:0] beatsRemaining_7; // @[VME.scala 350:27]
+  reg [4:0] beatsRemaining_8; // @[VME.scala 350:27]
+  reg [4:0] beatsRemaining_9; // @[VME.scala 350:27]
+  reg [4:0] beatsRemaining_10; // @[VME.scala 350:27]
+  reg [4:0] beatsRemaining_11; // @[VME.scala 350:27]
+  reg [4:0] beatsRemaining_12; // @[VME.scala 350:27]
+  reg [4:0] beatsRemaining_13; // @[VME.scala 350:27]
+  reg [4:0] beatsRemaining_14; // @[VME.scala 350:27]
+  reg [4:0] beatsRemaining_15; // @[VME.scala 350:27]
+  wire [4:0] _beatsRemaining_T = arLen + 4'h1; // @[VME.scala 352:35]
+  wire [4:0] _GEN_138 = 4'h0 == arId ? _beatsRemaining_T : beatsRemaining_0; // @[VME.scala 352:{26,26} 350:27]
+  wire [4:0] _GEN_139 = 4'h1 == arId ? _beatsRemaining_T : beatsRemaining_1; // @[VME.scala 352:{26,26} 350:27]
+  wire [4:0] _GEN_140 = 4'h2 == arId ? _beatsRemaining_T : beatsRemaining_2; // @[VME.scala 352:{26,26} 350:27]
+  wire [4:0] _GEN_141 = 4'h3 == arId ? _beatsRemaining_T : beatsRemaining_3; // @[VME.scala 352:{26,26} 350:27]
+  wire [4:0] _GEN_142 = 4'h4 == arId ? _beatsRemaining_T : beatsRemaining_4; // @[VME.scala 352:{26,26} 350:27]
+  wire [4:0] _GEN_143 = 4'h5 == arId ? _beatsRemaining_T : beatsRemaining_5; // @[VME.scala 352:{26,26} 350:27]
+  wire [4:0] _GEN_144 = 4'h6 == arId ? _beatsRemaining_T : beatsRemaining_6; // @[VME.scala 352:{26,26} 350:27]
+  wire [4:0] _GEN_145 = 4'h7 == arId ? _beatsRemaining_T : beatsRemaining_7; // @[VME.scala 352:{26,26} 350:27]
+  wire [4:0] _GEN_146 = 4'h8 == arId ? _beatsRemaining_T : beatsRemaining_8; // @[VME.scala 352:{26,26} 350:27]
+  wire [4:0] _GEN_147 = 4'h9 == arId ? _beatsRemaining_T : beatsRemaining_9; // @[VME.scala 352:{26,26} 350:27]
+  wire [4:0] _GEN_148 = 4'ha == arId ? _beatsRemaining_T : beatsRemaining_10; // @[VME.scala 352:{26,26} 350:27]
+  wire [4:0] _GEN_149 = 4'hb == arId ? _beatsRemaining_T : beatsRemaining_11; // @[VME.scala 352:{26,26} 350:27]
+  wire [4:0] _GEN_150 = 4'hc == arId ? _beatsRemaining_T : beatsRemaining_12; // @[VME.scala 352:{26,26} 350:27]
+  wire [4:0] _GEN_151 = 4'hd == arId ? _beatsRemaining_T : beatsRemaining_13; // @[VME.scala 352:{26,26} 350:27]
+  wire [4:0] _GEN_152 = 4'he == arId ? _beatsRemaining_T : beatsRemaining_14; // @[VME.scala 352:{26,26} 350:27]
+  wire [4:0] _GEN_153 = 4'hf == arId ? _beatsRemaining_T : beatsRemaining_15; // @[VME.scala 352:{26,26} 350:27]
+  wire [4:0] _GEN_154 = _T_10 ? _GEN_138 : beatsRemaining_0; // @[VME.scala 351:24 350:27]
+  wire [4:0] _GEN_155 = _T_10 ? _GEN_139 : beatsRemaining_1; // @[VME.scala 351:24 350:27]
+  wire [4:0] _GEN_156 = _T_10 ? _GEN_140 : beatsRemaining_2; // @[VME.scala 351:24 350:27]
+  wire [4:0] _GEN_157 = _T_10 ? _GEN_141 : beatsRemaining_3; // @[VME.scala 351:24 350:27]
+  wire [4:0] _GEN_158 = _T_10 ? _GEN_142 : beatsRemaining_4; // @[VME.scala 351:24 350:27]
+  wire [4:0] _GEN_159 = _T_10 ? _GEN_143 : beatsRemaining_5; // @[VME.scala 351:24 350:27]
+  wire [4:0] _GEN_160 = _T_10 ? _GEN_144 : beatsRemaining_6; // @[VME.scala 351:24 350:27]
+  wire [4:0] _GEN_161 = _T_10 ? _GEN_145 : beatsRemaining_7; // @[VME.scala 351:24 350:27]
+  wire [4:0] _GEN_162 = _T_10 ? _GEN_146 : beatsRemaining_8; // @[VME.scala 351:24 350:27]
+  wire [4:0] _GEN_163 = _T_10 ? _GEN_147 : beatsRemaining_9; // @[VME.scala 351:24 350:27]
+  wire [4:0] _GEN_164 = _T_10 ? _GEN_148 : beatsRemaining_10; // @[VME.scala 351:24 350:27]
+  wire [4:0] _GEN_165 = _T_10 ? _GEN_149 : beatsRemaining_11; // @[VME.scala 351:24 350:27]
+  wire [4:0] _GEN_166 = _T_10 ? _GEN_150 : beatsRemaining_12; // @[VME.scala 351:24 350:27]
+  wire [4:0] _GEN_167 = _T_10 ? _GEN_151 : beatsRemaining_13; // @[VME.scala 351:24 350:27]
+  wire [4:0] _GEN_168 = _T_10 ? _GEN_152 : beatsRemaining_14; // @[VME.scala 351:24 350:27]
+  wire [4:0] _GEN_169 = _T_10 ? _GEN_153 : beatsRemaining_15; // @[VME.scala 351:24 350:27]
+  wire [4:0] _GEN_171 = 4'h1 == ridIndex ? beatsRemaining_1 : beatsRemaining_0; // @[VME.scala 355:{27,27}]
+  wire [4:0] _GEN_172 = 4'h2 == ridIndex ? beatsRemaining_2 : _GEN_171; // @[VME.scala 355:{27,27}]
+  wire [4:0] _GEN_173 = 4'h3 == ridIndex ? beatsRemaining_3 : _GEN_172; // @[VME.scala 355:{27,27}]
+  wire [4:0] _GEN_174 = 4'h4 == ridIndex ? beatsRemaining_4 : _GEN_173; // @[VME.scala 355:{27,27}]
+  wire [4:0] _GEN_175 = 4'h5 == ridIndex ? beatsRemaining_5 : _GEN_174; // @[VME.scala 355:{27,27}]
+  wire [4:0] _GEN_176 = 4'h6 == ridIndex ? beatsRemaining_6 : _GEN_175; // @[VME.scala 355:{27,27}]
+  wire [4:0] _GEN_177 = 4'h7 == ridIndex ? beatsRemaining_7 : _GEN_176; // @[VME.scala 355:{27,27}]
+  wire [4:0] _GEN_178 = 4'h8 == ridIndex ? beatsRemaining_8 : _GEN_177; // @[VME.scala 355:{27,27}]
+  wire [4:0] _GEN_179 = 4'h9 == ridIndex ? beatsRemaining_9 : _GEN_178; // @[VME.scala 355:{27,27}]
+  wire [4:0] _GEN_180 = 4'ha == ridIndex ? beatsRemaining_10 : _GEN_179; // @[VME.scala 355:{27,27}]
+  wire [4:0] _GEN_181 = 4'hb == ridIndex ? beatsRemaining_11 : _GEN_180; // @[VME.scala 355:{27,27}]
+  wire [4:0] _GEN_182 = 4'hc == ridIndex ? beatsRemaining_12 : _GEN_181; // @[VME.scala 355:{27,27}]
+  wire [4:0] _GEN_183 = 4'hd == ridIndex ? beatsRemaining_13 : _GEN_182; // @[VME.scala 355:{27,27}]
+  wire [4:0] _GEN_184 = 4'he == ridIndex ? beatsRemaining_14 : _GEN_183; // @[VME.scala 355:{27,27}]
+  wire [4:0] _GEN_185 = 4'hf == ridIndex ? beatsRemaining_15 : _GEN_184; // @[VME.scala 355:{27,27}]
+  wire [4:0] currentBeats = issuingSameSlot ? _beatsRemaining_T : _GEN_185; // @[VME.scala 355:27]
+  wire  _T_15 = ~reset; // @[VME.scala 356:11]
+  wire [4:0] _beatsRemaining_T_2 = currentBeats - 5'h1; // @[VME.scala 360:46]
+  wire  _T_22 = ~ridInRange; // @[VME.scala 363:10]
+  wire  _T_23 = ~slotAllocated; // @[VME.scala 363:25]
+  wire  _T_25 = ~slotIssued; // @[VME.scala 363:43]
+  wire  _T_27 = ~clientInRange; // @[VME.scala 363:58]
+  wire  _T_28 = ~ridInRange | ~slotAllocated | ~slotIssued | ~clientInRange; // @[VME.scala 363:55]
+  reg [3:0] wr_len; // @[VME.scala 376:23]
+  reg [31:0] wr_addr; // @[VME.scala 377:24]
+  reg [1:0] wstate; // @[VME.scala 379:23]
+  reg [3:0] wr_cnt; // @[VME.scala 380:23]
+  wire  _io_vme_wr_0_cmd_ready_T = wstate == 2'h0; // @[VME.scala 381:36]
+  wire  _io_vme_wr_0_data_ready_T = wstate == 2'h2; // @[VME.scala 383:37]
+  wire  _io_mem_w_bits_last_T = wr_cnt == wr_len; // @[VME.scala 391:32]
+  wire  _T_56 = io_vme_wr_0_cmd_ready & io_vme_wr_0_cmd_valid; // @[Decoupled.scala 50:35]
+  wire  _T_58 = io_mem_w_ready & io_mem_w_valid; // @[Decoupled.scala 50:35]
+  wire [3:0] _wr_cnt_T_1 = wr_cnt + 4'h1; // @[VME.scala 407:22]
+  wire [1:0] _GEN_224 = io_vme_wr_0_data_valid & io_mem_w_ready & _io_mem_w_bits_last_T ? 2'h3 : wstate; // @[VME.scala 421:76 422:16 379:23]
+  wire [1:0] _GEN_225 = io_mem_b_valid ? 2'h0 : wstate; // @[VME.scala 426:28 427:16 379:23]
+  wire [1:0] _GEN_226 = 2'h3 == wstate ? _GEN_225 : wstate; // @[VME.scala 409:17 379:23]
+  wire  _GEN_233 = _freedEntry_T & ~reset; // @[VME.scala 356:11]
+  wire  _GEN_236 = io_mem_r_valid & _T_15; // @[VME.scala 368:11]
+  wire  _GEN_241 = io_mem_b_valid & _T_15; // @[VME.scala 395:11]
+  Queue VMEcmd_Qs_0 ( // @[VME.scala 243:11]
     .clock(VMEcmd_Qs_0_clock),
     .reset(VMEcmd_Qs_0_reset),
     .io_enq_ready(VMEcmd_Qs_0_io_enq_ready),
@@ -766,7 +1161,7 @@ module VME(
     .io_deq_bits_len(VMEcmd_Qs_0_io_deq_bits_len),
     .io_deq_bits_tag(VMEcmd_Qs_0_io_deq_bits_tag)
   );
-  Queue VMEcmd_Qs_1 ( // @[VME.scala 247:45]
+  Queue VMEcmd_Qs_1 ( // @[VME.scala 243:11]
     .clock(VMEcmd_Qs_1_clock),
     .reset(VMEcmd_Qs_1_reset),
     .io_enq_ready(VMEcmd_Qs_1_io_enq_ready),
@@ -780,7 +1175,7 @@ module VME(
     .io_deq_bits_len(VMEcmd_Qs_1_io_deq_bits_len),
     .io_deq_bits_tag(VMEcmd_Qs_1_io_deq_bits_tag)
   );
-  Queue VMEcmd_Qs_2 ( // @[VME.scala 247:45]
+  Queue VMEcmd_Qs_2 ( // @[VME.scala 243:11]
     .clock(VMEcmd_Qs_2_clock),
     .reset(VMEcmd_Qs_2_reset),
     .io_enq_ready(VMEcmd_Qs_2_io_enq_ready),
@@ -794,7 +1189,7 @@ module VME(
     .io_deq_bits_len(VMEcmd_Qs_2_io_deq_bits_len),
     .io_deq_bits_tag(VMEcmd_Qs_2_io_deq_bits_tag)
   );
-  Queue VMEcmd_Qs_3 ( // @[VME.scala 247:45]
+  Queue VMEcmd_Qs_3 ( // @[VME.scala 243:11]
     .clock(VMEcmd_Qs_3_clock),
     .reset(VMEcmd_Qs_3_reset),
     .io_enq_ready(VMEcmd_Qs_3_io_enq_ready),
@@ -808,7 +1203,7 @@ module VME(
     .io_deq_bits_len(VMEcmd_Qs_3_io_deq_bits_len),
     .io_deq_bits_tag(VMEcmd_Qs_3_io_deq_bits_tag)
   );
-  Queue VMEcmd_Qs_4 ( // @[VME.scala 247:45]
+  Queue VMEcmd_Qs_4 ( // @[VME.scala 243:11]
     .clock(VMEcmd_Qs_4_clock),
     .reset(VMEcmd_Qs_4_reset),
     .io_enq_ready(VMEcmd_Qs_4_io_enq_ready),
@@ -822,213 +1217,879 @@ module VME(
     .io_deq_bits_len(VMEcmd_Qs_4_io_deq_bits_len),
     .io_deq_bits_tag(VMEcmd_Qs_4_io_deq_bits_tag)
   );
-  assign vmeTag_array_client_id_localTag_out_MPORT_en = vmeTag_array_client_id_localTag_out_MPORT_en_pipe_0;
-  assign vmeTag_array_client_id_localTag_out_MPORT_addr = vmeTag_array_client_id_localTag_out_MPORT_addr_pipe_0;
-  assign vmeTag_array_client_id_localTag_out_MPORT_data =
-    vmeTag_array_client_id[vmeTag_array_client_id_localTag_out_MPORT_addr]; // @[VME.scala 220:33]
-  assign vmeTag_array_client_id_rdwrPort_data = VMEcmd_Qs_0_io_deq_ready ? 3'h0 : _GEN_36;
-  assign vmeTag_array_client_id_rdwrPort_addr = oneHotIdx_0 ? 4'h0 : _bitPostn_T_13;
-  assign vmeTag_array_client_id_rdwrPort_mask = 1'h1;
-  assign vmeTag_array_client_id_rdwrPort_en = _any_cmd_ready_T_3 | VMEcmd_Qs_4_io_deq_ready;
-  assign vmeTag_array_client_tag_localTag_out_MPORT_en = vmeTag_array_client_tag_localTag_out_MPORT_en_pipe_0;
-  assign vmeTag_array_client_tag_localTag_out_MPORT_addr = vmeTag_array_client_tag_localTag_out_MPORT_addr_pipe_0;
-  assign vmeTag_array_client_tag_localTag_out_MPORT_data =
-    vmeTag_array_client_tag[vmeTag_array_client_tag_localTag_out_MPORT_addr]; // @[VME.scala 220:33]
-  assign vmeTag_array_client_tag_rdwrPort_data = VMEcmd_Qs_0_io_deq_ready ? VMEcmd_Qs_0_io_deq_bits_tag : _GEN_37;
-  assign vmeTag_array_client_tag_rdwrPort_addr = oneHotIdx_0 ? 4'h0 : _bitPostn_T_13;
-  assign vmeTag_array_client_tag_rdwrPort_mask = 1'h1;
-  assign vmeTag_array_client_tag_rdwrPort_en = _any_cmd_ready_T_3 | VMEcmd_Qs_4_io_deq_ready;
-  assign io_mem_aw_valid = wstate == 2'h1; // @[VME.scala 346:29]
-  assign io_mem_aw_bits_addr = wr_addr; // @[VME.scala 347:23]
-  assign io_mem_aw_bits_len = wr_len; // @[VME.scala 348:22]
-  assign io_mem_w_valid = _io_vme_wr_0_data_ready_T & io_vme_wr_0_data_valid; // @[VME.scala 350:43]
-  assign io_mem_w_bits_data = io_vme_wr_0_data_bits_data; // @[VME.scala 351:22]
-  assign io_mem_w_bits_last = wr_cnt == wr_len; // @[VME.scala 353:32]
-  assign io_mem_b_ready = wstate == 2'h3; // @[VME.scala 355:28]
-  assign io_mem_ar_valid = VMEcmd_Qs_0_io_deq_ready ? VMEcmd_Qs_0_io_deq_valid : _GEN_34; // @[VME.scala 307:36 310:27]
-  assign io_mem_ar_bits_addr = VMEcmd_Qs_0_io_deq_ready ? VMEcmd_Qs_0_io_deq_bits_addr : _GEN_32; // @[VME.scala 307:36 308:27]
-  assign io_mem_ar_bits_id = {{4'd0}, _GEN_42};
-  assign io_mem_ar_bits_len = VMEcmd_Qs_0_io_deq_ready ? VMEcmd_Qs_0_io_deq_bits_len : _GEN_33; // @[VME.scala 307:36 309:27]
-  assign io_vme_rd_0_cmd_ready = VMEcmd_Qs_0_io_enq_ready; // @[VME.scala 283:28]
-  assign io_vme_rd_0_data_valid = _io_vme_rd_0_data_valid_T_1 & io_vme_rd_0_data_ready; // @[VME.scala 329:5]
-  assign io_vme_rd_0_data_bits_data = io_vme_rd_0_data_bits_data_REG; // @[VME.scala 332:33]
-  assign io_vme_rd_0_data_bits_last = io_vme_rd_0_data_bits_last_REG; // @[VME.scala 333:33]
-  assign io_vme_rd_1_cmd_ready = VMEcmd_Qs_1_io_enq_ready; // @[VME.scala 283:28]
-  assign io_vme_rd_1_data_valid = io_vme_rd_1_data_valid_REG & localTag_out_client_id == 3'h1; // @[VME.scala 328:75]
-  assign io_vme_rd_1_data_bits_data = io_vme_rd_1_data_bits_data_REG; // @[VME.scala 332:33]
-  assign io_vme_rd_1_data_bits_tag = vmeTag_array_client_tag_localTag_out_MPORT_data; // @[VME.scala 225:27 324:24]
-  assign io_vme_rd_1_data_bits_last = io_vme_rd_1_data_bits_last_REG; // @[VME.scala 333:33]
-  assign io_vme_rd_2_cmd_ready = VMEcmd_Qs_2_io_enq_ready; // @[VME.scala 283:28]
-  assign io_vme_rd_2_data_valid = io_vme_rd_2_data_valid_REG & localTag_out_client_id == 3'h2; // @[VME.scala 328:75]
-  assign io_vme_rd_2_data_bits_data = io_vme_rd_2_data_bits_data_REG; // @[VME.scala 332:33]
-  assign io_vme_rd_2_data_bits_tag = vmeTag_array_client_tag_localTag_out_MPORT_data; // @[VME.scala 225:27 324:24]
-  assign io_vme_rd_3_cmd_ready = VMEcmd_Qs_3_io_enq_ready; // @[VME.scala 283:28]
-  assign io_vme_rd_3_data_valid = io_vme_rd_3_data_valid_REG & localTag_out_client_id == 3'h3; // @[VME.scala 328:75]
-  assign io_vme_rd_3_data_bits_data = io_vme_rd_3_data_bits_data_REG; // @[VME.scala 332:33]
-  assign io_vme_rd_3_data_bits_tag = vmeTag_array_client_tag_localTag_out_MPORT_data; // @[VME.scala 225:27 324:24]
-  assign io_vme_rd_4_cmd_ready = VMEcmd_Qs_4_io_enq_ready; // @[VME.scala 283:28]
-  assign io_vme_rd_4_data_valid = io_vme_rd_4_data_valid_REG & localTag_out_client_id == 3'h4; // @[VME.scala 328:75]
-  assign io_vme_rd_4_data_bits_data = io_vme_rd_4_data_bits_data_REG; // @[VME.scala 332:33]
-  assign io_vme_rd_4_data_bits_tag = vmeTag_array_client_tag_localTag_out_MPORT_data; // @[VME.scala 225:27 324:24]
-  assign io_vme_wr_0_cmd_ready = wstate == 2'h0; // @[VME.scala 343:36]
-  assign io_vme_wr_0_data_ready = wstate == 2'h2 & io_mem_w_ready; // @[VME.scala 345:52]
+  Queue_5 responseQs_0 ( // @[VME.scala 329:11]
+    .clock(responseQs_0_clock),
+    .reset(responseQs_0_reset),
+    .io_enq_ready(responseQs_0_io_enq_ready),
+    .io_enq_valid(responseQs_0_io_enq_valid),
+    .io_enq_bits_data(responseQs_0_io_enq_bits_data),
+    .io_enq_bits_tag(responseQs_0_io_enq_bits_tag),
+    .io_enq_bits_last(responseQs_0_io_enq_bits_last),
+    .io_deq_ready(responseQs_0_io_deq_ready),
+    .io_deq_valid(responseQs_0_io_deq_valid),
+    .io_deq_bits_data(responseQs_0_io_deq_bits_data),
+    .io_deq_bits_tag(responseQs_0_io_deq_bits_tag),
+    .io_deq_bits_last(responseQs_0_io_deq_bits_last)
+  );
+  Queue_5 responseQs_1 ( // @[VME.scala 329:11]
+    .clock(responseQs_1_clock),
+    .reset(responseQs_1_reset),
+    .io_enq_ready(responseQs_1_io_enq_ready),
+    .io_enq_valid(responseQs_1_io_enq_valid),
+    .io_enq_bits_data(responseQs_1_io_enq_bits_data),
+    .io_enq_bits_tag(responseQs_1_io_enq_bits_tag),
+    .io_enq_bits_last(responseQs_1_io_enq_bits_last),
+    .io_deq_ready(responseQs_1_io_deq_ready),
+    .io_deq_valid(responseQs_1_io_deq_valid),
+    .io_deq_bits_data(responseQs_1_io_deq_bits_data),
+    .io_deq_bits_tag(responseQs_1_io_deq_bits_tag),
+    .io_deq_bits_last(responseQs_1_io_deq_bits_last)
+  );
+  Queue_5 responseQs_2 ( // @[VME.scala 329:11]
+    .clock(responseQs_2_clock),
+    .reset(responseQs_2_reset),
+    .io_enq_ready(responseQs_2_io_enq_ready),
+    .io_enq_valid(responseQs_2_io_enq_valid),
+    .io_enq_bits_data(responseQs_2_io_enq_bits_data),
+    .io_enq_bits_tag(responseQs_2_io_enq_bits_tag),
+    .io_enq_bits_last(responseQs_2_io_enq_bits_last),
+    .io_deq_ready(responseQs_2_io_deq_ready),
+    .io_deq_valid(responseQs_2_io_deq_valid),
+    .io_deq_bits_data(responseQs_2_io_deq_bits_data),
+    .io_deq_bits_tag(responseQs_2_io_deq_bits_tag),
+    .io_deq_bits_last(responseQs_2_io_deq_bits_last)
+  );
+  Queue_5 responseQs_3 ( // @[VME.scala 329:11]
+    .clock(responseQs_3_clock),
+    .reset(responseQs_3_reset),
+    .io_enq_ready(responseQs_3_io_enq_ready),
+    .io_enq_valid(responseQs_3_io_enq_valid),
+    .io_enq_bits_data(responseQs_3_io_enq_bits_data),
+    .io_enq_bits_tag(responseQs_3_io_enq_bits_tag),
+    .io_enq_bits_last(responseQs_3_io_enq_bits_last),
+    .io_deq_ready(responseQs_3_io_deq_ready),
+    .io_deq_valid(responseQs_3_io_deq_valid),
+    .io_deq_bits_data(responseQs_3_io_deq_bits_data),
+    .io_deq_bits_tag(responseQs_3_io_deq_bits_tag),
+    .io_deq_bits_last(responseQs_3_io_deq_bits_last)
+  );
+  Queue_5 responseQs_4 ( // @[VME.scala 329:11]
+    .clock(responseQs_4_clock),
+    .reset(responseQs_4_reset),
+    .io_enq_ready(responseQs_4_io_enq_ready),
+    .io_enq_valid(responseQs_4_io_enq_valid),
+    .io_enq_bits_data(responseQs_4_io_enq_bits_data),
+    .io_enq_bits_tag(responseQs_4_io_enq_bits_tag),
+    .io_enq_bits_last(responseQs_4_io_enq_bits_last),
+    .io_deq_ready(responseQs_4_io_deq_ready),
+    .io_deq_valid(responseQs_4_io_deq_valid),
+    .io_deq_bits_data(responseQs_4_io_deq_bits_data),
+    .io_deq_bits_tag(responseQs_4_io_deq_bits_tag),
+    .io_deq_bits_last(responseQs_4_io_deq_bits_last)
+  );
+  assign io_mem_aw_valid = wstate == 2'h1; // @[VME.scala 384:29]
+  assign io_mem_aw_bits_addr = wr_addr; // @[VME.scala 385:23]
+  assign io_mem_aw_bits_len = wr_len; // @[VME.scala 386:22]
+  assign io_mem_w_valid = _io_vme_wr_0_data_ready_T & io_vme_wr_0_data_valid; // @[VME.scala 388:43]
+  assign io_mem_w_bits_data = io_vme_wr_0_data_bits_data; // @[VME.scala 389:22]
+  assign io_mem_w_bits_last = wr_cnt == wr_len; // @[VME.scala 391:32]
+  assign io_mem_b_ready = wstate == 2'h3; // @[VME.scala 393:28]
+  assign io_mem_ar_valid = arPending; // @[VME.scala 294:23]
+  assign io_mem_ar_bits_addr = arAddr; // @[VME.scala 292:23]
+  assign io_mem_ar_bits_id = {{4'd0}, arId}; // @[VME.scala 295:23]
+  assign io_mem_ar_bits_len = arLen; // @[VME.scala 293:23]
+  assign io_mem_r_ready = slotAllocated & slotIssued & clientInRange & _io_mem_r_ready_T_11; // @[VME.scala 339:66]
+  assign io_vme_rd_0_cmd_ready = VMEcmd_Qs_0_io_enq_ready; // @[VME.scala 280:28]
+  assign io_vme_rd_0_data_valid = responseQs_0_io_deq_valid; // @[VME.scala 337:23]
+  assign io_vme_rd_0_data_bits_data = responseQs_0_io_deq_bits_data; // @[VME.scala 337:23]
+  assign io_vme_rd_0_data_bits_last = responseQs_0_io_deq_bits_last; // @[VME.scala 337:23]
+  assign io_vme_rd_1_cmd_ready = VMEcmd_Qs_1_io_enq_ready; // @[VME.scala 280:28]
+  assign io_vme_rd_1_data_valid = responseQs_1_io_deq_valid; // @[VME.scala 337:23]
+  assign io_vme_rd_1_data_bits_data = responseQs_1_io_deq_bits_data; // @[VME.scala 337:23]
+  assign io_vme_rd_1_data_bits_tag = responseQs_1_io_deq_bits_tag; // @[VME.scala 337:23]
+  assign io_vme_rd_1_data_bits_last = responseQs_1_io_deq_bits_last; // @[VME.scala 337:23]
+  assign io_vme_rd_2_cmd_ready = VMEcmd_Qs_2_io_enq_ready; // @[VME.scala 280:28]
+  assign io_vme_rd_2_data_valid = responseQs_2_io_deq_valid; // @[VME.scala 337:23]
+  assign io_vme_rd_2_data_bits_data = responseQs_2_io_deq_bits_data; // @[VME.scala 337:23]
+  assign io_vme_rd_2_data_bits_tag = responseQs_2_io_deq_bits_tag; // @[VME.scala 337:23]
+  assign io_vme_rd_3_cmd_ready = VMEcmd_Qs_3_io_enq_ready; // @[VME.scala 280:28]
+  assign io_vme_rd_3_data_valid = responseQs_3_io_deq_valid; // @[VME.scala 337:23]
+  assign io_vme_rd_3_data_bits_data = responseQs_3_io_deq_bits_data; // @[VME.scala 337:23]
+  assign io_vme_rd_3_data_bits_tag = responseQs_3_io_deq_bits_tag; // @[VME.scala 337:23]
+  assign io_vme_rd_4_cmd_ready = VMEcmd_Qs_4_io_enq_ready; // @[VME.scala 280:28]
+  assign io_vme_rd_4_data_valid = responseQs_4_io_deq_valid; // @[VME.scala 337:23]
+  assign io_vme_rd_4_data_bits_data = responseQs_4_io_deq_bits_data; // @[VME.scala 337:23]
+  assign io_vme_rd_4_data_bits_tag = responseQs_4_io_deq_bits_tag; // @[VME.scala 337:23]
+  assign io_vme_wr_0_cmd_ready = wstate == 2'h0; // @[VME.scala 381:36]
+  assign io_vme_wr_0_data_ready = wstate == 2'h2 & io_mem_w_ready; // @[VME.scala 383:52]
   assign io_vme_wr_0_ack = io_mem_b_ready & io_mem_b_valid; // @[Decoupled.scala 50:35]
   assign VMEcmd_Qs_0_clock = clock;
   assign VMEcmd_Qs_0_reset = reset;
-  assign VMEcmd_Qs_0_io_enq_valid = io_vme_rd_0_cmd_valid & VMEcmd_Qs_0_io_enq_ready; // @[VME.scala 278:58]
-  assign VMEcmd_Qs_0_io_enq_bits_addr = io_vme_rd_0_cmd_bits_addr; // @[VME.scala 279:31]
-  assign VMEcmd_Qs_0_io_enq_bits_len = io_vme_rd_0_cmd_bits_len; // @[VME.scala 279:31]
-  assign VMEcmd_Qs_0_io_enq_bits_tag = 21'h0; // @[VME.scala 279:31]
-  assign VMEcmd_Qs_0_io_deq_ready = _VMEcmd_Qs_0_io_deq_ready_T_1 & _T_1 & _T_4; // @[VME.scala 281:62]
+  assign VMEcmd_Qs_0_io_enq_valid = io_vme_rd_0_cmd_valid; // @[VME.scala 277:31]
+  assign VMEcmd_Qs_0_io_enq_bits_addr = io_vme_rd_0_cmd_bits_addr; // @[VME.scala 278:31]
+  assign VMEcmd_Qs_0_io_enq_bits_len = io_vme_rd_0_cmd_bits_len; // @[VME.scala 278:31]
+  assign VMEcmd_Qs_0_io_enq_bits_tag = 21'h0; // @[VME.scala 278:31]
+  assign VMEcmd_Qs_0_io_deq_ready = issueRead & vme_select == 3'h0; // @[VME.scala 279:44]
   assign VMEcmd_Qs_1_clock = clock;
   assign VMEcmd_Qs_1_reset = reset;
-  assign VMEcmd_Qs_1_io_enq_valid = io_vme_rd_1_cmd_valid & VMEcmd_Qs_1_io_enq_ready; // @[VME.scala 278:58]
-  assign VMEcmd_Qs_1_io_enq_bits_addr = io_vme_rd_1_cmd_bits_addr; // @[VME.scala 279:31]
-  assign VMEcmd_Qs_1_io_enq_bits_len = io_vme_rd_1_cmd_bits_len; // @[VME.scala 279:31]
-  assign VMEcmd_Qs_1_io_enq_bits_tag = io_vme_rd_1_cmd_bits_tag; // @[VME.scala 279:31]
-  assign VMEcmd_Qs_1_io_deq_ready = _VMEcmd_Qs_1_io_deq_ready_T_1 & _T_1 & _T_4; // @[VME.scala 281:62]
+  assign VMEcmd_Qs_1_io_enq_valid = io_vme_rd_1_cmd_valid; // @[VME.scala 277:31]
+  assign VMEcmd_Qs_1_io_enq_bits_addr = io_vme_rd_1_cmd_bits_addr; // @[VME.scala 278:31]
+  assign VMEcmd_Qs_1_io_enq_bits_len = io_vme_rd_1_cmd_bits_len; // @[VME.scala 278:31]
+  assign VMEcmd_Qs_1_io_enq_bits_tag = io_vme_rd_1_cmd_bits_tag; // @[VME.scala 278:31]
+  assign VMEcmd_Qs_1_io_deq_ready = issueRead & vme_select == 3'h1; // @[VME.scala 279:44]
   assign VMEcmd_Qs_2_clock = clock;
   assign VMEcmd_Qs_2_reset = reset;
-  assign VMEcmd_Qs_2_io_enq_valid = io_vme_rd_2_cmd_valid & VMEcmd_Qs_2_io_enq_ready; // @[VME.scala 278:58]
-  assign VMEcmd_Qs_2_io_enq_bits_addr = io_vme_rd_2_cmd_bits_addr; // @[VME.scala 279:31]
-  assign VMEcmd_Qs_2_io_enq_bits_len = io_vme_rd_2_cmd_bits_len; // @[VME.scala 279:31]
-  assign VMEcmd_Qs_2_io_enq_bits_tag = io_vme_rd_2_cmd_bits_tag; // @[VME.scala 279:31]
-  assign VMEcmd_Qs_2_io_deq_ready = _VMEcmd_Qs_2_io_deq_ready_T_1 & _T_1 & _T_4; // @[VME.scala 281:62]
+  assign VMEcmd_Qs_2_io_enq_valid = io_vme_rd_2_cmd_valid; // @[VME.scala 277:31]
+  assign VMEcmd_Qs_2_io_enq_bits_addr = io_vme_rd_2_cmd_bits_addr; // @[VME.scala 278:31]
+  assign VMEcmd_Qs_2_io_enq_bits_len = io_vme_rd_2_cmd_bits_len; // @[VME.scala 278:31]
+  assign VMEcmd_Qs_2_io_enq_bits_tag = io_vme_rd_2_cmd_bits_tag; // @[VME.scala 278:31]
+  assign VMEcmd_Qs_2_io_deq_ready = issueRead & vme_select == 3'h2; // @[VME.scala 279:44]
   assign VMEcmd_Qs_3_clock = clock;
   assign VMEcmd_Qs_3_reset = reset;
-  assign VMEcmd_Qs_3_io_enq_valid = io_vme_rd_3_cmd_valid & VMEcmd_Qs_3_io_enq_ready; // @[VME.scala 278:58]
-  assign VMEcmd_Qs_3_io_enq_bits_addr = io_vme_rd_3_cmd_bits_addr; // @[VME.scala 279:31]
-  assign VMEcmd_Qs_3_io_enq_bits_len = io_vme_rd_3_cmd_bits_len; // @[VME.scala 279:31]
-  assign VMEcmd_Qs_3_io_enq_bits_tag = io_vme_rd_3_cmd_bits_tag; // @[VME.scala 279:31]
-  assign VMEcmd_Qs_3_io_deq_ready = _VMEcmd_Qs_3_io_deq_ready_T_1 & _T_1 & _T_4; // @[VME.scala 281:62]
+  assign VMEcmd_Qs_3_io_enq_valid = io_vme_rd_3_cmd_valid; // @[VME.scala 277:31]
+  assign VMEcmd_Qs_3_io_enq_bits_addr = io_vme_rd_3_cmd_bits_addr; // @[VME.scala 278:31]
+  assign VMEcmd_Qs_3_io_enq_bits_len = io_vme_rd_3_cmd_bits_len; // @[VME.scala 278:31]
+  assign VMEcmd_Qs_3_io_enq_bits_tag = io_vme_rd_3_cmd_bits_tag; // @[VME.scala 278:31]
+  assign VMEcmd_Qs_3_io_deq_ready = issueRead & vme_select == 3'h3; // @[VME.scala 279:44]
   assign VMEcmd_Qs_4_clock = clock;
   assign VMEcmd_Qs_4_reset = reset;
-  assign VMEcmd_Qs_4_io_enq_valid = io_vme_rd_4_cmd_valid & VMEcmd_Qs_4_io_enq_ready; // @[VME.scala 278:58]
-  assign VMEcmd_Qs_4_io_enq_bits_addr = io_vme_rd_4_cmd_bits_addr; // @[VME.scala 279:31]
-  assign VMEcmd_Qs_4_io_enq_bits_len = io_vme_rd_4_cmd_bits_len; // @[VME.scala 279:31]
-  assign VMEcmd_Qs_4_io_enq_bits_tag = io_vme_rd_4_cmd_bits_tag; // @[VME.scala 279:31]
-  assign VMEcmd_Qs_4_io_deq_ready = _VMEcmd_Qs_4_io_deq_ready_T_1 & _T_1 & _T_4; // @[VME.scala 281:62]
+  assign VMEcmd_Qs_4_io_enq_valid = io_vme_rd_4_cmd_valid; // @[VME.scala 277:31]
+  assign VMEcmd_Qs_4_io_enq_bits_addr = io_vme_rd_4_cmd_bits_addr; // @[VME.scala 278:31]
+  assign VMEcmd_Qs_4_io_enq_bits_len = io_vme_rd_4_cmd_bits_len; // @[VME.scala 278:31]
+  assign VMEcmd_Qs_4_io_enq_bits_tag = io_vme_rd_4_cmd_bits_tag; // @[VME.scala 278:31]
+  assign VMEcmd_Qs_4_io_deq_ready = issueRead & vme_select == 3'h4; // @[VME.scala 279:44]
+  assign responseQs_0_clock = clock;
+  assign responseQs_0_reset = reset;
+  assign responseQs_0_io_enq_valid = io_mem_r_valid & slotAllocated & slotIssued & _responseQs_0_io_enq_valid_T_2; // @[VME.scala 332:81]
+  assign responseQs_0_io_enq_bits_data = io_mem_r_bits_data; // @[VME.scala 334:36]
+  assign responseQs_0_io_enq_bits_tag = ridInRange ? _GEN_137 : 21'h0; // @[VME.scala 321:22]
+  assign responseQs_0_io_enq_bits_last = io_mem_r_bits_last; // @[VME.scala 335:36]
+  assign responseQs_0_io_deq_ready = io_vme_rd_0_data_ready; // @[VME.scala 337:23]
+  assign responseQs_1_clock = clock;
+  assign responseQs_1_reset = reset;
+  assign responseQs_1_io_enq_valid = io_mem_r_valid & slotAllocated & slotIssued & _responseQs_1_io_enq_valid_T_2; // @[VME.scala 332:81]
+  assign responseQs_1_io_enq_bits_data = io_mem_r_bits_data; // @[VME.scala 334:36]
+  assign responseQs_1_io_enq_bits_tag = ridInRange ? _GEN_137 : 21'h0; // @[VME.scala 321:22]
+  assign responseQs_1_io_enq_bits_last = io_mem_r_bits_last; // @[VME.scala 335:36]
+  assign responseQs_1_io_deq_ready = 1'h1; // @[VME.scala 337:23]
+  assign responseQs_2_clock = clock;
+  assign responseQs_2_reset = reset;
+  assign responseQs_2_io_enq_valid = io_mem_r_valid & slotAllocated & slotIssued & _responseQs_2_io_enq_valid_T_2; // @[VME.scala 332:81]
+  assign responseQs_2_io_enq_bits_data = io_mem_r_bits_data; // @[VME.scala 334:36]
+  assign responseQs_2_io_enq_bits_tag = ridInRange ? _GEN_137 : 21'h0; // @[VME.scala 321:22]
+  assign responseQs_2_io_enq_bits_last = io_mem_r_bits_last; // @[VME.scala 335:36]
+  assign responseQs_2_io_deq_ready = 1'h1; // @[VME.scala 337:23]
+  assign responseQs_3_clock = clock;
+  assign responseQs_3_reset = reset;
+  assign responseQs_3_io_enq_valid = io_mem_r_valid & slotAllocated & slotIssued & _responseQs_3_io_enq_valid_T_2; // @[VME.scala 332:81]
+  assign responseQs_3_io_enq_bits_data = io_mem_r_bits_data; // @[VME.scala 334:36]
+  assign responseQs_3_io_enq_bits_tag = ridInRange ? _GEN_137 : 21'h0; // @[VME.scala 321:22]
+  assign responseQs_3_io_enq_bits_last = io_mem_r_bits_last; // @[VME.scala 335:36]
+  assign responseQs_3_io_deq_ready = 1'h1; // @[VME.scala 337:23]
+  assign responseQs_4_clock = clock;
+  assign responseQs_4_reset = reset;
+  assign responseQs_4_io_enq_valid = io_mem_r_valid & slotAllocated & slotIssued & _responseQs_4_io_enq_valid_T_2; // @[VME.scala 332:81]
+  assign responseQs_4_io_enq_bits_data = io_mem_r_bits_data; // @[VME.scala 334:36]
+  assign responseQs_4_io_enq_bits_tag = ridInRange ? _GEN_137 : 21'h0; // @[VME.scala 321:22]
+  assign responseQs_4_io_enq_bits_last = io_mem_r_bits_last; // @[VME.scala 335:36]
+  assign responseQs_4_io_deq_ready = 1'h1; // @[VME.scala 337:23]
   always @(posedge clock) begin
-    if (vmeTag_array_client_id_rdwrPort_en & vmeTag_array_client_id_rdwrPort_mask) begin
-      vmeTag_array_client_id[vmeTag_array_client_id_rdwrPort_addr] <= vmeTag_array_client_id_rdwrPort_data; // @[VME.scala 220:33]
-    end
-    vmeTag_array_client_id_localTag_out_MPORT_en_pipe_0 <= 1'h1;
-    if (1'h1) begin
-      vmeTag_array_client_id_localTag_out_MPORT_addr_pipe_0 <= io_mem_r_bits_id[3:0];
-    end
-    if (vmeTag_array_client_tag_rdwrPort_en & vmeTag_array_client_tag_rdwrPort_mask) begin
-      vmeTag_array_client_tag[vmeTag_array_client_tag_rdwrPort_addr] <= vmeTag_array_client_tag_rdwrPort_data; // @[VME.scala 220:33]
-    end
-    vmeTag_array_client_tag_localTag_out_MPORT_en_pipe_0 <= 1'h1;
-    if (1'h1) begin
-      vmeTag_array_client_tag_localTag_out_MPORT_addr_pipe_0 <= io_mem_r_bits_id[3:0];
-    end
-    if (reset) begin // @[VME.scala 239:21]
-      availableEntries <= 16'hffff; // @[VME.scala 240:20]
-    end else if (io_mem_r_bits_last & io_mem_r_valid) begin // @[VME.scala 232:44]
-      availableEntries <= _availableEntriesNext_T; // @[VME.scala 233:24]
-    end else if (availableEntriesEn & availableEntries != 16'h0 & ~_T) begin // @[VME.scala 234:103]
-      availableEntries <= newEntry; // @[VME.scala 235:23]
-    end
-    if (reset) begin // @[VME.scala 328:41]
-      io_vme_rd_0_data_valid_REG <= 1'h0; // @[VME.scala 328:41]
-    end else begin
-      io_vme_rd_0_data_valid_REG <= io_mem_r_valid; // @[VME.scala 328:41]
-    end
-    if (reset) begin // @[VME.scala 332:43]
-      io_vme_rd_0_data_bits_data_REG <= 64'h0; // @[VME.scala 332:43]
-    end else begin
-      io_vme_rd_0_data_bits_data_REG <= io_mem_r_bits_data; // @[VME.scala 332:43]
-    end
-    if (reset) begin // @[VME.scala 333:43]
-      io_vme_rd_0_data_bits_last_REG <= 1'h0; // @[VME.scala 333:43]
-    end else begin
-      io_vme_rd_0_data_bits_last_REG <= io_mem_r_bits_last; // @[VME.scala 333:43]
-    end
-    if (reset) begin // @[VME.scala 328:41]
-      io_vme_rd_1_data_valid_REG <= 1'h0; // @[VME.scala 328:41]
-    end else begin
-      io_vme_rd_1_data_valid_REG <= io_mem_r_valid; // @[VME.scala 328:41]
-    end
-    if (reset) begin // @[VME.scala 332:43]
-      io_vme_rd_1_data_bits_data_REG <= 64'h0; // @[VME.scala 332:43]
-    end else begin
-      io_vme_rd_1_data_bits_data_REG <= io_mem_r_bits_data; // @[VME.scala 332:43]
-    end
-    if (reset) begin // @[VME.scala 333:43]
-      io_vme_rd_1_data_bits_last_REG <= 1'h0; // @[VME.scala 333:43]
-    end else begin
-      io_vme_rd_1_data_bits_last_REG <= io_mem_r_bits_last; // @[VME.scala 333:43]
-    end
-    if (reset) begin // @[VME.scala 328:41]
-      io_vme_rd_2_data_valid_REG <= 1'h0; // @[VME.scala 328:41]
-    end else begin
-      io_vme_rd_2_data_valid_REG <= io_mem_r_valid; // @[VME.scala 328:41]
-    end
-    if (reset) begin // @[VME.scala 332:43]
-      io_vme_rd_2_data_bits_data_REG <= 64'h0; // @[VME.scala 332:43]
-    end else begin
-      io_vme_rd_2_data_bits_data_REG <= io_mem_r_bits_data; // @[VME.scala 332:43]
-    end
-    if (reset) begin // @[VME.scala 328:41]
-      io_vme_rd_3_data_valid_REG <= 1'h0; // @[VME.scala 328:41]
-    end else begin
-      io_vme_rd_3_data_valid_REG <= io_mem_r_valid; // @[VME.scala 328:41]
-    end
-    if (reset) begin // @[VME.scala 332:43]
-      io_vme_rd_3_data_bits_data_REG <= 64'h0; // @[VME.scala 332:43]
-    end else begin
-      io_vme_rd_3_data_bits_data_REG <= io_mem_r_bits_data; // @[VME.scala 332:43]
-    end
-    if (reset) begin // @[VME.scala 328:41]
-      io_vme_rd_4_data_valid_REG <= 1'h0; // @[VME.scala 328:41]
-    end else begin
-      io_vme_rd_4_data_valid_REG <= io_mem_r_valid; // @[VME.scala 328:41]
-    end
-    if (reset) begin // @[VME.scala 332:43]
-      io_vme_rd_4_data_bits_data_REG <= 64'h0; // @[VME.scala 332:43]
-    end else begin
-      io_vme_rd_4_data_bits_data_REG <= io_mem_r_bits_data; // @[VME.scala 332:43]
-    end
-    if (reset) begin // @[VME.scala 338:23]
-      wr_len <= 4'h0; // @[VME.scala 338:23]
-    end else if (_T_32) begin // @[VME.scala 356:31]
-      wr_len <= io_vme_wr_0_cmd_bits_len; // @[VME.scala 357:12]
-    end
-    if (reset) begin // @[VME.scala 339:24]
-      wr_addr <= 32'h0; // @[VME.scala 339:24]
-    end else if (_T_32) begin // @[VME.scala 356:31]
-      wr_addr <= io_vme_wr_0_cmd_bits_addr; // @[VME.scala 358:13]
-    end
-    if (reset) begin // @[VME.scala 341:23]
-      wstate <= 2'h0; // @[VME.scala 341:23]
-    end else if (2'h0 == wstate) begin // @[VME.scala 366:17]
-      if (io_vme_wr_0_cmd_valid) begin // @[VME.scala 368:35]
-        wstate <= 2'h1; // @[VME.scala 369:16]
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'h0 == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_0_client_id <= 3'h0; // @[VME.scala 303:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_0_client_id <= 3'h1; // @[VME.scala 303:39]
+        end else begin
+          vmeTag_array_0_client_id <= _GEN_83;
+        end
       end
-    end else if (2'h1 == wstate) begin // @[VME.scala 366:17]
-      if (io_mem_aw_ready) begin // @[VME.scala 373:28]
-        wstate <= 2'h2; // @[VME.scala 374:16]
-      end
-    end else if (2'h2 == wstate) begin // @[VME.scala 366:17]
-      wstate <= _GEN_52;
-    end else begin
-      wstate <= _GEN_54;
     end
-    if (reset) begin // @[VME.scala 342:23]
-      wr_cnt <= 4'h0; // @[VME.scala 342:23]
-    end else if (_io_vme_wr_0_cmd_ready_T) begin // @[VME.scala 360:31]
-      wr_cnt <= 4'h0; // @[VME.scala 361:12]
-    end else if (_T_34) begin // @[VME.scala 363:27]
-      wr_cnt <= _wr_cnt_T_1; // @[VME.scala 364:12]
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'h0 == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_0_client_tag <= VMEcmd_Qs_0_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_0_client_tag <= VMEcmd_Qs_1_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else begin
+          vmeTag_array_0_client_tag <= _GEN_84;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'h1 == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_1_client_id <= 3'h0; // @[VME.scala 303:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_1_client_id <= 3'h1; // @[VME.scala 303:39]
+        end else begin
+          vmeTag_array_1_client_id <= _GEN_83;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'h1 == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_1_client_tag <= VMEcmd_Qs_0_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_1_client_tag <= VMEcmd_Qs_1_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else begin
+          vmeTag_array_1_client_tag <= _GEN_84;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'h2 == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_2_client_id <= 3'h0; // @[VME.scala 303:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_2_client_id <= 3'h1; // @[VME.scala 303:39]
+        end else begin
+          vmeTag_array_2_client_id <= _GEN_83;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'h2 == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_2_client_tag <= VMEcmd_Qs_0_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_2_client_tag <= VMEcmd_Qs_1_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else begin
+          vmeTag_array_2_client_tag <= _GEN_84;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'h3 == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_3_client_id <= 3'h0; // @[VME.scala 303:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_3_client_id <= 3'h1; // @[VME.scala 303:39]
+        end else begin
+          vmeTag_array_3_client_id <= _GEN_83;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'h3 == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_3_client_tag <= VMEcmd_Qs_0_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_3_client_tag <= VMEcmd_Qs_1_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else begin
+          vmeTag_array_3_client_tag <= _GEN_84;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'h4 == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_4_client_id <= 3'h0; // @[VME.scala 303:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_4_client_id <= 3'h1; // @[VME.scala 303:39]
+        end else begin
+          vmeTag_array_4_client_id <= _GEN_83;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'h4 == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_4_client_tag <= VMEcmd_Qs_0_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_4_client_tag <= VMEcmd_Qs_1_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else begin
+          vmeTag_array_4_client_tag <= _GEN_84;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'h5 == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_5_client_id <= 3'h0; // @[VME.scala 303:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_5_client_id <= 3'h1; // @[VME.scala 303:39]
+        end else begin
+          vmeTag_array_5_client_id <= _GEN_83;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'h5 == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_5_client_tag <= VMEcmd_Qs_0_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_5_client_tag <= VMEcmd_Qs_1_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else begin
+          vmeTag_array_5_client_tag <= _GEN_84;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'h6 == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_6_client_id <= 3'h0; // @[VME.scala 303:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_6_client_id <= 3'h1; // @[VME.scala 303:39]
+        end else begin
+          vmeTag_array_6_client_id <= _GEN_83;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'h6 == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_6_client_tag <= VMEcmd_Qs_0_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_6_client_tag <= VMEcmd_Qs_1_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else begin
+          vmeTag_array_6_client_tag <= _GEN_84;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'h7 == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_7_client_id <= 3'h0; // @[VME.scala 303:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_7_client_id <= 3'h1; // @[VME.scala 303:39]
+        end else begin
+          vmeTag_array_7_client_id <= _GEN_83;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'h7 == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_7_client_tag <= VMEcmd_Qs_0_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_7_client_tag <= VMEcmd_Qs_1_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else begin
+          vmeTag_array_7_client_tag <= _GEN_84;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'h8 == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_8_client_id <= 3'h0; // @[VME.scala 303:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_8_client_id <= 3'h1; // @[VME.scala 303:39]
+        end else begin
+          vmeTag_array_8_client_id <= _GEN_83;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'h8 == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_8_client_tag <= VMEcmd_Qs_0_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_8_client_tag <= VMEcmd_Qs_1_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else begin
+          vmeTag_array_8_client_tag <= _GEN_84;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'h9 == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_9_client_id <= 3'h0; // @[VME.scala 303:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_9_client_id <= 3'h1; // @[VME.scala 303:39]
+        end else begin
+          vmeTag_array_9_client_id <= _GEN_83;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'h9 == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_9_client_tag <= VMEcmd_Qs_0_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_9_client_tag <= VMEcmd_Qs_1_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else begin
+          vmeTag_array_9_client_tag <= _GEN_84;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'ha == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_10_client_id <= 3'h0; // @[VME.scala 303:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_10_client_id <= 3'h1; // @[VME.scala 303:39]
+        end else begin
+          vmeTag_array_10_client_id <= _GEN_83;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'ha == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_10_client_tag <= VMEcmd_Qs_0_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_10_client_tag <= VMEcmd_Qs_1_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else begin
+          vmeTag_array_10_client_tag <= _GEN_84;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'hb == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_11_client_id <= 3'h0; // @[VME.scala 303:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_11_client_id <= 3'h1; // @[VME.scala 303:39]
+        end else begin
+          vmeTag_array_11_client_id <= _GEN_83;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'hb == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_11_client_tag <= VMEcmd_Qs_0_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_11_client_tag <= VMEcmd_Qs_1_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else begin
+          vmeTag_array_11_client_tag <= _GEN_84;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'hc == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_12_client_id <= 3'h0; // @[VME.scala 303:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_12_client_id <= 3'h1; // @[VME.scala 303:39]
+        end else begin
+          vmeTag_array_12_client_id <= _GEN_83;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'hc == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_12_client_tag <= VMEcmd_Qs_0_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_12_client_tag <= VMEcmd_Qs_1_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else begin
+          vmeTag_array_12_client_tag <= _GEN_84;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'hd == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_13_client_id <= 3'h0; // @[VME.scala 303:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_13_client_id <= 3'h1; // @[VME.scala 303:39]
+        end else begin
+          vmeTag_array_13_client_id <= _GEN_83;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'hd == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_13_client_tag <= VMEcmd_Qs_0_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_13_client_tag <= VMEcmd_Qs_1_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else begin
+          vmeTag_array_13_client_tag <= _GEN_84;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'he == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_14_client_id <= 3'h0; // @[VME.scala 303:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_14_client_id <= 3'h1; // @[VME.scala 303:39]
+        end else begin
+          vmeTag_array_14_client_id <= _GEN_83;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'he == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_14_client_tag <= VMEcmd_Qs_0_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_14_client_tag <= VMEcmd_Qs_1_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else begin
+          vmeTag_array_14_client_tag <= _GEN_84;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'hf == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_15_client_id <= 3'h0; // @[VME.scala 303:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_15_client_id <= 3'h1; // @[VME.scala 303:39]
+        end else begin
+          vmeTag_array_15_client_id <= _GEN_83;
+        end
+      end
+    end
+    if (issueRead) begin // @[VME.scala 288:27]
+      if (4'hf == firstPostn) begin // @[VME.scala 289:40]
+        if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_15_client_tag <= VMEcmd_Qs_0_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else if (_VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+          vmeTag_array_15_client_tag <= VMEcmd_Qs_1_io_deq_bits_tag; // @[VME.scala 304:39]
+        end else begin
+          vmeTag_array_15_client_tag <= _GEN_84;
+        end
+      end
+    end
+    if (reset) begin // @[VME.scala 239:33]
+      availableEntries <= 16'hffff; // @[VME.scala 239:33]
+    end else begin
+      availableEntries <= _availableEntries_T_2; // @[VME.scala 346:20]
+    end
+    if (reset) begin // @[VME.scala 271:26]
+      arPending <= 1'h0; // @[VME.scala 271:26]
+    end else if (_T_10) begin // @[VME.scala 313:24]
+      arPending <= 1'h0; // @[VME.scala 313:36]
+    end else begin
+      arPending <= _GEN_104;
+    end
+    if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+      if (issueRead) begin // @[VME.scala 305:23]
+        arAddr <= VMEcmd_Qs_0_io_deq_bits_addr; // @[VME.scala 306:16]
+      end else begin
+        arAddr <= _GEN_93;
+      end
+    end else begin
+      arAddr <= _GEN_93;
+    end
+    if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+      if (issueRead) begin // @[VME.scala 305:23]
+        arLen <= VMEcmd_Qs_0_io_deq_bits_len; // @[VME.scala 307:15]
+      end else begin
+        arLen <= _GEN_94;
+      end
+    end else begin
+      arLen <= _GEN_94;
+    end
+    if (_VMEcmd_Qs_0_io_deq_ready_T & any_cmd_valid) begin // @[VME.scala 302:46]
+      if (issueRead) begin // @[VME.scala 305:23]
+        arId <= firstPostn; // @[VME.scala 308:14]
+      end else begin
+        arId <= _GEN_95;
+      end
+    end else begin
+      arId <= _GEN_95;
+    end
+    if (reset) begin // @[VME.scala 323:30]
+      issuedEntries <= 16'h0; // @[VME.scala 323:30]
+    end else begin
+      issuedEntries <= _issuedEntries_T_2; // @[VME.scala 348:17]
+    end
+    if (_freedEntry_T) begin // @[VME.scala 354:23]
+      if (4'h0 == ridIndex) begin // @[VME.scala 360:30]
+        beatsRemaining_0 <= _beatsRemaining_T_2; // @[VME.scala 360:30]
+      end else begin
+        beatsRemaining_0 <= _GEN_154;
+      end
+    end else begin
+      beatsRemaining_0 <= _GEN_154;
+    end
+    if (_freedEntry_T) begin // @[VME.scala 354:23]
+      if (4'h1 == ridIndex) begin // @[VME.scala 360:30]
+        beatsRemaining_1 <= _beatsRemaining_T_2; // @[VME.scala 360:30]
+      end else begin
+        beatsRemaining_1 <= _GEN_155;
+      end
+    end else begin
+      beatsRemaining_1 <= _GEN_155;
+    end
+    if (_freedEntry_T) begin // @[VME.scala 354:23]
+      if (4'h2 == ridIndex) begin // @[VME.scala 360:30]
+        beatsRemaining_2 <= _beatsRemaining_T_2; // @[VME.scala 360:30]
+      end else begin
+        beatsRemaining_2 <= _GEN_156;
+      end
+    end else begin
+      beatsRemaining_2 <= _GEN_156;
+    end
+    if (_freedEntry_T) begin // @[VME.scala 354:23]
+      if (4'h3 == ridIndex) begin // @[VME.scala 360:30]
+        beatsRemaining_3 <= _beatsRemaining_T_2; // @[VME.scala 360:30]
+      end else begin
+        beatsRemaining_3 <= _GEN_157;
+      end
+    end else begin
+      beatsRemaining_3 <= _GEN_157;
+    end
+    if (_freedEntry_T) begin // @[VME.scala 354:23]
+      if (4'h4 == ridIndex) begin // @[VME.scala 360:30]
+        beatsRemaining_4 <= _beatsRemaining_T_2; // @[VME.scala 360:30]
+      end else begin
+        beatsRemaining_4 <= _GEN_158;
+      end
+    end else begin
+      beatsRemaining_4 <= _GEN_158;
+    end
+    if (_freedEntry_T) begin // @[VME.scala 354:23]
+      if (4'h5 == ridIndex) begin // @[VME.scala 360:30]
+        beatsRemaining_5 <= _beatsRemaining_T_2; // @[VME.scala 360:30]
+      end else begin
+        beatsRemaining_5 <= _GEN_159;
+      end
+    end else begin
+      beatsRemaining_5 <= _GEN_159;
+    end
+    if (_freedEntry_T) begin // @[VME.scala 354:23]
+      if (4'h6 == ridIndex) begin // @[VME.scala 360:30]
+        beatsRemaining_6 <= _beatsRemaining_T_2; // @[VME.scala 360:30]
+      end else begin
+        beatsRemaining_6 <= _GEN_160;
+      end
+    end else begin
+      beatsRemaining_6 <= _GEN_160;
+    end
+    if (_freedEntry_T) begin // @[VME.scala 354:23]
+      if (4'h7 == ridIndex) begin // @[VME.scala 360:30]
+        beatsRemaining_7 <= _beatsRemaining_T_2; // @[VME.scala 360:30]
+      end else begin
+        beatsRemaining_7 <= _GEN_161;
+      end
+    end else begin
+      beatsRemaining_7 <= _GEN_161;
+    end
+    if (_freedEntry_T) begin // @[VME.scala 354:23]
+      if (4'h8 == ridIndex) begin // @[VME.scala 360:30]
+        beatsRemaining_8 <= _beatsRemaining_T_2; // @[VME.scala 360:30]
+      end else begin
+        beatsRemaining_8 <= _GEN_162;
+      end
+    end else begin
+      beatsRemaining_8 <= _GEN_162;
+    end
+    if (_freedEntry_T) begin // @[VME.scala 354:23]
+      if (4'h9 == ridIndex) begin // @[VME.scala 360:30]
+        beatsRemaining_9 <= _beatsRemaining_T_2; // @[VME.scala 360:30]
+      end else begin
+        beatsRemaining_9 <= _GEN_163;
+      end
+    end else begin
+      beatsRemaining_9 <= _GEN_163;
+    end
+    if (_freedEntry_T) begin // @[VME.scala 354:23]
+      if (4'ha == ridIndex) begin // @[VME.scala 360:30]
+        beatsRemaining_10 <= _beatsRemaining_T_2; // @[VME.scala 360:30]
+      end else begin
+        beatsRemaining_10 <= _GEN_164;
+      end
+    end else begin
+      beatsRemaining_10 <= _GEN_164;
+    end
+    if (_freedEntry_T) begin // @[VME.scala 354:23]
+      if (4'hb == ridIndex) begin // @[VME.scala 360:30]
+        beatsRemaining_11 <= _beatsRemaining_T_2; // @[VME.scala 360:30]
+      end else begin
+        beatsRemaining_11 <= _GEN_165;
+      end
+    end else begin
+      beatsRemaining_11 <= _GEN_165;
+    end
+    if (_freedEntry_T) begin // @[VME.scala 354:23]
+      if (4'hc == ridIndex) begin // @[VME.scala 360:30]
+        beatsRemaining_12 <= _beatsRemaining_T_2; // @[VME.scala 360:30]
+      end else begin
+        beatsRemaining_12 <= _GEN_166;
+      end
+    end else begin
+      beatsRemaining_12 <= _GEN_166;
+    end
+    if (_freedEntry_T) begin // @[VME.scala 354:23]
+      if (4'hd == ridIndex) begin // @[VME.scala 360:30]
+        beatsRemaining_13 <= _beatsRemaining_T_2; // @[VME.scala 360:30]
+      end else begin
+        beatsRemaining_13 <= _GEN_167;
+      end
+    end else begin
+      beatsRemaining_13 <= _GEN_167;
+    end
+    if (_freedEntry_T) begin // @[VME.scala 354:23]
+      if (4'he == ridIndex) begin // @[VME.scala 360:30]
+        beatsRemaining_14 <= _beatsRemaining_T_2; // @[VME.scala 360:30]
+      end else begin
+        beatsRemaining_14 <= _GEN_168;
+      end
+    end else begin
+      beatsRemaining_14 <= _GEN_168;
+    end
+    if (_freedEntry_T) begin // @[VME.scala 354:23]
+      if (4'hf == ridIndex) begin // @[VME.scala 360:30]
+        beatsRemaining_15 <= _beatsRemaining_T_2; // @[VME.scala 360:30]
+      end else begin
+        beatsRemaining_15 <= _GEN_169;
+      end
+    end else begin
+      beatsRemaining_15 <= _GEN_169;
+    end
+    if (reset) begin // @[VME.scala 376:23]
+      wr_len <= 4'h0; // @[VME.scala 376:23]
+    end else if (_T_56) begin // @[VME.scala 399:31]
+      wr_len <= io_vme_wr_0_cmd_bits_len; // @[VME.scala 400:12]
+    end
+    if (reset) begin // @[VME.scala 377:24]
+      wr_addr <= 32'h0; // @[VME.scala 377:24]
+    end else if (_T_56) begin // @[VME.scala 399:31]
+      wr_addr <= io_vme_wr_0_cmd_bits_addr; // @[VME.scala 401:13]
+    end
+    if (reset) begin // @[VME.scala 379:23]
+      wstate <= 2'h0; // @[VME.scala 379:23]
+    end else if (2'h0 == wstate) begin // @[VME.scala 409:17]
+      if (io_vme_wr_0_cmd_valid) begin // @[VME.scala 411:35]
+        wstate <= 2'h1; // @[VME.scala 412:16]
+      end
+    end else if (2'h1 == wstate) begin // @[VME.scala 409:17]
+      if (io_mem_aw_ready) begin // @[VME.scala 416:28]
+        wstate <= 2'h2; // @[VME.scala 417:16]
+      end
+    end else if (2'h2 == wstate) begin // @[VME.scala 409:17]
+      wstate <= _GEN_224;
+    end else begin
+      wstate <= _GEN_226;
+    end
+    if (reset) begin // @[VME.scala 380:23]
+      wr_cnt <= 4'h0; // @[VME.scala 380:23]
+    end else if (_io_vme_wr_0_cmd_ready_T) begin // @[VME.scala 403:31]
+      wr_cnt <= 4'h0; // @[VME.scala 404:12]
+    end else if (_T_58) begin // @[VME.scala 406:27]
+      wr_cnt <= _wr_cnt_T_1; // @[VME.scala 407:12]
     end
     `ifndef SYNTHESIS
     `ifdef PRINTF_COND
       if (`PRINTF_COND) begin
     `endif
-        if (~reset & ~(io_vme_rd_0_data_ready | ~io_vme_rd_0_data_valid)) begin
+        if (_freedEntry_T & ~reset & ~(currentBeats != 5'h0)) begin
           $fwrite(32'h80000002,
-            "Assertion failed\n    at VME.scala:331 assert(io.vme.rd(i).data.ready || ~io.vme.rd(i).data.valid)\n"); // @[VME.scala 331:11]
+            "Assertion failed: VME received a read beat for a completed request\n    at VME.scala:356 assert(currentBeats =/= 0.U,\n"
+            ); // @[VME.scala 356:11]
+        end
+    `ifdef PRINTF_COND
+      end
+    `endif
+    `endif // SYNTHESIS
+    `ifndef SYNTHESIS
+    `ifdef PRINTF_COND
+      if (`PRINTF_COND) begin
+    `endif
+        if (_GEN_233 & ~(io_mem_r_bits_last == (currentBeats == 5'h1))) begin
+          $fwrite(32'h80000002,
+            "Assertion failed: VME AXI RLAST does not match ARLEN\n    at VME.scala:358 assert(io.mem.r.bits.last === (currentBeats === 1.U),\n"
+            ); // @[VME.scala 358:11]
+        end
+    `ifdef PRINTF_COND
+      end
+    `endif
+    `endif // SYNTHESIS
+    `ifndef SYNTHESIS
+    `ifdef PRINTF_COND
+      if (`PRINTF_COND) begin
+    `endif
+        if (io_mem_r_valid & _T_28 & _T_15) begin
+          $fwrite(32'h80000002,"[VME] invalid R rid=%d allocated=%x issued=%x arFire=%d arId=%d last=%d\n",
+            io_mem_r_bits_id,allocatedEntries,issuedEntries,_T_10,arId,io_mem_r_bits_last); // @[VME.scala 364:13]
+        end
+    `ifdef PRINTF_COND
+      end
+    `endif
+    `endif // SYNTHESIS
+    `ifndef SYNTHESIS
+    `ifdef PRINTF_COND
+      if (`PRINTF_COND) begin
+    `endif
+        if (io_mem_r_valid & _T_15 & _T_22) begin
+          $fwrite(32'h80000002,
+            "Assertion failed: VME received an AXI RID outside RequestQueueDepth\n    at VME.scala:368 assert(ridInRange, \"VME received an AXI RID outside RequestQueueDepth\")\n"
+            ); // @[VME.scala 368:11]
+        end
+    `ifdef PRINTF_COND
+      end
+    `endif
+    `endif // SYNTHESIS
+    `ifndef SYNTHESIS
+    `ifdef PRINTF_COND
+      if (`PRINTF_COND) begin
+    `endif
+        if (_GEN_236 & _T_23) begin
+          $fwrite(32'h80000002,
+            "Assertion failed: VME received an AXI RID with no allocated slot\n    at VME.scala:369 assert(slotAllocated, \"VME received an AXI RID with no allocated slot\")\n"
+            ); // @[VME.scala 369:11]
+        end
+    `ifdef PRINTF_COND
+      end
+    `endif
+    `endif // SYNTHESIS
+    `ifndef SYNTHESIS
+    `ifdef PRINTF_COND
+      if (`PRINTF_COND) begin
+    `endif
+        if (_GEN_236 & _T_25) begin
+          $fwrite(32'h80000002,
+            "Assertion failed: VME received an AXI response before its AR handshake\n    at VME.scala:370 assert(slotIssued, \"VME received an AXI response before its AR handshake\")\n"
+            ); // @[VME.scala 370:11]
+        end
+    `ifdef PRINTF_COND
+      end
+    `endif
+    `endif // SYNTHESIS
+    `ifndef SYNTHESIS
+    `ifdef PRINTF_COND
+      if (`PRINTF_COND) begin
+    `endif
+        if (_GEN_236 & _T_27) begin
+          $fwrite(32'h80000002,
+            "Assertion failed: VME tag contains an invalid read client\n    at VME.scala:371 assert(clientInRange, \"VME tag contains an invalid read client\")\n"
+            ); // @[VME.scala 371:11]
+        end
+    `ifdef PRINTF_COND
+      end
+    `endif
+    `endif // SYNTHESIS
+    `ifndef SYNTHESIS
+    `ifdef PRINTF_COND
+      if (`PRINTF_COND) begin
+    `endif
+        if (_GEN_236 & ~(io_mem_r_bits_resp == 2'h0)) begin
+          $fwrite(32'h80000002,
+            "Assertion failed: VME received an AXI read error response\n    at VME.scala:372 assert(io.mem.r.bits.resp === 0.U, \"VME received an AXI read error response\")\n"
+            ); // @[VME.scala 372:11]
+        end
+    `ifdef PRINTF_COND
+      end
+    `endif
+    `endif // SYNTHESIS
+    `ifndef SYNTHESIS
+    `ifdef PRINTF_COND
+      if (`PRINTF_COND) begin
+    `endif
+        if (io_mem_b_valid & _T_15 & ~(io_mem_b_bits_resp == 2'h0)) begin
+          $fwrite(32'h80000002,
+            "Assertion failed: VME received an AXI write error response\n    at VME.scala:395 assert(io.mem.b.bits.resp === 0.U, \"VME received an AXI write error response\")\n"
+            ); // @[VME.scala 395:11]
+        end
+    `ifdef PRINTF_COND
+      end
+    `endif
+    `endif // SYNTHESIS
+    `ifndef SYNTHESIS
+    `ifdef PRINTF_COND
+      if (`PRINTF_COND) begin
+    `endif
+        if (_GEN_241 & ~(io_mem_b_bits_id == 8'h0)) begin
+          $fwrite(32'h80000002,
+            "Assertion failed: VME received an AXI write response with an unexpected BID\n    at VME.scala:396 assert(io.mem.b.bits.id === p(ShellKey).memParams.idConst.U,\n"
+            ); // @[VME.scala 396:11]
         end
     `ifdef PRINTF_COND
       end
@@ -1070,57 +2131,123 @@ initial begin
         #0.002 begin end
       `endif
     `endif
-`ifdef RANDOMIZE_MEM_INIT
-  _RAND_0 = {1{`RANDOM}};
-  for (initvar = 0; initvar < 16; initvar = initvar+1)
-    vmeTag_array_client_id[initvar] = _RAND_0[2:0];
-  _RAND_3 = {1{`RANDOM}};
-  for (initvar = 0; initvar < 16; initvar = initvar+1)
-    vmeTag_array_client_tag[initvar] = _RAND_3[20:0];
-`endif // RANDOMIZE_MEM_INIT
 `ifdef RANDOMIZE_REG_INIT
+  _RAND_0 = {1{`RANDOM}};
+  vmeTag_array_0_client_id = _RAND_0[2:0];
   _RAND_1 = {1{`RANDOM}};
-  vmeTag_array_client_id_localTag_out_MPORT_en_pipe_0 = _RAND_1[0:0];
+  vmeTag_array_0_client_tag = _RAND_1[20:0];
   _RAND_2 = {1{`RANDOM}};
-  vmeTag_array_client_id_localTag_out_MPORT_addr_pipe_0 = _RAND_2[3:0];
+  vmeTag_array_1_client_id = _RAND_2[2:0];
+  _RAND_3 = {1{`RANDOM}};
+  vmeTag_array_1_client_tag = _RAND_3[20:0];
   _RAND_4 = {1{`RANDOM}};
-  vmeTag_array_client_tag_localTag_out_MPORT_en_pipe_0 = _RAND_4[0:0];
+  vmeTag_array_2_client_id = _RAND_4[2:0];
   _RAND_5 = {1{`RANDOM}};
-  vmeTag_array_client_tag_localTag_out_MPORT_addr_pipe_0 = _RAND_5[3:0];
+  vmeTag_array_2_client_tag = _RAND_5[20:0];
   _RAND_6 = {1{`RANDOM}};
-  availableEntries = _RAND_6[15:0];
+  vmeTag_array_3_client_id = _RAND_6[2:0];
   _RAND_7 = {1{`RANDOM}};
-  io_vme_rd_0_data_valid_REG = _RAND_7[0:0];
-  _RAND_8 = {2{`RANDOM}};
-  io_vme_rd_0_data_bits_data_REG = _RAND_8[63:0];
+  vmeTag_array_3_client_tag = _RAND_7[20:0];
+  _RAND_8 = {1{`RANDOM}};
+  vmeTag_array_4_client_id = _RAND_8[2:0];
   _RAND_9 = {1{`RANDOM}};
-  io_vme_rd_0_data_bits_last_REG = _RAND_9[0:0];
+  vmeTag_array_4_client_tag = _RAND_9[20:0];
   _RAND_10 = {1{`RANDOM}};
-  io_vme_rd_1_data_valid_REG = _RAND_10[0:0];
-  _RAND_11 = {2{`RANDOM}};
-  io_vme_rd_1_data_bits_data_REG = _RAND_11[63:0];
+  vmeTag_array_5_client_id = _RAND_10[2:0];
+  _RAND_11 = {1{`RANDOM}};
+  vmeTag_array_5_client_tag = _RAND_11[20:0];
   _RAND_12 = {1{`RANDOM}};
-  io_vme_rd_1_data_bits_last_REG = _RAND_12[0:0];
+  vmeTag_array_6_client_id = _RAND_12[2:0];
   _RAND_13 = {1{`RANDOM}};
-  io_vme_rd_2_data_valid_REG = _RAND_13[0:0];
-  _RAND_14 = {2{`RANDOM}};
-  io_vme_rd_2_data_bits_data_REG = _RAND_14[63:0];
+  vmeTag_array_6_client_tag = _RAND_13[20:0];
+  _RAND_14 = {1{`RANDOM}};
+  vmeTag_array_7_client_id = _RAND_14[2:0];
   _RAND_15 = {1{`RANDOM}};
-  io_vme_rd_3_data_valid_REG = _RAND_15[0:0];
-  _RAND_16 = {2{`RANDOM}};
-  io_vme_rd_3_data_bits_data_REG = _RAND_16[63:0];
+  vmeTag_array_7_client_tag = _RAND_15[20:0];
+  _RAND_16 = {1{`RANDOM}};
+  vmeTag_array_8_client_id = _RAND_16[2:0];
   _RAND_17 = {1{`RANDOM}};
-  io_vme_rd_4_data_valid_REG = _RAND_17[0:0];
-  _RAND_18 = {2{`RANDOM}};
-  io_vme_rd_4_data_bits_data_REG = _RAND_18[63:0];
+  vmeTag_array_8_client_tag = _RAND_17[20:0];
+  _RAND_18 = {1{`RANDOM}};
+  vmeTag_array_9_client_id = _RAND_18[2:0];
   _RAND_19 = {1{`RANDOM}};
-  wr_len = _RAND_19[3:0];
+  vmeTag_array_9_client_tag = _RAND_19[20:0];
   _RAND_20 = {1{`RANDOM}};
-  wr_addr = _RAND_20[31:0];
+  vmeTag_array_10_client_id = _RAND_20[2:0];
   _RAND_21 = {1{`RANDOM}};
-  wstate = _RAND_21[1:0];
+  vmeTag_array_10_client_tag = _RAND_21[20:0];
   _RAND_22 = {1{`RANDOM}};
-  wr_cnt = _RAND_22[3:0];
+  vmeTag_array_11_client_id = _RAND_22[2:0];
+  _RAND_23 = {1{`RANDOM}};
+  vmeTag_array_11_client_tag = _RAND_23[20:0];
+  _RAND_24 = {1{`RANDOM}};
+  vmeTag_array_12_client_id = _RAND_24[2:0];
+  _RAND_25 = {1{`RANDOM}};
+  vmeTag_array_12_client_tag = _RAND_25[20:0];
+  _RAND_26 = {1{`RANDOM}};
+  vmeTag_array_13_client_id = _RAND_26[2:0];
+  _RAND_27 = {1{`RANDOM}};
+  vmeTag_array_13_client_tag = _RAND_27[20:0];
+  _RAND_28 = {1{`RANDOM}};
+  vmeTag_array_14_client_id = _RAND_28[2:0];
+  _RAND_29 = {1{`RANDOM}};
+  vmeTag_array_14_client_tag = _RAND_29[20:0];
+  _RAND_30 = {1{`RANDOM}};
+  vmeTag_array_15_client_id = _RAND_30[2:0];
+  _RAND_31 = {1{`RANDOM}};
+  vmeTag_array_15_client_tag = _RAND_31[20:0];
+  _RAND_32 = {1{`RANDOM}};
+  availableEntries = _RAND_32[15:0];
+  _RAND_33 = {1{`RANDOM}};
+  arPending = _RAND_33[0:0];
+  _RAND_34 = {1{`RANDOM}};
+  arAddr = _RAND_34[31:0];
+  _RAND_35 = {1{`RANDOM}};
+  arLen = _RAND_35[3:0];
+  _RAND_36 = {1{`RANDOM}};
+  arId = _RAND_36[3:0];
+  _RAND_37 = {1{`RANDOM}};
+  issuedEntries = _RAND_37[15:0];
+  _RAND_38 = {1{`RANDOM}};
+  beatsRemaining_0 = _RAND_38[4:0];
+  _RAND_39 = {1{`RANDOM}};
+  beatsRemaining_1 = _RAND_39[4:0];
+  _RAND_40 = {1{`RANDOM}};
+  beatsRemaining_2 = _RAND_40[4:0];
+  _RAND_41 = {1{`RANDOM}};
+  beatsRemaining_3 = _RAND_41[4:0];
+  _RAND_42 = {1{`RANDOM}};
+  beatsRemaining_4 = _RAND_42[4:0];
+  _RAND_43 = {1{`RANDOM}};
+  beatsRemaining_5 = _RAND_43[4:0];
+  _RAND_44 = {1{`RANDOM}};
+  beatsRemaining_6 = _RAND_44[4:0];
+  _RAND_45 = {1{`RANDOM}};
+  beatsRemaining_7 = _RAND_45[4:0];
+  _RAND_46 = {1{`RANDOM}};
+  beatsRemaining_8 = _RAND_46[4:0];
+  _RAND_47 = {1{`RANDOM}};
+  beatsRemaining_9 = _RAND_47[4:0];
+  _RAND_48 = {1{`RANDOM}};
+  beatsRemaining_10 = _RAND_48[4:0];
+  _RAND_49 = {1{`RANDOM}};
+  beatsRemaining_11 = _RAND_49[4:0];
+  _RAND_50 = {1{`RANDOM}};
+  beatsRemaining_12 = _RAND_50[4:0];
+  _RAND_51 = {1{`RANDOM}};
+  beatsRemaining_13 = _RAND_51[4:0];
+  _RAND_52 = {1{`RANDOM}};
+  beatsRemaining_14 = _RAND_52[4:0];
+  _RAND_53 = {1{`RANDOM}};
+  beatsRemaining_15 = _RAND_53[4:0];
+  _RAND_54 = {1{`RANDOM}};
+  wr_len = _RAND_54[3:0];
+  _RAND_55 = {1{`RANDOM}};
+  wr_addr = _RAND_55[31:0];
+  _RAND_56 = {1{`RANDOM}};
+  wstate = _RAND_56[1:0];
+  _RAND_57 = {1{`RANDOM}};
+  wr_cnt = _RAND_57[3:0];
 `endif // RANDOMIZE_REG_INIT
   `endif // RANDOMIZE
 end // initial
@@ -1130,28 +2257,44 @@ end // initial
 `endif // SYNTHESIS
   always @(posedge clock) begin
     //
-    if (~reset) begin
-      assert(io_vme_rd_0_data_ready | ~io_vme_rd_0_data_valid); // @[VME.scala 331:11]
+    if (_freedEntry_T & ~reset) begin
+      assert(currentBeats != 5'h0); // @[VME.scala 356:11]
     end
     //
-    if (~reset) begin
-      assert(1'h1); // @[VME.scala 331:11]
+    if (_freedEntry_T & _T_15) begin
+      assert(io_mem_r_bits_last == (currentBeats == 5'h1)); // @[VME.scala 358:11]
     end
     //
-    if (~reset) begin
-      assert(1'h1); // @[VME.scala 331:11]
+    if (io_mem_r_valid & _T_15) begin
+      assert(ridInRange); // @[VME.scala 368:11]
     end
     //
-    if (~reset) begin
-      assert(1'h1); // @[VME.scala 331:11]
+    if (io_mem_r_valid & _T_15) begin
+      assert(slotAllocated); // @[VME.scala 369:11]
     end
     //
-    if (~reset) begin
-      assert(1'h1); // @[VME.scala 331:11]
+    if (io_mem_r_valid & _T_15) begin
+      assert(slotIssued); // @[VME.scala 370:11]
+    end
+    //
+    if (io_mem_r_valid & _T_15) begin
+      assert(clientInRange); // @[VME.scala 371:11]
+    end
+    //
+    if (io_mem_r_valid & _T_15) begin
+      assert(io_mem_r_bits_resp == 2'h0); // @[VME.scala 372:11]
+    end
+    //
+    if (io_mem_b_valid & _T_15) begin
+      assert(io_mem_b_bits_resp == 2'h0); // @[VME.scala 395:11]
+    end
+    //
+    if (io_mem_b_valid & _T_15) begin
+      assert(io_mem_b_bits_id == 8'h0); // @[VME.scala 396:11]
     end
   end
 endmodule
-module Queue_5(
+module Queue_10(
   input        clock,
   input        reset,
   output       io_enq_ready,
@@ -1272,7 +2415,7 @@ end // initial
 `endif
 `endif // SYNTHESIS
 endmodule
-module Queue_9(
+module Queue_14(
   input        clock,
   input        reset,
   output       io_enq_ready,
@@ -1435,24 +2578,26 @@ module FetchDecode(
   wire  _csignals_T_19 = 128'h1000000000000000000000000004 == _csignals_T_16; // @[Lookup.scala 31:38]
   wire  _csignals_T_21 = 128'h2000000000000000000000000004 == _csignals_T_16; // @[Lookup.scala 31:38]
   wire  _csignals_T_23 = 128'h3000000000000000000000000004 == _csignals_T_16; // @[Lookup.scala 31:38]
+  wire  _csignals_T_25 = 128'h4000000000000000000000000004 == _csignals_T_16; // @[Lookup.scala 31:38]
   wire  cs_val_inst = _csignals_T_1 | (_csignals_T_3 | (_csignals_T_5 | (_csignals_T_7 | (_csignals_T_9 | (
-    _csignals_T_11 | (_csignals_T_13 | (_csignals_T_15 | (_csignals_T_17 | (_csignals_T_19 | (_csignals_T_21 |
-    _csignals_T_23)))))))))); // @[Lookup.scala 34:39]
-  wire [2:0] _csignals_T_35 = _csignals_T_23 ? 3'h2 : 3'h5; // @[Lookup.scala 34:39]
-  wire [2:0] _csignals_T_36 = _csignals_T_21 ? 3'h2 : _csignals_T_35; // @[Lookup.scala 34:39]
-  wire [2:0] _csignals_T_37 = _csignals_T_19 ? 3'h2 : _csignals_T_36; // @[Lookup.scala 34:39]
-  wire [2:0] _csignals_T_38 = _csignals_T_17 ? 3'h2 : _csignals_T_37; // @[Lookup.scala 34:39]
-  wire [2:0] _csignals_T_39 = _csignals_T_15 ? 3'h2 : _csignals_T_38; // @[Lookup.scala 34:39]
-  wire [2:0] _csignals_T_40 = _csignals_T_13 ? 3'h2 : _csignals_T_39; // @[Lookup.scala 34:39]
-  wire [2:0] _csignals_T_41 = _csignals_T_11 ? 3'h1 : _csignals_T_40; // @[Lookup.scala 34:39]
-  wire [2:0] _csignals_T_42 = _csignals_T_9 ? 3'h2 : _csignals_T_41; // @[Lookup.scala 34:39]
-  wire [2:0] _csignals_T_43 = _csignals_T_7 ? 3'h2 : _csignals_T_42; // @[Lookup.scala 34:39]
-  wire [2:0] _csignals_T_44 = _csignals_T_5 ? 3'h0 : _csignals_T_43; // @[Lookup.scala 34:39]
-  wire [2:0] _csignals_T_45 = _csignals_T_3 ? 3'h0 : _csignals_T_44; // @[Lookup.scala 34:39]
-  wire [2:0] cs_op_type = _csignals_T_1 ? 3'h2 : _csignals_T_45; // @[Lookup.scala 34:39]
-  assign io_isLoad = cs_val_inst & cs_op_type == 3'h0; // @[Decode.scala 156:28]
-  assign io_isCompute = cs_val_inst & cs_op_type == 3'h2; // @[Decode.scala 157:31]
-  assign io_isStore = cs_val_inst & cs_op_type == 3'h1; // @[Decode.scala 158:29]
+    _csignals_T_11 | (_csignals_T_13 | (_csignals_T_15 | (_csignals_T_17 | (_csignals_T_19 | (_csignals_T_21 | (
+    _csignals_T_23 | _csignals_T_25))))))))))); // @[Lookup.scala 34:39]
+  wire [2:0] _csignals_T_38 = _csignals_T_25 ? 3'h2 : 3'h5; // @[Lookup.scala 34:39]
+  wire [2:0] _csignals_T_39 = _csignals_T_23 ? 3'h2 : _csignals_T_38; // @[Lookup.scala 34:39]
+  wire [2:0] _csignals_T_40 = _csignals_T_21 ? 3'h2 : _csignals_T_39; // @[Lookup.scala 34:39]
+  wire [2:0] _csignals_T_41 = _csignals_T_19 ? 3'h2 : _csignals_T_40; // @[Lookup.scala 34:39]
+  wire [2:0] _csignals_T_42 = _csignals_T_17 ? 3'h2 : _csignals_T_41; // @[Lookup.scala 34:39]
+  wire [2:0] _csignals_T_43 = _csignals_T_15 ? 3'h2 : _csignals_T_42; // @[Lookup.scala 34:39]
+  wire [2:0] _csignals_T_44 = _csignals_T_13 ? 3'h2 : _csignals_T_43; // @[Lookup.scala 34:39]
+  wire [2:0] _csignals_T_45 = _csignals_T_11 ? 3'h1 : _csignals_T_44; // @[Lookup.scala 34:39]
+  wire [2:0] _csignals_T_46 = _csignals_T_9 ? 3'h2 : _csignals_T_45; // @[Lookup.scala 34:39]
+  wire [2:0] _csignals_T_47 = _csignals_T_7 ? 3'h2 : _csignals_T_46; // @[Lookup.scala 34:39]
+  wire [2:0] _csignals_T_48 = _csignals_T_5 ? 3'h0 : _csignals_T_47; // @[Lookup.scala 34:39]
+  wire [2:0] _csignals_T_49 = _csignals_T_3 ? 3'h0 : _csignals_T_48; // @[Lookup.scala 34:39]
+  wire [2:0] cs_op_type = _csignals_T_1 ? 3'h2 : _csignals_T_49; // @[Lookup.scala 34:39]
+  assign io_isLoad = cs_val_inst & cs_op_type == 3'h0; // @[Decode.scala 157:28]
+  assign io_isCompute = cs_val_inst & cs_op_type == 3'h2; // @[Decode.scala 158:31]
+  assign io_isStore = cs_val_inst & cs_op_type == 3'h1; // @[Decode.scala 159:29]
 endmodule
 module Arbiter(
   output       io_in_0_ready,
@@ -1569,15 +2714,15 @@ module FetchInstMemCore(
   wire  writeDecode_io_isLoad; // @[FetchInstMem.scala 86:27]
   wire  writeDecode_io_isCompute; // @[FetchInstMem.scala 86:27]
   wire  writeDecode_io_isStore; // @[FetchInstMem.scala 86:27]
-  wire  requestArb_io_in_0_ready; // @[FetchInstMem.scala 120:26]
-  wire  requestArb_io_in_0_valid; // @[FetchInstMem.scala 120:26]
-  wire  requestArb_io_in_1_ready; // @[FetchInstMem.scala 120:26]
-  wire  requestArb_io_in_1_valid; // @[FetchInstMem.scala 120:26]
-  wire  requestArb_io_in_2_ready; // @[FetchInstMem.scala 120:26]
-  wire  requestArb_io_in_2_valid; // @[FetchInstMem.scala 120:26]
-  wire  requestArb_io_out_ready; // @[FetchInstMem.scala 120:26]
-  wire  requestArb_io_out_valid; // @[FetchInstMem.scala 120:26]
-  wire [1:0] requestArb_io_out_bits; // @[FetchInstMem.scala 120:26]
+  wire  requestArb_io_in_0_ready; // @[FetchInstMem.scala 124:26]
+  wire  requestArb_io_in_0_valid; // @[FetchInstMem.scala 124:26]
+  wire  requestArb_io_in_1_ready; // @[FetchInstMem.scala 124:26]
+  wire  requestArb_io_in_1_valid; // @[FetchInstMem.scala 124:26]
+  wire  requestArb_io_in_2_ready; // @[FetchInstMem.scala 124:26]
+  wire  requestArb_io_in_2_valid; // @[FetchInstMem.scala 124:26]
+  wire  requestArb_io_out_ready; // @[FetchInstMem.scala 124:26]
+  wire  requestArb_io_out_valid; // @[FetchInstMem.scala 124:26]
+  wire [1:0] requestArb_io_out_bits; // @[FetchInstMem.scala 124:26]
   reg [127:0] nextData_0; // @[FetchInstMem.scala 66:21]
   reg [127:0] nextData_1; // @[FetchInstMem.scala 66:21]
   reg [127:0] nextData_2; // @[FetchInstMem.scala 66:21]
@@ -1597,51 +2742,52 @@ module FetchInstMemCore(
     addrQueues_2_io_enq_ready; // @[Mux.scala 101:16]
   wire  writeTargetReady = writeDecode_io_isLoad ? addrQueues_0_io_enq_ready : _writeTargetReady_T_1; // @[Mux.scala 101:16]
   wire  instructionWrite = io_write_ready & io_write_valid; // @[Decoupled.scala 50:35]
-  wire  _T_1 = ~reset; // @[FetchInstMem.scala 98:11]
-  wire [5:0] _virginSlot_T_1 = virginSlot + 6'h1; // @[FetchInstMem.scala 104:32]
-  reg  readState; // @[FetchInstMem.scala 129:26]
-  reg [1:0] readClient; // @[FetchInstMem.scala 130:23]
-  reg [4:0] readSlot; // @[FetchInstMem.scala 131:21]
+  wire  _T = ~knownInstruction; // @[FetchInstMem.scala 98:10]
+  wire  _T_3 = ~reset; // @[FetchInstMem.scala 99:13]
+  wire [5:0] _virginSlot_T_1 = virginSlot + 6'h1; // @[FetchInstMem.scala 108:32]
+  reg  readState; // @[FetchInstMem.scala 133:26]
+  reg [1:0] readClient; // @[FetchInstMem.scala 134:23]
+  reg [4:0] readSlot; // @[FetchInstMem.scala 135:21]
   wire  _selectedAddrValid_T_3 = 2'h1 == requestQueue_io_deq_bits ? addrQueues_1_io_deq_valid : 2'h0 ==
     requestQueue_io_deq_bits & addrQueues_0_io_deq_valid; // @[Mux.scala 81:58]
   wire  selectedAddrValid = 2'h2 == requestQueue_io_deq_bits ? addrQueues_2_io_deq_valid : _selectedAddrValid_T_3; // @[Mux.scala 81:58]
   wire [4:0] _selectedAddr_T_1 = 2'h0 == requestQueue_io_deq_bits ? addrQueues_0_io_deq_bits : 5'h0; // @[Mux.scala 81:58]
   wire [4:0] _selectedAddr_T_3 = 2'h1 == requestQueue_io_deq_bits ? addrQueues_1_io_deq_bits : _selectedAddr_T_1; // @[Mux.scala 81:58]
   wire [4:0] selectedAddr = 2'h2 == requestQueue_io_deq_bits ? addrQueues_2_io_deq_bits : _selectedAddr_T_3; // @[Mux.scala 81:58]
-  wire  _localReadEnable_T = ~readState; // @[FetchInstMem.scala 150:35]
-  wire  _localReadEnable_T_2 = ~instructionWrite; // @[FetchInstMem.scala 151:5]
-  wire  localReadEnable = ~readState & requestQueue_io_deq_valid & _localReadEnable_T_2; // @[FetchInstMem.scala 150:74]
-  wire  _addrQueues_0_io_deq_ready_T = requestQueue_io_deq_bits == 2'h0; // @[FetchInstMem.scala 155:32]
-  wire  _addrQueues_1_io_deq_ready_T = requestQueue_io_deq_bits == 2'h1; // @[FetchInstMem.scala 155:32]
-  wire  _addrQueues_2_io_deq_ready_T = requestQueue_io_deq_bits == 2'h2; // @[FetchInstMem.scala 155:32]
-  wire  _GEN_13 = localReadEnable | readState; // @[FetchInstMem.scala 166:31 169:21 129:26]
+  wire  _localReadEnable_T = ~readState; // @[FetchInstMem.scala 154:35]
+  wire  _localReadEnable_T_2 = ~instructionWrite; // @[FetchInstMem.scala 155:5]
+  wire  localReadEnable = ~readState & requestQueue_io_deq_valid & _localReadEnable_T_2; // @[FetchInstMem.scala 154:74]
+  wire  _addrQueues_0_io_deq_ready_T = requestQueue_io_deq_bits == 2'h0; // @[FetchInstMem.scala 159:32]
+  wire  _addrQueues_1_io_deq_ready_T = requestQueue_io_deq_bits == 2'h1; // @[FetchInstMem.scala 159:32]
+  wire  _addrQueues_2_io_deq_ready_T = requestQueue_io_deq_bits == 2'h2; // @[FetchInstMem.scala 159:32]
+  wire  _GEN_13 = localReadEnable | readState; // @[FetchInstMem.scala 170:31 173:21 133:26]
   wire  reserveSlots = io_reserve_ready & io_reserve_valid; // @[Decoupled.scala 50:35]
-  wire [5:0] _freeCount_T_1 = freeCount - io_reserve_bits; // @[FetchInstMem.scala 190:28]
-  wire [5:0] _freeCount_T_3 = _freeCount_T_1 + 6'h1; // @[FetchInstMem.scala 190:46]
-  wire [5:0] _freeCount_T_7 = freeCount + 6'h1; // @[FetchInstMem.scala 194:28]
-  wire [5:0] _GEN_21 = readState ? _freeCount_T_7 : freeCount; // @[FetchInstMem.scala 193:27 194:15 76:26]
+  wire [5:0] _freeCount_T_1 = freeCount - io_reserve_bits; // @[FetchInstMem.scala 194:28]
+  wire [5:0] _freeCount_T_3 = _freeCount_T_1 + 6'h1; // @[FetchInstMem.scala 194:46]
+  wire [5:0] _freeCount_T_7 = freeCount + 6'h1; // @[FetchInstMem.scala 198:28]
+  wire [5:0] _GEN_21 = readState ? _freeCount_T_7 : freeCount; // @[FetchInstMem.scala 197:27 198:15 76:26]
   wire  nextPop = io_inst_ld_ready & io_inst_ld_valid; // @[Decoupled.scala 50:35]
-  wire  nextPush = readState & readClient == 2'h0; // @[FetchInstMem.scala 199:39]
-  wire  _GEN_26 = nextPop ? 1'h0 : nextValid_0; // @[FetchInstMem.scala 208:27 209:22 67:26]
-  wire  _GEN_28 = nextPush | _GEN_26; // @[FetchInstMem.scala 204:22 206:22]
-  wire  _GEN_29 = nextPush ? 1'h0 : readPending_0; // @[FetchInstMem.scala 204:22 207:24 68:28]
-  wire  _T_14 = requestArb_io_in_0_ready & requestArb_io_in_0_valid; // @[Decoupled.scala 50:35]
-  wire  _GEN_30 = _T_14 | _GEN_29; // @[FetchInstMem.scala 211:38 212:24]
+  wire  nextPush = readState & readClient == 2'h0; // @[FetchInstMem.scala 203:39]
+  wire  _GEN_26 = nextPop ? 1'h0 : nextValid_0; // @[FetchInstMem.scala 212:27 213:22 67:26]
+  wire  _GEN_28 = nextPush | _GEN_26; // @[FetchInstMem.scala 208:22 210:22]
+  wire  _GEN_29 = nextPush ? 1'h0 : readPending_0; // @[FetchInstMem.scala 208:22 211:24 68:28]
+  wire  _T_18 = requestArb_io_in_0_ready & requestArb_io_in_0_valid; // @[Decoupled.scala 50:35]
+  wire  _GEN_30 = _T_18 | _GEN_29; // @[FetchInstMem.scala 215:38 216:24]
   wire  nextPop_1 = io_inst_co_ready & io_inst_co_valid; // @[Decoupled.scala 50:35]
-  wire  nextPush_1 = readState & readClient == 2'h1; // @[FetchInstMem.scala 199:39]
-  wire  _GEN_34 = nextPop_1 ? 1'h0 : nextValid_1; // @[FetchInstMem.scala 208:27 209:22 67:26]
-  wire  _GEN_36 = nextPush_1 | _GEN_34; // @[FetchInstMem.scala 204:22 206:22]
-  wire  _GEN_37 = nextPush_1 ? 1'h0 : readPending_1; // @[FetchInstMem.scala 204:22 207:24 68:28]
-  wire  _T_15 = requestArb_io_in_1_ready & requestArb_io_in_1_valid; // @[Decoupled.scala 50:35]
-  wire  _GEN_38 = _T_15 | _GEN_37; // @[FetchInstMem.scala 211:38 212:24]
+  wire  nextPush_1 = readState & readClient == 2'h1; // @[FetchInstMem.scala 203:39]
+  wire  _GEN_34 = nextPop_1 ? 1'h0 : nextValid_1; // @[FetchInstMem.scala 212:27 213:22 67:26]
+  wire  _GEN_36 = nextPush_1 | _GEN_34; // @[FetchInstMem.scala 208:22 210:22]
+  wire  _GEN_37 = nextPush_1 ? 1'h0 : readPending_1; // @[FetchInstMem.scala 208:22 211:24 68:28]
+  wire  _T_19 = requestArb_io_in_1_ready & requestArb_io_in_1_valid; // @[Decoupled.scala 50:35]
+  wire  _GEN_38 = _T_19 | _GEN_37; // @[FetchInstMem.scala 215:38 216:24]
   wire  nextPop_2 = io_inst_st_ready & io_inst_st_valid; // @[Decoupled.scala 50:35]
-  wire  nextPush_2 = readState & readClient == 2'h2; // @[FetchInstMem.scala 199:39]
-  wire  _GEN_42 = nextPop_2 ? 1'h0 : nextValid_2; // @[FetchInstMem.scala 208:27 209:22 67:26]
-  wire  _GEN_44 = nextPush_2 | _GEN_42; // @[FetchInstMem.scala 204:22 206:22]
-  wire  _GEN_45 = nextPush_2 ? 1'h0 : readPending_2; // @[FetchInstMem.scala 204:22 207:24 68:28]
-  wire  _T_16 = requestArb_io_in_2_ready & requestArb_io_in_2_valid; // @[Decoupled.scala 50:35]
-  wire  _GEN_46 = _T_16 | _GEN_45; // @[FetchInstMem.scala 211:38 212:24]
-  Queue_5 addrQueues_0 ( // @[FetchInstMem.scala 57:35]
+  wire  nextPush_2 = readState & readClient == 2'h2; // @[FetchInstMem.scala 203:39]
+  wire  _GEN_42 = nextPop_2 ? 1'h0 : nextValid_2; // @[FetchInstMem.scala 212:27 213:22 67:26]
+  wire  _GEN_44 = nextPush_2 | _GEN_42; // @[FetchInstMem.scala 208:22 210:22]
+  wire  _GEN_45 = nextPush_2 ? 1'h0 : readPending_2; // @[FetchInstMem.scala 208:22 211:24 68:28]
+  wire  _T_20 = requestArb_io_in_2_ready & requestArb_io_in_2_valid; // @[Decoupled.scala 50:35]
+  wire  _GEN_46 = _T_20 | _GEN_45; // @[FetchInstMem.scala 215:38 216:24]
+  Queue_10 addrQueues_0 ( // @[FetchInstMem.scala 57:35]
     .clock(addrQueues_0_clock),
     .reset(addrQueues_0_reset),
     .io_enq_ready(addrQueues_0_io_enq_ready),
@@ -1651,7 +2797,7 @@ module FetchInstMemCore(
     .io_deq_valid(addrQueues_0_io_deq_valid),
     .io_deq_bits(addrQueues_0_io_deq_bits)
   );
-  Queue_5 addrQueues_1 ( // @[FetchInstMem.scala 57:35]
+  Queue_10 addrQueues_1 ( // @[FetchInstMem.scala 57:35]
     .clock(addrQueues_1_clock),
     .reset(addrQueues_1_reset),
     .io_enq_ready(addrQueues_1_io_enq_ready),
@@ -1661,7 +2807,7 @@ module FetchInstMemCore(
     .io_deq_valid(addrQueues_1_io_deq_valid),
     .io_deq_bits(addrQueues_1_io_deq_bits)
   );
-  Queue_5 addrQueues_2 ( // @[FetchInstMem.scala 57:35]
+  Queue_10 addrQueues_2 ( // @[FetchInstMem.scala 57:35]
     .clock(addrQueues_2_clock),
     .reset(addrQueues_2_reset),
     .io_enq_ready(addrQueues_2_io_enq_ready),
@@ -1671,7 +2817,7 @@ module FetchInstMemCore(
     .io_deq_valid(addrQueues_2_io_deq_valid),
     .io_deq_bits(addrQueues_2_io_deq_bits)
   );
-  Queue_5 freeSlots ( // @[FetchInstMem.scala 60:11]
+  Queue_10 freeSlots ( // @[FetchInstMem.scala 60:11]
     .clock(freeSlots_clock),
     .reset(freeSlots_reset),
     .io_enq_ready(freeSlots_io_enq_ready),
@@ -1681,7 +2827,7 @@ module FetchInstMemCore(
     .io_deq_valid(freeSlots_io_deq_valid),
     .io_deq_bits(freeSlots_io_deq_bits)
   );
-  Queue_9 requestQueue ( // @[FetchInstMem.scala 63:11]
+  Queue_14 requestQueue ( // @[FetchInstMem.scala 63:11]
     .clock(requestQueue_clock),
     .reset(requestQueue_reset),
     .io_enq_ready(requestQueue_io_enq_ready),
@@ -1697,7 +2843,7 @@ module FetchInstMemCore(
     .io_isCompute(writeDecode_io_isCompute),
     .io_isStore(writeDecode_io_isStore)
   );
-  Arbiter requestArb ( // @[FetchInstMem.scala 120:26]
+  Arbiter requestArb ( // @[FetchInstMem.scala 124:26]
     .io_in_0_ready(requestArb_io_in_0_ready),
     .io_in_0_valid(requestArb_io_in_0_valid),
     .io_in_1_ready(requestArb_io_in_1_ready),
@@ -1725,34 +2871,34 @@ module FetchInstMemCore(
   assign io_inst_st_bits = nextData_2; // @[FetchInstMem.scala 71:21]
   assign addrQueues_0_clock = clock;
   assign addrQueues_0_reset = reset | io_launch; // @[FetchInstMem.scala 51:33]
-  assign addrQueues_0_io_enq_valid = instructionWrite & writeDecode_io_isLoad; // @[FetchInstMem.scala 111:52]
+  assign addrQueues_0_io_enq_valid = instructionWrite & writeDecode_io_isLoad; // @[FetchInstMem.scala 115:52]
   assign addrQueues_0_io_enq_bits = useVirginSlot ? virginSlot[4:0] : freeSlots_io_deq_bits; // @[FetchInstMem.scala 82:26]
-  assign addrQueues_0_io_deq_ready = localReadEnable & _addrQueues_0_io_deq_ready_T; // @[FetchInstMem.scala 154:51]
+  assign addrQueues_0_io_deq_ready = localReadEnable & _addrQueues_0_io_deq_ready_T; // @[FetchInstMem.scala 158:51]
   assign addrQueues_1_clock = clock;
   assign addrQueues_1_reset = reset | io_launch; // @[FetchInstMem.scala 51:33]
-  assign addrQueues_1_io_enq_valid = instructionWrite & writeDecode_io_isCompute; // @[FetchInstMem.scala 111:52]
+  assign addrQueues_1_io_enq_valid = instructionWrite & writeDecode_io_isCompute; // @[FetchInstMem.scala 115:52]
   assign addrQueues_1_io_enq_bits = useVirginSlot ? virginSlot[4:0] : freeSlots_io_deq_bits; // @[FetchInstMem.scala 82:26]
-  assign addrQueues_1_io_deq_ready = localReadEnable & _addrQueues_1_io_deq_ready_T; // @[FetchInstMem.scala 154:51]
+  assign addrQueues_1_io_deq_ready = localReadEnable & _addrQueues_1_io_deq_ready_T; // @[FetchInstMem.scala 158:51]
   assign addrQueues_2_clock = clock;
   assign addrQueues_2_reset = reset | io_launch; // @[FetchInstMem.scala 51:33]
-  assign addrQueues_2_io_enq_valid = instructionWrite & writeDecode_io_isStore; // @[FetchInstMem.scala 111:52]
+  assign addrQueues_2_io_enq_valid = instructionWrite & writeDecode_io_isStore; // @[FetchInstMem.scala 115:52]
   assign addrQueues_2_io_enq_bits = useVirginSlot ? virginSlot[4:0] : freeSlots_io_deq_bits; // @[FetchInstMem.scala 82:26]
-  assign addrQueues_2_io_deq_ready = localReadEnable & _addrQueues_2_io_deq_ready_T; // @[FetchInstMem.scala 154:51]
+  assign addrQueues_2_io_deq_ready = localReadEnable & _addrQueues_2_io_deq_ready_T; // @[FetchInstMem.scala 158:51]
   assign freeSlots_clock = clock;
   assign freeSlots_reset = reset | io_launch; // @[FetchInstMem.scala 51:33]
-  assign freeSlots_io_enq_valid = readState; // @[FetchInstMem.scala 159:38]
-  assign freeSlots_io_enq_bits = readSlot; // @[FetchInstMem.scala 180:25]
-  assign freeSlots_io_deq_ready = instructionWrite & ~useVirginSlot; // @[FetchInstMem.scala 107:46]
+  assign freeSlots_io_enq_valid = readState; // @[FetchInstMem.scala 163:38]
+  assign freeSlots_io_enq_bits = readSlot; // @[FetchInstMem.scala 184:25]
+  assign freeSlots_io_deq_ready = instructionWrite & ~useVirginSlot; // @[FetchInstMem.scala 111:46]
   assign requestQueue_clock = clock;
   assign requestQueue_reset = reset | io_launch; // @[FetchInstMem.scala 51:33]
-  assign requestQueue_io_enq_valid = requestArb_io_out_valid; // @[FetchInstMem.scala 126:23]
-  assign requestQueue_io_enq_bits = requestArb_io_out_bits; // @[FetchInstMem.scala 126:23]
-  assign requestQueue_io_deq_ready = ~readState & requestQueue_io_deq_valid & _localReadEnable_T_2; // @[FetchInstMem.scala 150:74]
+  assign requestQueue_io_enq_valid = requestArb_io_out_valid; // @[FetchInstMem.scala 130:23]
+  assign requestQueue_io_enq_bits = requestArb_io_out_bits; // @[FetchInstMem.scala 130:23]
+  assign requestQueue_io_deq_ready = ~readState & requestQueue_io_deq_valid & _localReadEnable_T_2; // @[FetchInstMem.scala 154:74]
   assign writeDecode_io_inst = io_write_bits; // @[FetchInstMem.scala 87:23]
-  assign requestArb_io_in_0_valid = ~nextValid_0 & ~readPending_0 & addrQueues_0_io_deq_valid; // @[FetchInstMem.scala 122:67]
-  assign requestArb_io_in_1_valid = ~nextValid_1 & ~readPending_1 & addrQueues_1_io_deq_valid; // @[FetchInstMem.scala 122:67]
-  assign requestArb_io_in_2_valid = ~nextValid_2 & ~readPending_2 & addrQueues_2_io_deq_valid; // @[FetchInstMem.scala 122:67]
-  assign requestArb_io_out_ready = requestQueue_io_enq_ready; // @[FetchInstMem.scala 126:23]
+  assign requestArb_io_in_0_valid = ~nextValid_0 & ~readPending_0 & addrQueues_0_io_deq_valid; // @[FetchInstMem.scala 126:67]
+  assign requestArb_io_in_1_valid = ~nextValid_1 & ~readPending_1 & addrQueues_1_io_deq_valid; // @[FetchInstMem.scala 126:67]
+  assign requestArb_io_in_2_valid = ~nextValid_2 & ~readPending_2 & addrQueues_2_io_deq_valid; // @[FetchInstMem.scala 126:67]
+  assign requestArb_io_out_ready = requestQueue_io_enq_ready; // @[FetchInstMem.scala 130:23]
   always @(posedge clock) begin
     if (instMem_rw_w_en & instMem_rw_w_mask) begin
       instMem[instMem_rw_w_addr] <= instMem_rw_w_data; // @[FetchInstMem.scala 55:28]
@@ -1773,102 +2919,102 @@ module FetchInstMemCore(
         instMem_rw_r_addr_pipe_0 <= _selectedAddr_T_1;
       end
     end
-    if (!(io_launch)) begin // @[FetchInstMem.scala 200:21]
-      if (nextPush) begin // @[FetchInstMem.scala 204:22]
-        nextData_0 <= instMem_rw_r_data; // @[FetchInstMem.scala 205:21]
+    if (!(io_launch)) begin // @[FetchInstMem.scala 204:21]
+      if (nextPush) begin // @[FetchInstMem.scala 208:22]
+        nextData_0 <= instMem_rw_r_data; // @[FetchInstMem.scala 209:21]
       end
     end
-    if (!(io_launch)) begin // @[FetchInstMem.scala 200:21]
-      if (nextPush_1) begin // @[FetchInstMem.scala 204:22]
-        nextData_1 <= instMem_rw_r_data; // @[FetchInstMem.scala 205:21]
+    if (!(io_launch)) begin // @[FetchInstMem.scala 204:21]
+      if (nextPush_1) begin // @[FetchInstMem.scala 208:22]
+        nextData_1 <= instMem_rw_r_data; // @[FetchInstMem.scala 209:21]
       end
     end
-    if (!(io_launch)) begin // @[FetchInstMem.scala 200:21]
-      if (nextPush_2) begin // @[FetchInstMem.scala 204:22]
-        nextData_2 <= instMem_rw_r_data; // @[FetchInstMem.scala 205:21]
+    if (!(io_launch)) begin // @[FetchInstMem.scala 204:21]
+      if (nextPush_2) begin // @[FetchInstMem.scala 208:22]
+        nextData_2 <= instMem_rw_r_data; // @[FetchInstMem.scala 209:21]
       end
     end
     if (reset) begin // @[FetchInstMem.scala 67:26]
       nextValid_0 <= 1'h0; // @[FetchInstMem.scala 67:26]
-    end else if (io_launch) begin // @[FetchInstMem.scala 200:21]
-      nextValid_0 <= 1'h0; // @[FetchInstMem.scala 201:20]
+    end else if (io_launch) begin // @[FetchInstMem.scala 204:21]
+      nextValid_0 <= 1'h0; // @[FetchInstMem.scala 205:20]
     end else begin
       nextValid_0 <= _GEN_28;
     end
     if (reset) begin // @[FetchInstMem.scala 67:26]
       nextValid_1 <= 1'h0; // @[FetchInstMem.scala 67:26]
-    end else if (io_launch) begin // @[FetchInstMem.scala 200:21]
-      nextValid_1 <= 1'h0; // @[FetchInstMem.scala 201:20]
+    end else if (io_launch) begin // @[FetchInstMem.scala 204:21]
+      nextValid_1 <= 1'h0; // @[FetchInstMem.scala 205:20]
     end else begin
       nextValid_1 <= _GEN_36;
     end
     if (reset) begin // @[FetchInstMem.scala 67:26]
       nextValid_2 <= 1'h0; // @[FetchInstMem.scala 67:26]
-    end else if (io_launch) begin // @[FetchInstMem.scala 200:21]
-      nextValid_2 <= 1'h0; // @[FetchInstMem.scala 201:20]
+    end else if (io_launch) begin // @[FetchInstMem.scala 204:21]
+      nextValid_2 <= 1'h0; // @[FetchInstMem.scala 205:20]
     end else begin
       nextValid_2 <= _GEN_44;
     end
     if (reset) begin // @[FetchInstMem.scala 68:28]
       readPending_0 <= 1'h0; // @[FetchInstMem.scala 68:28]
-    end else if (io_launch) begin // @[FetchInstMem.scala 200:21]
-      readPending_0 <= 1'h0; // @[FetchInstMem.scala 202:22]
+    end else if (io_launch) begin // @[FetchInstMem.scala 204:21]
+      readPending_0 <= 1'h0; // @[FetchInstMem.scala 206:22]
     end else begin
       readPending_0 <= _GEN_30;
     end
     if (reset) begin // @[FetchInstMem.scala 68:28]
       readPending_1 <= 1'h0; // @[FetchInstMem.scala 68:28]
-    end else if (io_launch) begin // @[FetchInstMem.scala 200:21]
-      readPending_1 <= 1'h0; // @[FetchInstMem.scala 202:22]
+    end else if (io_launch) begin // @[FetchInstMem.scala 204:21]
+      readPending_1 <= 1'h0; // @[FetchInstMem.scala 206:22]
     end else begin
       readPending_1 <= _GEN_38;
     end
     if (reset) begin // @[FetchInstMem.scala 68:28]
       readPending_2 <= 1'h0; // @[FetchInstMem.scala 68:28]
-    end else if (io_launch) begin // @[FetchInstMem.scala 200:21]
-      readPending_2 <= 1'h0; // @[FetchInstMem.scala 202:22]
+    end else if (io_launch) begin // @[FetchInstMem.scala 204:21]
+      readPending_2 <= 1'h0; // @[FetchInstMem.scala 206:22]
     end else begin
       readPending_2 <= _GEN_46;
     end
     if (reset) begin // @[FetchInstMem.scala 76:26]
       freeCount <= 6'h20; // @[FetchInstMem.scala 76:26]
-    end else if (io_launch) begin // @[FetchInstMem.scala 186:19]
-      freeCount <= 6'h20; // @[FetchInstMem.scala 187:15]
-    end else if (reserveSlots & readState) begin // @[FetchInstMem.scala 189:43]
-      freeCount <= _freeCount_T_3; // @[FetchInstMem.scala 190:15]
-    end else if (reserveSlots) begin // @[FetchInstMem.scala 191:28]
-      freeCount <= _freeCount_T_1; // @[FetchInstMem.scala 192:15]
+    end else if (io_launch) begin // @[FetchInstMem.scala 190:19]
+      freeCount <= 6'h20; // @[FetchInstMem.scala 191:15]
+    end else if (reserveSlots & readState) begin // @[FetchInstMem.scala 193:43]
+      freeCount <= _freeCount_T_3; // @[FetchInstMem.scala 194:15]
+    end else if (reserveSlots) begin // @[FetchInstMem.scala 195:28]
+      freeCount <= _freeCount_T_1; // @[FetchInstMem.scala 196:15]
     end else begin
       freeCount <= _GEN_21;
     end
     if (reset) begin // @[FetchInstMem.scala 80:27]
       virginSlot <= 6'h0; // @[FetchInstMem.scala 80:27]
-    end else if (io_launch) begin // @[FetchInstMem.scala 186:19]
-      virginSlot <= 6'h0; // @[FetchInstMem.scala 188:16]
-    end else if (instructionWrite) begin // @[FetchInstMem.scala 101:26]
-      if (useVirginSlot) begin // @[FetchInstMem.scala 103:25]
-        virginSlot <= _virginSlot_T_1; // @[FetchInstMem.scala 104:18]
+    end else if (io_launch) begin // @[FetchInstMem.scala 190:19]
+      virginSlot <= 6'h0; // @[FetchInstMem.scala 192:16]
+    end else if (instructionWrite) begin // @[FetchInstMem.scala 105:26]
+      if (useVirginSlot) begin // @[FetchInstMem.scala 107:25]
+        virginSlot <= _virginSlot_T_1; // @[FetchInstMem.scala 108:18]
       end
     end
-    if (reset) begin // @[FetchInstMem.scala 129:26]
-      readState <= 1'h0; // @[FetchInstMem.scala 129:26]
-    end else if (io_launch) begin // @[FetchInstMem.scala 161:19]
-      readState <= 1'h0; // @[FetchInstMem.scala 162:15]
-    end else if (_localReadEnable_T) begin // @[FetchInstMem.scala 164:23]
+    if (reset) begin // @[FetchInstMem.scala 133:26]
+      readState <= 1'h0; // @[FetchInstMem.scala 133:26]
+    end else if (io_launch) begin // @[FetchInstMem.scala 165:19]
+      readState <= 1'h0; // @[FetchInstMem.scala 166:15]
+    end else if (_localReadEnable_T) begin // @[FetchInstMem.scala 168:23]
       readState <= _GEN_13;
-    end else if (readState) begin // @[FetchInstMem.scala 164:23]
-      readState <= 1'h0; // @[FetchInstMem.scala 173:19]
+    end else if (readState) begin // @[FetchInstMem.scala 168:23]
+      readState <= 1'h0; // @[FetchInstMem.scala 177:19]
     end
-    if (!(io_launch)) begin // @[FetchInstMem.scala 161:19]
-      if (_localReadEnable_T) begin // @[FetchInstMem.scala 164:23]
-        if (localReadEnable) begin // @[FetchInstMem.scala 166:31]
-          readClient <= requestQueue_io_deq_bits; // @[FetchInstMem.scala 167:22]
+    if (!(io_launch)) begin // @[FetchInstMem.scala 165:19]
+      if (_localReadEnable_T) begin // @[FetchInstMem.scala 168:23]
+        if (localReadEnable) begin // @[FetchInstMem.scala 170:31]
+          readClient <= requestQueue_io_deq_bits; // @[FetchInstMem.scala 171:22]
         end
       end
     end
-    if (!(io_launch)) begin // @[FetchInstMem.scala 161:19]
-      if (_localReadEnable_T) begin // @[FetchInstMem.scala 164:23]
-        if (localReadEnable) begin // @[FetchInstMem.scala 166:31]
+    if (!(io_launch)) begin // @[FetchInstMem.scala 165:19]
+      if (_localReadEnable_T) begin // @[FetchInstMem.scala 168:23]
+        if (localReadEnable) begin // @[FetchInstMem.scala 170:31]
           if (2'h2 == requestQueue_io_deq_bits) begin // @[Mux.scala 81:58]
             readSlot <= addrQueues_2_io_deq_bits;
           end else begin
@@ -1881,10 +3027,8 @@ module FetchInstMemCore(
     `ifdef PRINTF_COND
       if (`PRINTF_COND) begin
     `endif
-        if (io_write_valid & ~reset & ~knownInstruction) begin
-          $fwrite(32'h80000002,
-            "Assertion failed: -F- FetchInstMem: unknown instruction type\n    at FetchInstMem.scala:98 assert(knownInstruction, \"-F- FetchInstMem: unknown instruction type\")\n"
-            ); // @[FetchInstMem.scala 98:11]
+        if (io_write_valid & _T & ~reset) begin
+          $fwrite(32'h80000002,"[FetchInstMem] unknown instruction=%x opcode=%x\n",io_write_bits,io_write_bits[2:0]); // @[FetchInstMem.scala 99:13]
         end
     `ifdef PRINTF_COND
       end
@@ -1894,10 +3038,10 @@ module FetchInstMemCore(
     `ifdef PRINTF_COND
       if (`PRINTF_COND) begin
     `endif
-        if (requestQueue_io_deq_valid & _T_1 & ~selectedAddrValid) begin
+        if (io_write_valid & _T_3 & _T) begin
           $fwrite(32'h80000002,
-            "Assertion failed: -F- FetchInstMem: queued read request has no instruction address\n    at FetchInstMem.scala:144 assert(selectedAddrValid,\n"
-            ); // @[FetchInstMem.scala 144:11]
+            "Assertion failed: -F- FetchInstMem: unknown instruction type\n    at FetchInstMem.scala:102 assert(knownInstruction, \"-F- FetchInstMem: unknown instruction type\")\n"
+            ); // @[FetchInstMem.scala 102:11]
         end
     `ifdef PRINTF_COND
       end
@@ -1907,10 +3051,23 @@ module FetchInstMemCore(
     `ifdef PRINTF_COND
       if (`PRINTF_COND) begin
     `endif
-        if (_T_1 & ~(_localReadEnable_T | freeSlots_io_enq_ready)) begin
+        if (requestQueue_io_deq_valid & _T_3 & ~selectedAddrValid) begin
           $fwrite(32'h80000002,
-            "Assertion failed: -F- FetchInstMem: free-slot FIFO overflow\n    at FetchInstMem.scala:181 assert(!completedLocalRead || freeSlots.io.enq.ready,\n"
-            ); // @[FetchInstMem.scala 181:9]
+            "Assertion failed: -F- FetchInstMem: queued read request has no instruction address\n    at FetchInstMem.scala:148 assert(selectedAddrValid,\n"
+            ); // @[FetchInstMem.scala 148:11]
+        end
+    `ifdef PRINTF_COND
+      end
+    `endif
+    `endif // SYNTHESIS
+    `ifndef SYNTHESIS
+    `ifdef PRINTF_COND
+      if (`PRINTF_COND) begin
+    `endif
+        if (_T_3 & ~(_localReadEnable_T | freeSlots_io_enq_ready)) begin
+          $fwrite(32'h80000002,
+            "Assertion failed: -F- FetchInstMem: free-slot FIFO overflow\n    at FetchInstMem.scala:185 assert(!completedLocalRead || freeSlots.io.enq.ready,\n"
+            ); // @[FetchInstMem.scala 185:9]
         end
     `ifdef PRINTF_COND
       end
@@ -1999,16 +3156,16 @@ end // initial
 `endif // SYNTHESIS
   always @(posedge clock) begin
     //
-    if (io_write_valid & ~reset) begin
-      assert(knownInstruction); // @[FetchInstMem.scala 98:11]
+    if (io_write_valid & _T_3) begin
+      assert(knownInstruction); // @[FetchInstMem.scala 102:11]
     end
     //
-    if (requestQueue_io_deq_valid & _T_1) begin
-      assert(selectedAddrValid); // @[FetchInstMem.scala 144:11]
+    if (requestQueue_io_deq_valid & _T_3) begin
+      assert(selectedAddrValid); // @[FetchInstMem.scala 148:11]
     end
     //
-    if (_T_1) begin
-      assert(_localReadEnable_T | freeSlots_io_enq_ready); // @[FetchInstMem.scala 181:9]
+    if (_T_3) begin
+      assert(_localReadEnable_T | freeSlots_io_enq_ready); // @[FetchInstMem.scala 185:9]
     end
   end
 endmodule
@@ -2048,69 +3205,70 @@ module FetchInstMemNarrow(
   reg [63:0] _RAND_8;
   reg [63:0] _RAND_9;
 `endif // RANDOMIZE_REG_INIT
-  wire  core_clock; // @[FetchInstMem.scala 264:20]
-  wire  core_reset; // @[FetchInstMem.scala 264:20]
-  wire  core_io_launch; // @[FetchInstMem.scala 264:20]
-  wire  core_io_reserve_ready; // @[FetchInstMem.scala 264:20]
-  wire  core_io_reserve_valid; // @[FetchInstMem.scala 264:20]
-  wire [5:0] core_io_reserve_bits; // @[FetchInstMem.scala 264:20]
-  wire  core_io_write_ready; // @[FetchInstMem.scala 264:20]
-  wire  core_io_write_valid; // @[FetchInstMem.scala 264:20]
-  wire [127:0] core_io_write_bits; // @[FetchInstMem.scala 264:20]
-  wire  core_io_inst_ld_ready; // @[FetchInstMem.scala 264:20]
-  wire  core_io_inst_ld_valid; // @[FetchInstMem.scala 264:20]
-  wire [127:0] core_io_inst_ld_bits; // @[FetchInstMem.scala 264:20]
-  wire  core_io_inst_co_ready; // @[FetchInstMem.scala 264:20]
-  wire  core_io_inst_co_valid; // @[FetchInstMem.scala 264:20]
-  wire [127:0] core_io_inst_co_bits; // @[FetchInstMem.scala 264:20]
-  wire  core_io_inst_st_ready; // @[FetchInstMem.scala 264:20]
-  wire  core_io_inst_st_valid; // @[FetchInstMem.scala 264:20]
-  wire [127:0] core_io_inst_st_bits; // @[FetchInstMem.scala 264:20]
-  reg  launchLast; // @[FetchInstMem.scala 262:27]
-  wire  launch = io_launch & ~launchLast; // @[FetchInstMem.scala 263:26]
-  reg [1:0] state; // @[FetchInstMem.scala 268:22]
-  reg [31:0] address; // @[FetchInstMem.scala 269:20]
-  reg [31:0] remaining; // @[FetchInstMem.scala 270:22]
-  reg [5:0] selectedInsts; // @[FetchInstMem.scala 271:26]
-  reg [4:0] selectedBeats; // @[FetchInstMem.scala 272:26]
-  reg [4:0] beatsLeft; // @[FetchInstMem.scala 273:22]
-  reg  instBeat; // @[FetchInstMem.scala 274:25]
-  reg [63:0] parts_0; // @[FetchInstMem.scala 275:18]
-  reg [63:0] parts_1; // @[FetchInstMem.scala 275:18]
-  wire [5:0] wantedInsts = remaining > 32'h8 ? 6'h8 : remaining[5:0]; // @[FetchInstMem.scala 277:24]
-  wire [4:0] _io_vme_rd_cmd_bits_len_T_1 = selectedBeats - 5'h1; // @[FetchInstMem.scala 284:44]
-  wire [63:0] completedParts_0 = ~instBeat ? io_vme_rd_data_bits_data : parts_0; // @[FetchInstMem.scala 288:18 289:{28,28}]
-  wire [63:0] completedParts_1 = instBeat ? io_vme_rd_data_bits_data : parts_1; // @[FetchInstMem.scala 288:18 289:{28,28}]
-  wire  _core_io_write_valid_T = state == 2'h3; // @[FetchInstMem.scala 291:32]
-  wire  _io_vme_rd_data_ready_T_2 = ~instBeat | core_io_write_ready; // @[FetchInstMem.scala 294:21]
+  wire  core_clock; // @[FetchInstMem.scala 268:20]
+  wire  core_reset; // @[FetchInstMem.scala 268:20]
+  wire  core_io_launch; // @[FetchInstMem.scala 268:20]
+  wire  core_io_reserve_ready; // @[FetchInstMem.scala 268:20]
+  wire  core_io_reserve_valid; // @[FetchInstMem.scala 268:20]
+  wire [5:0] core_io_reserve_bits; // @[FetchInstMem.scala 268:20]
+  wire  core_io_write_ready; // @[FetchInstMem.scala 268:20]
+  wire  core_io_write_valid; // @[FetchInstMem.scala 268:20]
+  wire [127:0] core_io_write_bits; // @[FetchInstMem.scala 268:20]
+  wire  core_io_inst_ld_ready; // @[FetchInstMem.scala 268:20]
+  wire  core_io_inst_ld_valid; // @[FetchInstMem.scala 268:20]
+  wire [127:0] core_io_inst_ld_bits; // @[FetchInstMem.scala 268:20]
+  wire  core_io_inst_co_ready; // @[FetchInstMem.scala 268:20]
+  wire  core_io_inst_co_valid; // @[FetchInstMem.scala 268:20]
+  wire [127:0] core_io_inst_co_bits; // @[FetchInstMem.scala 268:20]
+  wire  core_io_inst_st_ready; // @[FetchInstMem.scala 268:20]
+  wire  core_io_inst_st_valid; // @[FetchInstMem.scala 268:20]
+  wire [127:0] core_io_inst_st_bits; // @[FetchInstMem.scala 268:20]
+  reg  launchLast; // @[FetchInstMem.scala 266:27]
+  wire  launch = io_launch & ~launchLast; // @[FetchInstMem.scala 267:26]
+  reg [1:0] state; // @[FetchInstMem.scala 272:22]
+  reg [31:0] address; // @[FetchInstMem.scala 273:20]
+  reg [31:0] remaining; // @[FetchInstMem.scala 274:22]
+  reg [5:0] selectedInsts; // @[FetchInstMem.scala 275:26]
+  reg [4:0] selectedBeats; // @[FetchInstMem.scala 276:26]
+  reg [4:0] beatsLeft; // @[FetchInstMem.scala 277:22]
+  reg  instBeat; // @[FetchInstMem.scala 278:25]
+  reg [63:0] parts_0; // @[FetchInstMem.scala 279:18]
+  reg [63:0] parts_1; // @[FetchInstMem.scala 279:18]
+  wire [5:0] wantedInsts = remaining > 32'h8 ? 6'h8 : remaining[5:0]; // @[FetchInstMem.scala 281:24]
+  wire [4:0] _io_vme_rd_cmd_bits_len_T_1 = selectedBeats - 5'h1; // @[FetchInstMem.scala 288:44]
+  wire [63:0] completedParts_0 = ~instBeat ? io_vme_rd_data_bits_data : parts_0; // @[FetchInstMem.scala 292:18 293:{28,28}]
+  wire [63:0] completedParts_1 = instBeat ? io_vme_rd_data_bits_data : parts_1; // @[FetchInstMem.scala 292:18 293:{28,28}]
+  wire  _core_io_write_valid_T = state == 2'h3; // @[FetchInstMem.scala 295:32]
+  wire  _io_vme_rd_data_ready_T_2 = ~instBeat | core_io_write_ready; // @[FetchInstMem.scala 298:21]
   wire  dataFire = io_vme_rd_data_ready & io_vme_rd_data_valid; // @[Decoupled.scala 50:35]
-  wire [4:0] _beatsLeft_T_1 = beatsLeft - 5'h1; // @[FetchInstMem.scala 304:28]
-  wire  _T = beatsLeft == 5'h1; // @[FetchInstMem.scala 305:52]
-  wire  _T_3 = ~reset; // @[FetchInstMem.scala 305:11]
-  wire [4:0] _GEN_8 = dataFire ? _beatsLeft_T_1 : beatsLeft; // @[FetchInstMem.scala 297:18 304:15 273:22]
-  wire [31:0] _T_5 = io_ins_baddr & 32'h7f; // @[FetchInstMem.scala 314:26]
-  wire  _T_12 = core_io_reserve_ready & core_io_reserve_valid; // @[Decoupled.scala 50:35]
-  wire [7:0] _selectedBeats_T = wantedInsts * 2'h2; // @[FetchInstMem.scala 324:40]
-  wire [7:0] _GEN_10 = _T_12 ? _selectedBeats_T : {{3'd0}, selectedBeats}; // @[FetchInstMem.scala 322:36 324:25 272:26]
-  wire [1:0] _GEN_11 = _T_12 ? 2'h2 : state; // @[FetchInstMem.scala 322:36 325:17 268:22]
-  wire  _T_14 = io_vme_rd_cmd_ready & io_vme_rd_cmd_valid; // @[Decoupled.scala 50:35]
-  wire [31:0] _GEN_41 = {{26'd0}, selectedInsts}; // @[FetchInstMem.scala 330:34]
-  wire [31:0] _remaining_T_1 = remaining - _GEN_41; // @[FetchInstMem.scala 330:34]
-  wire [8:0] _address_T = selectedBeats * 4'h8; // @[FetchInstMem.scala 331:46]
-  wire [31:0] _GEN_42 = {{23'd0}, _address_T}; // @[FetchInstMem.scala 331:30]
-  wire [31:0] _address_T_2 = address + _GEN_42; // @[FetchInstMem.scala 331:30]
-  wire [31:0] _GEN_12 = _T_14 ? _remaining_T_1 : remaining; // @[FetchInstMem.scala 329:34 330:21 270:22]
-  wire [31:0] _GEN_13 = _T_14 ? _address_T_2 : address; // @[FetchInstMem.scala 329:34 331:19 269:20]
-  wire [4:0] _GEN_14 = _T_14 ? selectedBeats : _GEN_8; // @[FetchInstMem.scala 329:34 332:21]
-  wire [1:0] _GEN_15 = _T_14 ? 2'h3 : state; // @[FetchInstMem.scala 329:34 333:17 268:22]
-  wire [1:0] _state_T_3 = remaining == 32'h0 ? 2'h0 : 2'h1; // @[FetchInstMem.scala 338:23]
-  wire [1:0] _GEN_16 = dataFire & _T ? _state_T_3 : state; // @[FetchInstMem.scala 337:45 338:17 268:22]
-  wire [1:0] _GEN_17 = 2'h3 == state ? _GEN_16 : state; // @[FetchInstMem.scala 317:19 268:22]
-  wire [1:0] _GEN_21 = 2'h2 == state ? _GEN_15 : _GEN_17; // @[FetchInstMem.scala 317:19]
-  wire [7:0] _GEN_23 = 2'h1 == state ? _GEN_10 : {{3'd0}, selectedBeats}; // @[FetchInstMem.scala 317:19 272:26]
-  wire [7:0] _GEN_29 = 2'h0 == state ? {{3'd0}, selectedBeats} : _GEN_23; // @[FetchInstMem.scala 317:19 272:26]
-  wire [7:0] _GEN_39 = launch ? {{3'd0}, selectedBeats} : _GEN_29; // @[FetchInstMem.scala 309:16 272:26]
-  FetchInstMemCore core ( // @[FetchInstMem.scala 264:20]
+  wire [4:0] _beatsLeft_T_1 = beatsLeft - 5'h1; // @[FetchInstMem.scala 308:28]
+  wire  _T = beatsLeft == 5'h1; // @[FetchInstMem.scala 309:50]
+  wire  _T_1 = io_vme_rd_data_bits_last != (beatsLeft == 5'h1); // @[FetchInstMem.scala 309:35]
+  wire  _T_3 = ~reset; // @[FetchInstMem.scala 310:13]
+  wire [4:0] _GEN_8 = dataFire ? _beatsLeft_T_1 : beatsLeft; // @[FetchInstMem.scala 301:18 308:15 277:22]
+  wire [31:0] _T_9 = io_ins_baddr & 32'h7f; // @[FetchInstMem.scala 322:26]
+  wire  _T_16 = core_io_reserve_ready & core_io_reserve_valid; // @[Decoupled.scala 50:35]
+  wire [7:0] _selectedBeats_T = wantedInsts * 2'h2; // @[FetchInstMem.scala 332:40]
+  wire [7:0] _GEN_10 = _T_16 ? _selectedBeats_T : {{3'd0}, selectedBeats}; // @[FetchInstMem.scala 330:36 332:25 276:26]
+  wire [1:0] _GEN_11 = _T_16 ? 2'h2 : state; // @[FetchInstMem.scala 330:36 333:17 272:22]
+  wire  _T_18 = io_vme_rd_cmd_ready & io_vme_rd_cmd_valid; // @[Decoupled.scala 50:35]
+  wire [31:0] _GEN_41 = {{26'd0}, selectedInsts}; // @[FetchInstMem.scala 338:34]
+  wire [31:0] _remaining_T_1 = remaining - _GEN_41; // @[FetchInstMem.scala 338:34]
+  wire [8:0] _address_T = selectedBeats * 4'h8; // @[FetchInstMem.scala 339:46]
+  wire [31:0] _GEN_42 = {{23'd0}, _address_T}; // @[FetchInstMem.scala 339:30]
+  wire [31:0] _address_T_2 = address + _GEN_42; // @[FetchInstMem.scala 339:30]
+  wire [31:0] _GEN_12 = _T_18 ? _remaining_T_1 : remaining; // @[FetchInstMem.scala 337:34 338:21 274:22]
+  wire [31:0] _GEN_13 = _T_18 ? _address_T_2 : address; // @[FetchInstMem.scala 337:34 339:19 273:20]
+  wire [4:0] _GEN_14 = _T_18 ? selectedBeats : _GEN_8; // @[FetchInstMem.scala 337:34 340:21]
+  wire [1:0] _GEN_15 = _T_18 ? 2'h3 : state; // @[FetchInstMem.scala 337:34 341:17 272:22]
+  wire [1:0] _state_T_3 = remaining == 32'h0 ? 2'h0 : 2'h1; // @[FetchInstMem.scala 346:23]
+  wire [1:0] _GEN_16 = dataFire & _T ? _state_T_3 : state; // @[FetchInstMem.scala 345:45 346:17 272:22]
+  wire [1:0] _GEN_17 = 2'h3 == state ? _GEN_16 : state; // @[FetchInstMem.scala 325:19 272:22]
+  wire [1:0] _GEN_21 = 2'h2 == state ? _GEN_15 : _GEN_17; // @[FetchInstMem.scala 325:19]
+  wire [7:0] _GEN_23 = 2'h1 == state ? _GEN_10 : {{3'd0}, selectedBeats}; // @[FetchInstMem.scala 325:19 276:26]
+  wire [7:0] _GEN_29 = 2'h0 == state ? {{3'd0}, selectedBeats} : _GEN_23; // @[FetchInstMem.scala 325:19 276:26]
+  wire [7:0] _GEN_39 = launch ? {{3'd0}, selectedBeats} : _GEN_29; // @[FetchInstMem.scala 317:16 276:26]
+  FetchInstMemCore core ( // @[FetchInstMem.scala 268:20]
     .clock(core_clock),
     .reset(core_reset),
     .io_launch(core_io_launch),
@@ -2130,115 +3288,114 @@ module FetchInstMemNarrow(
     .io_inst_st_valid(core_io_inst_st_valid),
     .io_inst_st_bits(core_io_inst_st_bits)
   );
-  assign io_vme_rd_cmd_valid = state == 2'h2; // @[FetchInstMem.scala 282:32]
-  assign io_vme_rd_cmd_bits_addr = address; // @[FetchInstMem.scala 283:27]
-  assign io_vme_rd_cmd_bits_len = _io_vme_rd_cmd_bits_len_T_1[3:0]; // @[FetchInstMem.scala 284:50]
-  assign io_vme_rd_data_ready = _core_io_write_valid_T & _io_vme_rd_data_ready_T_2; // @[FetchInstMem.scala 293:46]
-  assign io_inst_ld_valid = core_io_inst_ld_valid; // @[FetchInstMem.scala 266:11]
-  assign io_inst_ld_bits = core_io_inst_ld_bits; // @[FetchInstMem.scala 266:11]
-  assign io_inst_co_valid = core_io_inst_co_valid; // @[FetchInstMem.scala 266:11]
-  assign io_inst_co_bits = core_io_inst_co_bits; // @[FetchInstMem.scala 266:11]
-  assign io_inst_st_valid = core_io_inst_st_valid; // @[FetchInstMem.scala 266:11]
-  assign io_inst_st_bits = core_io_inst_st_bits; // @[FetchInstMem.scala 266:11]
+  assign io_vme_rd_cmd_valid = state == 2'h2; // @[FetchInstMem.scala 286:32]
+  assign io_vme_rd_cmd_bits_addr = address; // @[FetchInstMem.scala 287:27]
+  assign io_vme_rd_cmd_bits_len = _io_vme_rd_cmd_bits_len_T_1[3:0]; // @[FetchInstMem.scala 288:50]
+  assign io_vme_rd_data_ready = _core_io_write_valid_T & _io_vme_rd_data_ready_T_2; // @[FetchInstMem.scala 297:46]
+  assign io_inst_ld_valid = core_io_inst_ld_valid; // @[FetchInstMem.scala 270:11]
+  assign io_inst_ld_bits = core_io_inst_ld_bits; // @[FetchInstMem.scala 270:11]
+  assign io_inst_co_valid = core_io_inst_co_valid; // @[FetchInstMem.scala 270:11]
+  assign io_inst_co_bits = core_io_inst_co_bits; // @[FetchInstMem.scala 270:11]
+  assign io_inst_st_valid = core_io_inst_st_valid; // @[FetchInstMem.scala 270:11]
+  assign io_inst_st_bits = core_io_inst_st_bits; // @[FetchInstMem.scala 270:11]
   assign core_clock = clock;
   assign core_reset = reset;
-  assign core_io_launch = io_launch & ~launchLast; // @[FetchInstMem.scala 263:26]
-  assign core_io_reserve_valid = state == 2'h1; // @[FetchInstMem.scala 279:34]
-  assign core_io_reserve_bits = remaining > 32'h8 ? 6'h8 : remaining[5:0]; // @[FetchInstMem.scala 277:24]
-  assign core_io_write_valid = state == 2'h3 & io_vme_rd_data_valid & instBeat; // @[FetchInstMem.scala 291:69]
-  assign core_io_write_bits = {completedParts_1,completedParts_0}; // @[FetchInstMem.scala 292:40]
-  assign core_io_inst_ld_ready = io_inst_ld_ready; // @[FetchInstMem.scala 266:11]
-  assign core_io_inst_co_ready = io_inst_co_ready; // @[FetchInstMem.scala 266:11]
-  assign core_io_inst_st_ready = io_inst_st_ready; // @[FetchInstMem.scala 266:11]
+  assign core_io_launch = io_launch & ~launchLast; // @[FetchInstMem.scala 267:26]
+  assign core_io_reserve_valid = state == 2'h1; // @[FetchInstMem.scala 283:34]
+  assign core_io_reserve_bits = remaining > 32'h8 ? 6'h8 : remaining[5:0]; // @[FetchInstMem.scala 281:24]
+  assign core_io_write_valid = state == 2'h3 & io_vme_rd_data_valid & instBeat; // @[FetchInstMem.scala 295:69]
+  assign core_io_write_bits = {completedParts_1,completedParts_0}; // @[FetchInstMem.scala 296:40]
+  assign core_io_inst_ld_ready = io_inst_ld_ready; // @[FetchInstMem.scala 270:11]
+  assign core_io_inst_co_ready = io_inst_co_ready; // @[FetchInstMem.scala 270:11]
+  assign core_io_inst_st_ready = io_inst_st_ready; // @[FetchInstMem.scala 270:11]
   always @(posedge clock) begin
-    if (reset) begin // @[FetchInstMem.scala 262:27]
-      launchLast <= 1'h0; // @[FetchInstMem.scala 262:27]
+    if (reset) begin // @[FetchInstMem.scala 266:27]
+      launchLast <= 1'h0; // @[FetchInstMem.scala 266:27]
     end else begin
-      launchLast <= io_launch; // @[FetchInstMem.scala 262:27]
+      launchLast <= io_launch; // @[FetchInstMem.scala 266:27]
     end
-    if (reset) begin // @[FetchInstMem.scala 268:22]
-      state <= 2'h0; // @[FetchInstMem.scala 268:22]
-    end else if (launch) begin // @[FetchInstMem.scala 309:16]
-      if (io_ins_count == 32'h0) begin // @[FetchInstMem.scala 313:17]
+    if (reset) begin // @[FetchInstMem.scala 272:22]
+      state <= 2'h0; // @[FetchInstMem.scala 272:22]
+    end else if (launch) begin // @[FetchInstMem.scala 317:16]
+      if (io_ins_count == 32'h0) begin // @[FetchInstMem.scala 321:17]
         state <= 2'h0;
       end else begin
         state <= 2'h1;
       end
-    end else if (!(2'h0 == state)) begin // @[FetchInstMem.scala 317:19]
-      if (2'h1 == state) begin // @[FetchInstMem.scala 317:19]
+    end else if (!(2'h0 == state)) begin // @[FetchInstMem.scala 325:19]
+      if (2'h1 == state) begin // @[FetchInstMem.scala 325:19]
         state <= _GEN_11;
       end else begin
         state <= _GEN_21;
       end
     end
-    if (launch) begin // @[FetchInstMem.scala 309:16]
-      address <= io_ins_baddr; // @[FetchInstMem.scala 310:13]
-    end else if (!(2'h0 == state)) begin // @[FetchInstMem.scala 317:19]
-      if (!(2'h1 == state)) begin // @[FetchInstMem.scala 317:19]
-        if (2'h2 == state) begin // @[FetchInstMem.scala 317:19]
+    if (launch) begin // @[FetchInstMem.scala 317:16]
+      address <= io_ins_baddr; // @[FetchInstMem.scala 318:13]
+    end else if (!(2'h0 == state)) begin // @[FetchInstMem.scala 325:19]
+      if (!(2'h1 == state)) begin // @[FetchInstMem.scala 325:19]
+        if (2'h2 == state) begin // @[FetchInstMem.scala 325:19]
           address <= _GEN_13;
         end
       end
     end
-    if (launch) begin // @[FetchInstMem.scala 309:16]
-      remaining <= io_ins_count; // @[FetchInstMem.scala 311:15]
-    end else if (!(2'h0 == state)) begin // @[FetchInstMem.scala 317:19]
-      if (!(2'h1 == state)) begin // @[FetchInstMem.scala 317:19]
-        if (2'h2 == state) begin // @[FetchInstMem.scala 317:19]
+    if (launch) begin // @[FetchInstMem.scala 317:16]
+      remaining <= io_ins_count; // @[FetchInstMem.scala 319:15]
+    end else if (!(2'h0 == state)) begin // @[FetchInstMem.scala 325:19]
+      if (!(2'h1 == state)) begin // @[FetchInstMem.scala 325:19]
+        if (2'h2 == state) begin // @[FetchInstMem.scala 325:19]
           remaining <= _GEN_12;
         end
       end
     end
-    if (!(launch)) begin // @[FetchInstMem.scala 309:16]
-      if (!(2'h0 == state)) begin // @[FetchInstMem.scala 317:19]
-        if (2'h1 == state) begin // @[FetchInstMem.scala 317:19]
-          if (_T_12) begin // @[FetchInstMem.scala 322:36]
-            selectedInsts <= wantedInsts; // @[FetchInstMem.scala 323:25]
+    if (!(launch)) begin // @[FetchInstMem.scala 317:16]
+      if (!(2'h0 == state)) begin // @[FetchInstMem.scala 325:19]
+        if (2'h1 == state) begin // @[FetchInstMem.scala 325:19]
+          if (_T_16) begin // @[FetchInstMem.scala 330:36]
+            selectedInsts <= wantedInsts; // @[FetchInstMem.scala 331:25]
           end
         end
       end
     end
     selectedBeats <= _GEN_39[4:0];
-    if (launch) begin // @[FetchInstMem.scala 309:16]
+    if (launch) begin // @[FetchInstMem.scala 317:16]
       beatsLeft <= _GEN_8;
-    end else if (2'h0 == state) begin // @[FetchInstMem.scala 317:19]
+    end else if (2'h0 == state) begin // @[FetchInstMem.scala 325:19]
       beatsLeft <= _GEN_8;
-    end else if (2'h1 == state) begin // @[FetchInstMem.scala 317:19]
+    end else if (2'h1 == state) begin // @[FetchInstMem.scala 325:19]
       beatsLeft <= _GEN_8;
-    end else if (2'h2 == state) begin // @[FetchInstMem.scala 317:19]
+    end else if (2'h2 == state) begin // @[FetchInstMem.scala 325:19]
       beatsLeft <= _GEN_14;
     end else begin
       beatsLeft <= _GEN_8;
     end
-    if (reset) begin // @[FetchInstMem.scala 274:25]
-      instBeat <= 1'h0; // @[FetchInstMem.scala 274:25]
-    end else if (launch) begin // @[FetchInstMem.scala 309:16]
-      instBeat <= 1'h0; // @[FetchInstMem.scala 312:14]
-    end else if (dataFire) begin // @[FetchInstMem.scala 297:18]
-      if (instBeat) begin // @[FetchInstMem.scala 299:25]
-        instBeat <= 1'h0; // @[FetchInstMem.scala 300:16]
+    if (reset) begin // @[FetchInstMem.scala 278:25]
+      instBeat <= 1'h0; // @[FetchInstMem.scala 278:25]
+    end else if (launch) begin // @[FetchInstMem.scala 317:16]
+      instBeat <= 1'h0; // @[FetchInstMem.scala 320:14]
+    end else if (dataFire) begin // @[FetchInstMem.scala 301:18]
+      if (instBeat) begin // @[FetchInstMem.scala 303:25]
+        instBeat <= 1'h0; // @[FetchInstMem.scala 304:16]
       end else begin
-        instBeat <= instBeat + 1'h1; // @[FetchInstMem.scala 302:16]
+        instBeat <= instBeat + 1'h1; // @[FetchInstMem.scala 306:16]
       end
     end
-    if (dataFire) begin // @[FetchInstMem.scala 297:18]
-      if (~instBeat) begin // @[FetchInstMem.scala 289:28]
-        parts_0 <= io_vme_rd_data_bits_data; // @[FetchInstMem.scala 289:28]
+    if (dataFire) begin // @[FetchInstMem.scala 301:18]
+      if (~instBeat) begin // @[FetchInstMem.scala 293:28]
+        parts_0 <= io_vme_rd_data_bits_data; // @[FetchInstMem.scala 293:28]
       end
     end
-    if (dataFire) begin // @[FetchInstMem.scala 297:18]
-      if (instBeat) begin // @[FetchInstMem.scala 289:28]
-        parts_1 <= io_vme_rd_data_bits_data; // @[FetchInstMem.scala 289:28]
+    if (dataFire) begin // @[FetchInstMem.scala 301:18]
+      if (instBeat) begin // @[FetchInstMem.scala 293:28]
+        parts_1 <= io_vme_rd_data_bits_data; // @[FetchInstMem.scala 293:28]
       end
     end
     `ifndef SYNTHESIS
     `ifdef PRINTF_COND
       if (`PRINTF_COND) begin
     `endif
-        if (dataFire & ~reset & ~(io_vme_rd_data_bits_last == (beatsLeft == 5'h1))) begin
-          $fwrite(32'h80000002,
-            "Assertion failed: -F- FetchInstMemNarrow: malformed VME burst\n    at FetchInstMem.scala:305 assert(io.vme_rd.data.bits.last === (beatsLeft === 1.U),\n"
-            ); // @[FetchInstMem.scala 305:11]
+        if (dataFire & _T_1 & ~reset) begin
+          $fwrite(32'h80000002,"[FetchInstMemNarrow] malformed addr=%x selected=%d left=%d last=%d\n",address,
+            selectedBeats,beatsLeft,io_vme_rd_data_bits_last); // @[FetchInstMem.scala 310:13]
         end
     `ifdef PRINTF_COND
       end
@@ -2248,10 +3405,23 @@ module FetchInstMemNarrow(
     `ifdef PRINTF_COND
       if (`PRINTF_COND) begin
     `endif
-        if (launch & _T_3 & ~(_T_5 == 32'h0)) begin
+        if (dataFire & _T_3 & ~(io_vme_rd_data_bits_last == _T)) begin
           $fwrite(32'h80000002,
-            "Assertion failed: -F- FetchInstMemNarrow: instruction address must align to maximum burst bytes\n    at FetchInstMem.scala:314 assert((io.ins_baddr & (maxBurstBytes - 1).U) === 0.U,\n"
-            ); // @[FetchInstMem.scala 314:11]
+            "Assertion failed: -F- FetchInstMemNarrow: malformed VME burst\n    at FetchInstMem.scala:313 assert(io.vme_rd.data.bits.last === (beatsLeft === 1.U),\n"
+            ); // @[FetchInstMem.scala 313:11]
+        end
+    `ifdef PRINTF_COND
+      end
+    `endif
+    `endif // SYNTHESIS
+    `ifndef SYNTHESIS
+    `ifdef PRINTF_COND
+      if (`PRINTF_COND) begin
+    `endif
+        if (launch & _T_3 & ~(_T_9 == 32'h0)) begin
+          $fwrite(32'h80000002,
+            "Assertion failed: -F- FetchInstMemNarrow: instruction address must align to maximum burst bytes\n    at FetchInstMem.scala:322 assert((io.ins_baddr & (maxBurstBytes - 1).U) === 0.U,\n"
+            ); // @[FetchInstMem.scala 322:11]
         end
     `ifdef PRINTF_COND
       end
@@ -2323,12 +3493,12 @@ end // initial
 `endif // SYNTHESIS
   always @(posedge clock) begin
     //
-    if (dataFire & ~reset) begin
-      assert(io_vme_rd_data_bits_last == (beatsLeft == 5'h1)); // @[FetchInstMem.scala 305:11]
+    if (dataFire & _T_3) begin
+      assert(io_vme_rd_data_bits_last == _T); // @[FetchInstMem.scala 313:11]
     end
     //
     if (launch & _T_3) begin
-      assert(_T_5 == 32'h0); // @[FetchInstMem.scala 314:11]
+      assert(_T_9 == 32'h0); // @[FetchInstMem.scala 322:11]
     end
   end
 endmodule
@@ -2583,16 +3753,16 @@ module LoadDecode(
   output         io_isWeight,
   output         io_isSync
 );
-  wire [15:0] dec_xsize = io_inst[95:80]; // @[Decode.scala 174:29]
-  wire [127:0] _io_isInput_T = io_inst & 128'h387; // @[Decode.scala 177:25]
-  wire  _io_isInput_T_1 = 128'h100 == _io_isInput_T; // @[Decode.scala 177:25]
-  wire  _io_isInput_T_2 = dec_xsize != 16'h0; // @[Decode.scala 177:46]
-  wire  _io_isWeight_T_1 = 128'h80 == _io_isInput_T; // @[Decode.scala 178:26]
-  assign io_push_next = io_inst[6]; // @[Decode.scala 174:29]
-  assign io_pop_next = io_inst[4]; // @[Decode.scala 174:29]
-  assign io_isInput = 128'h100 == _io_isInput_T & dec_xsize != 16'h0; // @[Decode.scala 177:34]
-  assign io_isWeight = 128'h80 == _io_isInput_T & _io_isInput_T_2; // @[Decode.scala 178:35]
-  assign io_isSync = (_io_isInput_T_1 | _io_isWeight_T_1) & dec_xsize == 16'h0; // @[Decode.scala 179:54]
+  wire [15:0] dec_xsize = io_inst[95:80]; // @[Decode.scala 175:29]
+  wire [127:0] _io_isInput_T = io_inst & 128'h387; // @[Decode.scala 178:25]
+  wire  _io_isInput_T_1 = 128'h100 == _io_isInput_T; // @[Decode.scala 178:25]
+  wire  _io_isInput_T_2 = dec_xsize != 16'h0; // @[Decode.scala 178:46]
+  wire  _io_isWeight_T_1 = 128'h80 == _io_isInput_T; // @[Decode.scala 179:26]
+  assign io_push_next = io_inst[6]; // @[Decode.scala 175:29]
+  assign io_pop_next = io_inst[4]; // @[Decode.scala 175:29]
+  assign io_isInput = 128'h100 == _io_isInput_T & dec_xsize != 16'h0; // @[Decode.scala 178:34]
+  assign io_isWeight = 128'h80 == _io_isInput_T & _io_isInput_T_2; // @[Decode.scala 179:35]
+  assign io_isSync = (_io_isInput_T_1 | _io_isWeight_T_1) & dec_xsize == 16'h0; // @[Decode.scala 180:54]
 endmodule
 module GenVMECmd(
   input          clock,
@@ -18040,24 +19210,26 @@ module ComputeDecode(
   output         io_isGemm,
   output         io_isFinish
 );
-  wire [15:0] dec_xsize = io_inst[95:80]; // @[Decode.scala 200:29]
-  wire [127:0] _io_isLoadAcc_T = io_inst & 128'h387; // @[Decode.scala 205:28]
-  wire  _io_isLoadAcc_T_4 = 128'h180 == _io_isLoadAcc_T | 128'h280 == _io_isLoadAcc_T; // @[Decode.scala 205:37]
-  wire  _io_isLoadAcc_T_5 = dec_xsize != 16'h0; // @[Decode.scala 205:70]
-  wire  _io_isLoadUop_T_1 = 128'h0 == _io_isLoadAcc_T; // @[Decode.scala 206:27]
-  wire [127:0] _io_isAlu_T = io_inst & 128'h7000000000000000000000000007; // @[Decode.scala 208:23]
-  wire [127:0] _io_isGemm_T = io_inst & 128'h7; // @[Decode.scala 209:24]
-  assign io_push_next = io_inst[6]; // @[Decode.scala 200:29]
-  assign io_push_prev = io_inst[5]; // @[Decode.scala 200:29]
-  assign io_pop_next = io_inst[4]; // @[Decode.scala 200:29]
-  assign io_pop_prev = io_inst[3]; // @[Decode.scala 200:29]
-  assign io_isLoadAcc = (128'h180 == _io_isLoadAcc_T | 128'h280 == _io_isLoadAcc_T) & dec_xsize != 16'h0; // @[Decode.scala 205:58]
-  assign io_isLoadUop = 128'h0 == _io_isLoadAcc_T & _io_isLoadAcc_T_5; // @[Decode.scala 206:36]
-  assign io_isSync = (_io_isLoadAcc_T_4 | _io_isLoadUop_T_1) & dec_xsize == 16'h0; // @[Decode.scala 207:74]
-  assign io_isAlu = 128'h4 == _io_isAlu_T | 128'h1000000000000000000000000004 == _io_isAlu_T | 128'h2000000000000000000000000004
-     == _io_isAlu_T | 128'h3000000000000000000000000004 == _io_isAlu_T; // @[Decode.scala 208:70]
-  assign io_isGemm = 128'h2 == _io_isGemm_T; // @[Decode.scala 209:24]
-  assign io_isFinish = 128'h3 == _io_isGemm_T; // @[Decode.scala 210:26]
+  wire [15:0] dec_xsize = io_inst[95:80]; // @[Decode.scala 201:29]
+  wire [127:0] _io_isLoadAcc_T = io_inst & 128'h387; // @[Decode.scala 206:28]
+  wire  _io_isLoadAcc_T_4 = 128'h180 == _io_isLoadAcc_T | 128'h280 == _io_isLoadAcc_T; // @[Decode.scala 206:37]
+  wire  _io_isLoadAcc_T_5 = dec_xsize != 16'h0; // @[Decode.scala 206:70]
+  wire  _io_isLoadUop_T_1 = 128'h0 == _io_isLoadAcc_T; // @[Decode.scala 207:27]
+  wire [127:0] _io_isAlu_T = io_inst & 128'h7000000000000000000000000007; // @[Decode.scala 209:23]
+  wire  _io_isAlu_T_9 = 128'h3000000000000000000000000004 == _io_isAlu_T; // @[Decode.scala 210:13]
+  wire  _io_isAlu_T_10 = 128'h4 == _io_isAlu_T | 128'h1000000000000000000000000004 == _io_isAlu_T | 128'h2000000000000000000000000004
+     == _io_isAlu_T | _io_isAlu_T_9; // @[Decode.scala 209:70]
+  wire [127:0] _io_isGemm_T = io_inst & 128'h7; // @[Decode.scala 211:24]
+  assign io_push_next = io_inst[6]; // @[Decode.scala 201:29]
+  assign io_push_prev = io_inst[5]; // @[Decode.scala 201:29]
+  assign io_pop_next = io_inst[4]; // @[Decode.scala 201:29]
+  assign io_pop_prev = io_inst[3]; // @[Decode.scala 201:29]
+  assign io_isLoadAcc = (128'h180 == _io_isLoadAcc_T | 128'h280 == _io_isLoadAcc_T) & dec_xsize != 16'h0; // @[Decode.scala 206:58]
+  assign io_isLoadUop = 128'h0 == _io_isLoadAcc_T & _io_isLoadAcc_T_5; // @[Decode.scala 207:36]
+  assign io_isSync = (_io_isLoadAcc_T_4 | _io_isLoadUop_T_1) & dec_xsize == 16'h0; // @[Decode.scala 208:74]
+  assign io_isAlu = _io_isAlu_T_10 | 128'h4000000000000000000000000004 == _io_isAlu_T; // @[Decode.scala 210:22]
+  assign io_isGemm = 128'h2 == _io_isGemm_T; // @[Decode.scala 211:24]
+  assign io_isFinish = 128'h3 == _io_isGemm_T; // @[Decode.scala 212:26]
 endmodule
 module Compute(
   input          clock,
@@ -20186,13 +21358,13 @@ module StoreDecode(
   output         io_isStore,
   output         io_isSync
 );
-  wire [15:0] dec_xsize = io_inst[95:80]; // @[Decode.scala 225:29]
-  wire [127:0] _io_isStore_T = io_inst & 128'h7; // @[Decode.scala 228:25]
-  wire  _io_isStore_T_1 = 128'h1 == _io_isStore_T; // @[Decode.scala 228:25]
-  assign io_push_prev = io_inst[5]; // @[Decode.scala 225:29]
-  assign io_pop_prev = io_inst[3]; // @[Decode.scala 225:29]
-  assign io_isStore = 128'h1 == _io_isStore_T & dec_xsize != 16'h0; // @[Decode.scala 228:34]
-  assign io_isSync = _io_isStore_T_1 & dec_xsize == 16'h0; // @[Decode.scala 229:33]
+  wire [15:0] dec_xsize = io_inst[95:80]; // @[Decode.scala 227:29]
+  wire [127:0] _io_isStore_T = io_inst & 128'h7; // @[Decode.scala 230:25]
+  wire  _io_isStore_T_1 = 128'h1 == _io_isStore_T; // @[Decode.scala 230:25]
+  assign io_push_prev = io_inst[5]; // @[Decode.scala 227:29]
+  assign io_pop_prev = io_inst[3]; // @[Decode.scala 227:29]
+  assign io_isStore = 128'h1 == _io_isStore_T & dec_xsize != 16'h0; // @[Decode.scala 230:34]
+  assign io_isSync = _io_isStore_T_1 & dec_xsize == 16'h0; // @[Decode.scala 231:33]
 endmodule
 module TensorStoreNarrowVME(
   input          clock,
@@ -23412,13 +24584,17 @@ module VTAShellAPB(
   wire  vme_io_mem_w_bits_last; // @[VTAShell.scala 93:19]
   wire  vme_io_mem_b_ready; // @[VTAShell.scala 93:19]
   wire  vme_io_mem_b_valid; // @[VTAShell.scala 93:19]
+  wire [1:0] vme_io_mem_b_bits_resp; // @[VTAShell.scala 93:19]
+  wire [7:0] vme_io_mem_b_bits_id; // @[VTAShell.scala 93:19]
   wire  vme_io_mem_ar_ready; // @[VTAShell.scala 93:19]
   wire  vme_io_mem_ar_valid; // @[VTAShell.scala 93:19]
   wire [31:0] vme_io_mem_ar_bits_addr; // @[VTAShell.scala 93:19]
   wire [7:0] vme_io_mem_ar_bits_id; // @[VTAShell.scala 93:19]
   wire [3:0] vme_io_mem_ar_bits_len; // @[VTAShell.scala 93:19]
+  wire  vme_io_mem_r_ready; // @[VTAShell.scala 93:19]
   wire  vme_io_mem_r_valid; // @[VTAShell.scala 93:19]
   wire [63:0] vme_io_mem_r_bits_data; // @[VTAShell.scala 93:19]
+  wire [1:0] vme_io_mem_r_bits_resp; // @[VTAShell.scala 93:19]
   wire  vme_io_mem_r_bits_last; // @[VTAShell.scala 93:19]
   wire [7:0] vme_io_mem_r_bits_id; // @[VTAShell.scala 93:19]
   wire  vme_io_vme_rd_0_cmd_ready; // @[VTAShell.scala 93:19]
@@ -23572,13 +24748,17 @@ module VTAShellAPB(
     .io_mem_w_bits_last(vme_io_mem_w_bits_last),
     .io_mem_b_ready(vme_io_mem_b_ready),
     .io_mem_b_valid(vme_io_mem_b_valid),
+    .io_mem_b_bits_resp(vme_io_mem_b_bits_resp),
+    .io_mem_b_bits_id(vme_io_mem_b_bits_id),
     .io_mem_ar_ready(vme_io_mem_ar_ready),
     .io_mem_ar_valid(vme_io_mem_ar_valid),
     .io_mem_ar_bits_addr(vme_io_mem_ar_bits_addr),
     .io_mem_ar_bits_id(vme_io_mem_ar_bits_id),
     .io_mem_ar_bits_len(vme_io_mem_ar_bits_len),
+    .io_mem_r_ready(vme_io_mem_r_ready),
     .io_mem_r_valid(vme_io_mem_r_valid),
     .io_mem_r_bits_data(vme_io_mem_r_bits_data),
+    .io_mem_r_bits_resp(vme_io_mem_r_bits_resp),
     .io_mem_r_bits_last(vme_io_mem_r_bits_last),
     .io_mem_r_bits_id(vme_io_mem_r_bits_id),
     .io_vme_rd_0_cmd_ready(vme_io_vme_rd_0_cmd_ready),
@@ -23731,7 +24911,7 @@ module VTAShellAPB(
   assign io_mem_ar_bits_prot = 3'h4; // @[VTAShell.scala 101:10]
   assign io_mem_ar_bits_qos = 4'h0; // @[VTAShell.scala 101:10]
   assign io_mem_ar_bits_region = 4'h0; // @[VTAShell.scala 101:10]
-  assign io_mem_r_ready = 1'h1; // @[VTAShell.scala 101:10]
+  assign io_mem_r_ready = vme_io_mem_r_ready; // @[VTAShell.scala 101:10]
   assign vcr_clock = clock;
   assign vcr_reset = reset;
   assign vcr_io_host_paddr = io_host_paddr; // @[VTAShell.scala 96:15]
@@ -23750,9 +24930,12 @@ module VTAShellAPB(
   assign vme_io_mem_aw_ready = io_mem_aw_ready; // @[VTAShell.scala 101:10]
   assign vme_io_mem_w_ready = io_mem_w_ready; // @[VTAShell.scala 101:10]
   assign vme_io_mem_b_valid = io_mem_b_valid; // @[VTAShell.scala 101:10]
+  assign vme_io_mem_b_bits_resp = io_mem_b_bits_resp; // @[VTAShell.scala 101:10]
+  assign vme_io_mem_b_bits_id = io_mem_b_bits_id; // @[VTAShell.scala 101:10]
   assign vme_io_mem_ar_ready = io_mem_ar_ready; // @[VTAShell.scala 101:10]
   assign vme_io_mem_r_valid = io_mem_r_valid; // @[VTAShell.scala 101:10]
   assign vme_io_mem_r_bits_data = io_mem_r_bits_data; // @[VTAShell.scala 101:10]
+  assign vme_io_mem_r_bits_resp = io_mem_r_bits_resp; // @[VTAShell.scala 101:10]
   assign vme_io_mem_r_bits_last = io_mem_r_bits_last; // @[VTAShell.scala 101:10]
   assign vme_io_mem_r_bits_id = io_mem_r_bits_id; // @[VTAShell.scala 101:10]
   assign vme_io_vme_rd_0_cmd_valid = shell_io_vme_rd_0_cmd_valid; // @[VTAShell.scala 98:16]

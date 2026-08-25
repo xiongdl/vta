@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from migen import ClockSignal, Constant, FSM, If, Instance, Module, NextState, NextValue, ResetSignal, Signal
+from migen import ClockSignal, Constant, Display, FSM, If, Instance, Module, NextState, NextValue, ResetSignal, Signal
 from litex.soc.interconnect import axi, wishbone
 
 
@@ -45,7 +45,7 @@ class WishboneToAPB32(Module):
 
 
 class FrozenVTA(Module):
-    def __init__(self, platform, ip_dir):
+    def __init__(self, platform, ip_dir, sim_debug=False):
         ip_dir = Path(ip_dir)
         manifest = json.loads((ip_dir / "manifest.json").read_text())
         if manifest["host_protocol"] != "apb4" or manifest["host_data_width"] != 32:
@@ -62,17 +62,19 @@ class FrozenVTA(Module):
                 platform.add_source(str(ip_dir / entry))
 
         self.submodules.control = control = WishboneToAPB32(address_width=16)
-        self.axi = axi.AXIInterface(data_width=width, address_width=32, id_width=8)
-        a = self.axi
+        # The current VME registers AR and holds VALID/payload until READY, so
+        # the frozen IP can connect directly to the LiteX AXI interconnect.
+        self.axi = raw = a = axi.AXIInterface(
+            data_width=width, address_width=32, id_width=8)
         aw_len = Signal(4)
         ar_len = Signal(4)
         aw_lock = Signal(2)
         ar_lock = Signal(2)
         self.comb += [
-            a.aw.len.eq(aw_len),
-            a.ar.len.eq(ar_len),
-            a.aw.lock.eq(aw_lock[0]),
-            a.ar.lock.eq(ar_lock[0]),
+            raw.aw.len.eq(aw_len),
+            raw.ar.len.eq(ar_len),
+            raw.aw.lock.eq(aw_lock[0]),
+            raw.ar.lock.eq(ar_lock[0]),
         ]
 
         params = dict(
@@ -88,44 +90,44 @@ class FrozenVTA(Module):
             o_io_host_prdata=control.prdata,
             o_io_host_pready=control.pready,
             o_io_host_pslverr=control.pslverr,
-            i_io_mem_aw_ready=a.aw.ready,
-            o_io_mem_aw_valid=a.aw.valid,
-            o_io_mem_aw_bits_addr=a.aw.addr,
-            o_io_mem_aw_bits_id=a.aw.id,
+            i_io_mem_aw_ready=raw.aw.ready,
+            o_io_mem_aw_valid=raw.aw.valid,
+            o_io_mem_aw_bits_addr=raw.aw.addr,
+            o_io_mem_aw_bits_id=raw.aw.id,
             o_io_mem_aw_bits_len=aw_len,
-            o_io_mem_aw_bits_size=a.aw.size,
-            o_io_mem_aw_bits_burst=a.aw.burst,
+            o_io_mem_aw_bits_size=raw.aw.size,
+            o_io_mem_aw_bits_burst=raw.aw.burst,
             o_io_mem_aw_bits_lock=aw_lock,
-            o_io_mem_aw_bits_cache=a.aw.cache,
-            o_io_mem_aw_bits_prot=a.aw.prot,
-            o_io_mem_aw_bits_qos=a.aw.qos,
-            i_io_mem_w_ready=a.w.ready,
-            o_io_mem_w_valid=a.w.valid,
-            o_io_mem_w_bits_data=a.w.data,
-            o_io_mem_w_bits_strb=a.w.strb,
-            o_io_mem_w_bits_last=a.w.last,
+            o_io_mem_aw_bits_cache=raw.aw.cache,
+            o_io_mem_aw_bits_prot=raw.aw.prot,
+            o_io_mem_aw_bits_qos=raw.aw.qos,
+            i_io_mem_w_ready=raw.w.ready,
+            o_io_mem_w_valid=raw.w.valid,
+            o_io_mem_w_bits_data=raw.w.data,
+            o_io_mem_w_bits_strb=raw.w.strb,
+            o_io_mem_w_bits_last=raw.w.last,
             o_io_mem_w_bits_id=Signal(8),
-            o_io_mem_b_ready=a.b.ready,
-            i_io_mem_b_valid=a.b.valid,
-            i_io_mem_b_bits_resp=a.b.resp,
-            i_io_mem_b_bits_id=a.b.id,
-            i_io_mem_ar_ready=a.ar.ready,
-            o_io_mem_ar_valid=a.ar.valid,
-            o_io_mem_ar_bits_addr=a.ar.addr,
-            o_io_mem_ar_bits_id=a.ar.id,
+            o_io_mem_b_ready=raw.b.ready,
+            i_io_mem_b_valid=raw.b.valid,
+            i_io_mem_b_bits_resp=raw.b.resp,
+            i_io_mem_b_bits_id=raw.b.id,
+            i_io_mem_ar_ready=raw.ar.ready,
+            o_io_mem_ar_valid=raw.ar.valid,
+            o_io_mem_ar_bits_addr=raw.ar.addr,
+            o_io_mem_ar_bits_id=raw.ar.id,
             o_io_mem_ar_bits_len=ar_len,
-            o_io_mem_ar_bits_size=a.ar.size,
-            o_io_mem_ar_bits_burst=a.ar.burst,
+            o_io_mem_ar_bits_size=raw.ar.size,
+            o_io_mem_ar_bits_burst=raw.ar.burst,
             o_io_mem_ar_bits_lock=ar_lock,
-            o_io_mem_ar_bits_cache=a.ar.cache,
-            o_io_mem_ar_bits_prot=a.ar.prot,
-            o_io_mem_ar_bits_qos=a.ar.qos,
-            o_io_mem_r_ready=a.r.ready,
-            i_io_mem_r_valid=a.r.valid,
-            i_io_mem_r_bits_data=a.r.data,
-            i_io_mem_r_bits_resp=a.r.resp,
-            i_io_mem_r_bits_last=a.r.last,
-            i_io_mem_r_bits_id=a.r.id,
+            o_io_mem_ar_bits_cache=raw.ar.cache,
+            o_io_mem_ar_bits_prot=raw.ar.prot,
+            o_io_mem_ar_bits_qos=raw.ar.qos,
+            o_io_mem_r_ready=raw.r.ready,
+            i_io_mem_r_valid=raw.r.valid,
+            i_io_mem_r_bits_data=raw.r.data,
+            i_io_mem_r_bits_resp=raw.r.resp,
+            i_io_mem_r_bits_last=raw.r.last,
+            i_io_mem_r_bits_id=raw.r.id,
         )
         # Chisel's coherent/user fields are constants for VTA and are not
         # represented by LiteX's generic AXI interface.
@@ -136,3 +138,22 @@ class FrozenVTA(Module):
         params["o_io_mem_ar_bits_region"] = Signal(4)
         params["i_io_mem_r_bits_user"] = Constant(0, 5)
         self.specials += Instance(manifest["top"], **params)
+        if sim_debug:
+            ar_seen = Signal()
+            self.sync += [
+                If(~a.ar.valid, ar_seen.eq(0)),
+                If(a.ar.valid & ~ar_seen,
+                    ar_seen.eq(1),
+                    Display("[vta-axi] ARVALID addr=%08x len=%d ready=%d",
+                            a.ar.addr, a.ar.len, a.ar.ready)),
+                If(a.ar.valid & a.ar.ready,
+                    Display("[vta-axi] AR addr=%08x len=%d size=%d id=%d",
+                            a.ar.addr, a.ar.len, a.ar.size, a.ar.id)),
+                If(a.r.valid & a.r.ready & a.r.last,
+                    Display("[vta-axi] RLAST id=%d resp=%d", a.r.id, a.r.resp)),
+                If(a.aw.valid & a.aw.ready,
+                    Display("[vta-axi] AW addr=%08x len=%d size=%d id=%d",
+                            a.aw.addr, a.aw.len, a.aw.size, a.aw.id)),
+                If(a.b.valid & a.b.ready,
+                    Display("[vta-axi] B id=%d resp=%d", a.b.id, a.b.resp)),
+            ]

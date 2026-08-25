@@ -60,8 +60,8 @@ elaborates a ZCU104 design containing VexRiscv, 64 KiB ROM, 512 KiB on-chip
 SRAM, UART, timer, ZCU104 DDR and VTA. The simulation target keeps the RV32/CSR
 AXI path at 32 bits: with the pinned LiteX version, a 64-bit AXI system bus
 turns RV32 accesses to CSR offsets such as `+4` into unsupported/misaligned
-64-bit transactions. VTA remains a native AXI64 master and LiteX inserts a
-width converter on the simulation target. The ZCU104 target retains a native
+64-bit transactions. VTA remains a native AXI64 master and uses a dedicated
+native-width LiteDRAM port in simulation. The ZCU104 target retains a native
 64-bit system/memory interconnect for performance validation. Generate the
 Vivado project without running Vivado with:
 
@@ -77,9 +77,29 @@ Verilator. On macOS, `make sim-run` applies the pinned LiteX compatibility patch
 builds with the local RISC-V toolchain and system clang++, and starts the BIOS.
 After a model has been built, `make vcr-smoke` writes and reads VTA register
 offset `0x08` through the CPU and checks the exact value. AHB VCR insertion into
-LiteX, VTA workload execution, AHB/AXI32 memory
-variants, NN package loading and the actual ZCU104 bitstream remain required
-before the system can be described as inference-ready.
+LiteX, the remaining AHB memory variants, NN package loading and the actual
+ZCU104 bitstream remain required before the system can be described as
+inference-ready.
+
+The validated simulation topology keeps the CPU/CSR system AXI bus at 32 bits
+and connects the frozen AXI64 VTA to a dedicated 64-bit LiteDRAM native port.
+This preserves VTA bursts without routing them through LiteX's 64-to-32 AXI
+converter.  The current VME registers ARVALID and its payload until handshake,
+so `litex/vta_ip.py` connects it directly without the former legacy AR
+workaround.  ZCU104 remains on the shared native AXI64 system path.
+
+The frozen-IP launch test and packaged workload replay are:
+
+```bash
+make frozen-vta-smoke
+make case-run CASE=/path/to/packed-gemm-case
+make case-run CASE=/path/to/packed-conv2d-case
+```
+
+Frozen manifests record the RTL hash, VTA configuration hash, source commit,
+and offline generator.  `soc/generator/APBHostSim32.scala` provides an external
+offline AXI32 generator entry without modifying `hardware/chisel`; the accepted
+GEMM/Conv2D simulation baseline uses AXI64.
 
 ## FSIM/TSIM case export and SoC replay
 

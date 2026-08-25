@@ -43,6 +43,14 @@ case class VMEParams
 
   require(nReadClients > 0,
   s"\n\n[VTA] [VMEParams] nReadClients must be larger than 0\n\n")
+  require((BigInt(1) << clientBits) >= nReadClients,
+  s"\n\n[VTA] [VMEParams] clientBits must encode every read client\n\n")
+  require(RequestQueueDepth > 0,
+  s"\n\n[VTA] [VMEParams] RequestQueueDepth must be larger than 0\n\n")
+  require(clientCmdQueueDepth > 0,
+  s"\n\n[VTA] [VMEParams] clientCmdQueueDepth must be larger than 0\n\n")
+  require(clientDataQueueDepth > 0,
+  s"\n\n[VTA] [VMEParams] clientDataQueueDepth must be larger than 0\n\n")
   require(
     nWriteClients == 1,
     s"\n\n[VTA] [VMEParams] nWriteClients must be 1, only one-write-client support atm\n\n")
@@ -61,7 +69,6 @@ class clientTag(implicit p:Parameters) extends Bundle{
   val RequestQueueMaskBits = p(ShellKey).vmeParams.RequestQueueMaskBits
   val client_id  = UInt(clientBits.W)
   val client_tag = UInt(p(ShellKey).vmeParams.clientTagBitWidth.W)
-  val client_mask = UInt(RequestQueueMaskBits.W)
 }
 
 class VMECmd(implicit p: Parameters) extends VMEBase {
@@ -206,45 +213,35 @@ class VME(implicit p: Parameters) extends Module {
   val clientCmdQueueDepth = p(ShellKey).vmeParams.clientCmdQueueDepth
   val clientDataQueueDepth = p(ShellKey).vmeParams.clientDataQueueDepth
   val RequestQueueDepth = p(ShellKey).vmeParams.RequestQueueDepth
-  val RequestQueueAddrWidth = log2Ceil(RequestQueueDepth.toInt)
+  val RequestQueueAddrWidth = math.max(1, log2Ceil(RequestQueueDepth.toInt))
   val dataBits = p(ShellKey).memParams.dataBits
   val nReadClients = p(ShellKey).vmeParams.nReadClients
   val addrBits = p(ShellKey).memParams.addrBits
   val lenBits = p(ShellKey).memParams.lenBits
   val idBits = p(ShellKey).memParams.idBits
+  require(RequestQueueDepth <= (BigInt(1) << idBits),
+    "VME RequestQueueDepth exceeds the AXI ID space")
   val perfEnabled = p(ShellKey).vcrParams.enableVMEPerfCounters
   val perf = if (perfEnabled) Some(RegInit(
     VecInit(Seq.fill(VMEPerf.nCounters)(0.U(32.W))))) else None
   io.perf.counters.foreach(_ := 0.U)
   perf.foreach(io.perf.counters := _)
-  val vmeTag_array = SyncReadMem(RequestQueueDepth,(new(clientTag)))
+  // Tags are small and need a combinational lookup to decide whether the
+  // selected client response queue can accept an AXI read beat.  Using
+  // registers here also lets RREADY provide real backpressure instead of
+  // unconditionally accepting a beat before its destination is known.
+  val vmeTag_array = Reg(Vec(RequestQueueDepth, new clientTag))
   val vmeTag_array_wr_data = Wire(new(clientTag))
   val vmeTag_array_wr_addr = Wire(UInt(RequestQueueAddrWidth.W))
   val vmeTag_array_rd_addr = Wire(UInt(RequestQueueAddrWidth.W))
   val vmeTag_array_wr_en  = Wire(Bool())
   val localTag_out  = Wire(new(clientTag))
-  val availableEntriesEn = Wire(Bool())
-  val availableEntriesNext = Wire(UInt(RequestQueueDepth.W))
-  val availableEntries     = Reg(availableEntriesNext.cloneType)
-  val freeTagLocation  = Wire(UInt(RequestQueueDepth.W))
-  val (resetEntry,newEntry,firstPostn) = firstOneOH(availableEntries.asUInt)
-  val updateEntry = Wire(UInt(RequestQueueDepth.W))
-  when(io.mem.r.bits.last & io.mem.r.valid){
-  availableEntriesNext := updateEntry | availableEntries
-  }.elsewhen(availableEntriesEn && availableEntries =/= 0.U && !(io.mem.r.bits.last & io.mem.r.valid)){
-  availableEntriesNext:= newEntry
-  }.otherwise{
-  availableEntriesNext:= availableEntries
-  }
-  when(reset.asBool){
-  availableEntries := VecInit(Seq.fill(RequestQueueDepth)(true.B)).asUInt
-  updateEntry := 0.U
-  }.otherwise{
-  availableEntries := availableEntriesNext
-  updateEntry := VecInit(IndexedSeq.tabulate(RequestQueueDepth){ i => i.U === (io.mem.r.bits.id).asUInt }).asUInt
-  }
+  val availableEntries = RegInit(((BigInt(1) << RequestQueueDepth) - 1).U(RequestQueueDepth.W))
+  val (resetEntry, _, firstPostn) = firstOneOH(availableEntries.asUInt)
   // Cmd Queues for eaach VME client
-  val VMEcmd_Qs = IndexedSeq.fill(5){ Module(new Queue(new VMECmd, clientCmdQueueDepth))}
+  val VMEcmd_Qs = IndexedSeq.fill(nReadClients) {
+    Module(new Queue(new VMECmd, clientCmdQueueDepth))
+  }
 
   //---------------------------------------
   //--- Find available buffer entries -----
@@ -266,72 +263,113 @@ class VME(implicit p: Parameters) extends Module {
   val default_tag = Wire(new(clientTag))
   default_tag.client_tag  := 0.U
   default_tag.client_id  := 0.U
-  default_tag.client_mask := 0.U
 
   val cmd_valids = for { q <- VMEcmd_Qs } yield q.io.deq.valid
 
   val vme_select = PriorityEncoder(cmd_valids :+ true.B)
   val any_cmd_valid = cmd_valids.foldLeft(false.B){ case (x,y) => x || y}
-  availableEntriesEn := io.mem.ar.ready & any_cmd_valid
-
-  for { i <- 0 until 5} {
-    VMEcmd_Qs(i).io.enq.valid := io.vme.rd(i).cmd.valid  & VMEcmd_Qs(i).io.enq.ready
+  val arPending = RegInit(false.B)
+  val arAddr = Reg(UInt(addrBits.W))
+  val arLen = Reg(UInt(lenBits.W))
+  val arId = Reg(UInt(RequestQueueAddrWidth.W))
+  val issueRead = !arPending && any_cmd_valid && availableEntries.orR
+  for { i <- 0 until nReadClients} {
+    VMEcmd_Qs(i).io.enq.valid := io.vme.rd(i).cmd.valid
     VMEcmd_Qs(i).io.enq.bits  := io.vme.rd(i).cmd.bits
-    VMEcmd_Qs(i).io.deq.ready := io.mem.ar.ready &
-    (vme_select === i.U) & (availableEntries.asUInt =/= 0.U) &
-    !(io.mem.r.bits.last & io.mem.r.valid)
+    VMEcmd_Qs(i).io.deq.ready := issueRead && (vme_select === i.U)
     io.vme.rd(i).cmd.ready := VMEcmd_Qs(i).io.enq.ready
   }
 
   vmeTag_array_wr_addr := firstPostn.asUInt
 
 
-  val cmd_readys = for { q <- VMEcmd_Qs} yield q.io.deq.ready
-  val any_cmd_ready = cmd_readys.foldLeft(false.B){ case (x,y) => x || y}
-
-  vmeTag_array_wr_en := any_cmd_ready
+  vmeTag_array_wr_en := issueRead
 
   when(vmeTag_array_wr_en){
-    val rdwrPort = vmeTag_array(vmeTag_array_wr_addr)
-    rdwrPort  := vmeTag_array_wr_data
+    vmeTag_array(vmeTag_array_wr_addr) := vmeTag_array_wr_data
   }
 
-  io.mem.ar.bits.addr := 0.U
-  io.mem.ar.bits.len  := 0.U
-  io.mem.ar.valid     := 0.U
-  io.mem.ar.bits.id   := 0.U
+  io.mem.ar.bits.addr := arAddr
+  io.mem.ar.bits.len  := arLen
+  io.mem.ar.valid     := arPending
+  io.mem.ar.bits.id   := arId
   vmeTag_array_wr_data := default_tag
 
-  // Last assign wins so do this in reverse order
-  for { i <- 4 to 0 by -1} {
-    when(VMEcmd_Qs(i).io.deq.ready){
-      io.mem.ar.bits.addr := VMEcmd_Qs(i).io.deq.bits.addr
-      io.mem.ar.bits.len  := VMEcmd_Qs(i).io.deq.bits.len
-      io.mem.ar.valid     := VMEcmd_Qs(i).io.deq.valid
-      io.mem.ar.bits.id   := vmeTag_array_wr_addr
+  // Capture the selected command and reserve its tag before presenting it to
+  // AXI.  The registered AR payload then remains stable for every cycle that
+  // VALID is asserted without READY.
+  for { i <- nReadClients - 1 to 0 by -1} {
+    when(vme_select === i.U && any_cmd_valid){
       vmeTag_array_wr_data.client_id  := i.U
       vmeTag_array_wr_data.client_tag := VMEcmd_Qs(i).io.deq.bits.tag
-      vmeTag_array_wr_data.client_mask := resetEntry
+      when(issueRead) {
+        arAddr := VMEcmd_Qs(i).io.deq.bits.addr
+        arLen := VMEcmd_Qs(i).io.deq.bits.len
+        arId := vmeTag_array_wr_addr
+      }
     }
   }
+  when(issueRead) { arPending := true.B }
+  when(io.mem.ar.fire) { arPending := false.B }
 
-  // We need one clock cycle to look up the local tag from the
-  // centralized tag buffer vmeTag_array
-  // Adding a flop stage for mem.r.data, mem.r.last, mem.r.valid
-  // till local tag lookup is performed.
-  io.mem.r.ready  := true.B
-  vmeTag_array_rd_addr :=  io.mem.r.bits.id
-  localTag_out         :=  vmeTag_array(vmeTag_array_rd_addr)
-  freeTagLocation      :=  localTag_out.client_mask
-
+  // Route each AXI read beat through a client response queue.  The queue
+  // provides storage while a client is stalled, and VALID never depends on
+  // that client's READY.
+  val ridInRange = io.mem.r.bits.id < RequestQueueDepth.U
+  val ridIndex = io.mem.r.bits.id(RequestQueueAddrWidth - 1, 0)
+  vmeTag_array_rd_addr := ridIndex
+  localTag_out := Mux(ridInRange, vmeTag_array(vmeTag_array_rd_addr), default_tag)
+  val allocatedEntries = ~availableEntries
+  val issuedEntries = RegInit(0.U(RequestQueueDepth.W))
+  val slotAllocated = ridInRange && allocatedEntries(ridIndex)
+  val issuingSameSlot = io.mem.ar.fire && arId === ridIndex
+  val slotIssued = ridInRange && (issuedEntries(ridIndex) || issuingSameSlot)
+  val clientInRange = localTag_out.client_id < nReadClients.U
+  val responseQs = IndexedSeq.fill(nReadClients) {
+    Module(new Queue(new VMEData, clientDataQueueDepth))
+  }
   for (i <- 0 until nReadClients) {
-    io.vme.rd(i).data.valid := ((RegNext(io.mem.r.valid, init = false.B)) && ((localTag_out.client_id) === i.U)
-    && io.vme.rd(i).data.ready)
-    //VME doesnt stop on not ready
-    assert(io.vme.rd(i).data.ready || ~io.vme.rd(i).data.valid)
-    io.vme.rd(i).data.bits.data := RegNext(io.mem.r.bits.data, init = false.B)
-    io.vme.rd(i).data.bits.last := RegNext(io.mem.r.bits.last, init = false.B)
-    io.vme.rd(i).data.bits.tag  := localTag_out.client_tag
+    responseQs(i).io.enq.valid := io.mem.r.valid && slotAllocated && slotIssued &&
+      localTag_out.client_id === i.U
+    responseQs(i).io.enq.bits.data := io.mem.r.bits.data
+    responseQs(i).io.enq.bits.last := io.mem.r.bits.last
+    responseQs(i).io.enq.bits.tag := localTag_out.client_tag
+    io.vme.rd(i).data <> responseQs(i).io.deq
+  }
+  io.mem.r.ready := slotAllocated && slotIssued && clientInRange &&
+    MuxLookup(localTag_out.client_id, false.B,
+      responseQs.indices.map(i => i.U -> responseQs(i).io.enq.ready))
+
+  val allocatedEntry = Mux(issueRead, resetEntry, 0.U)
+  val freedEntry = Mux(io.mem.r.fire && io.mem.r.bits.last,
+    UIntToOH(ridIndex, RequestQueueDepth), 0.U)
+  availableEntries := (availableEntries | freedEntry) & ~allocatedEntry
+  val issuedEntry = Mux(io.mem.ar.fire, UIntToOH(arId, RequestQueueDepth), 0.U)
+  issuedEntries := (issuedEntries | issuedEntry) & ~freedEntry
+
+  val beatsRemaining = Reg(Vec(RequestQueueDepth, UInt((lenBits + 1).W)))
+  when(io.mem.ar.fire) {
+    beatsRemaining(arId) := arLen +& 1.U
+  }
+  when(io.mem.r.fire) {
+    val currentBeats = Mux(issuingSameSlot, arLen +& 1.U, beatsRemaining(ridIndex))
+    assert(currentBeats =/= 0.U,
+      "VME received a read beat for a completed request")
+    assert(io.mem.r.bits.last === (currentBeats === 1.U),
+      "VME AXI RLAST does not match ARLEN")
+    beatsRemaining(ridIndex) := currentBeats - 1.U
+  }
+  when(io.mem.r.valid) {
+    when(!ridInRange || !slotAllocated || !slotIssued || !clientInRange) {
+      printf("[VME] invalid R rid=%d allocated=%x issued=%x arFire=%d arId=%d last=%d\n",
+        io.mem.r.bits.id, allocatedEntries, issuedEntries, io.mem.ar.fire, arId,
+        io.mem.r.bits.last)
+    }
+    assert(ridInRange, "VME received an AXI RID outside RequestQueueDepth")
+    assert(slotAllocated, "VME received an AXI RID with no allocated slot")
+    assert(slotIssued, "VME received an AXI response before its AR handshake")
+    assert(clientInRange, "VME tag contains an invalid read client")
+    assert(io.mem.r.bits.resp === 0.U, "VME received an AXI read error response")
   }
 
   // VME <-> AXI write interface
@@ -353,6 +391,11 @@ class VME(implicit p: Parameters) extends Module {
   io.mem.w.bits.last := wr_cnt === wr_len
   io.mem.w.bits.id   := p(ShellKey).memParams.idConst.U // no support for multiple writes
   io.mem.b.ready := wstate === sWriteResp
+  when(io.mem.b.valid) {
+    assert(io.mem.b.bits.resp === 0.U, "VME received an AXI write error response")
+    assert(io.mem.b.bits.id === p(ShellKey).memParams.idConst.U,
+      "VME received an AXI write response with an unexpected BID")
+  }
   when(io.vme.wr(0).cmd.fire) {
     wr_len := io.vme.wr(0).cmd.bits.len
     wr_addr := io.vme.wr(0).cmd.bits.addr

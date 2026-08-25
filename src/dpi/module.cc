@@ -210,34 +210,45 @@ void MemDevice::SetRequest(
   uint8_t  wr_req_valid) {
 
   std::lock_guard<std::mutex> lock(mutex_);
-  if(rd_req_addr !=0 ){
-    void * rd_vaddr = vta::vmem::VirtualMemoryManager::Global()->GetAddr(rd_req_addr);
-    if(rd_req_valid == 1) {
+  if (rd_req_valid == 1) {
+    if (rd_req_addr != 0) {
+      void* rd_vaddr =
+          vta::vmem::VirtualMemoryManager::Global()->GetAddr(rd_req_addr);
       rlen_ = rd_req_len + 1;
       rid_  = rd_req_id;
       raddr_ = reinterpret_cast<uint32_t*>(rd_vaddr);
+    } else {
+      rlen_ = 0;
+      raddr_ = nullptr;
     }
   }
 
-  if(wr_req_addr != 0){
-    void * wr_vaddr = vta::vmem::VirtualMemoryManager::Global()->GetAddr(wr_req_addr);
-    if (wr_req_valid == 1) {
+  if (wr_req_valid == 1) {
+    if (wr_req_addr != 0) {
+      void* wr_vaddr =
+          vta::vmem::VirtualMemoryManager::Global()->GetAddr(wr_req_addr);
       wlen_ = wr_req_len + 1;
       waddr_ = reinterpret_cast<uint32_t*>(wr_vaddr);
-    } 
+    } else {
+      wlen_ = 0;
+      waddr_ = nullptr;
+    }
   }
 }
 
 MemResponse MemDevice::ReadData(uint8_t ready, int blkNb) {
   std::lock_guard<std::mutex> lock(mutex_);
-  MemResponse r;
-  r.valid = rlen_ > 0;
-  r.value = rlen_ > 0 ? raddr_ : dead_beef_;
-  r.id    = rid_;
+  // VTAMemDPI.v registers this callback's outputs for the next cycle.  When
+  // the currently registered beat handshakes, advance first so the callback
+  // returns the following beat rather than repeating the accepted one.
   if (ready == 1 && rlen_ > 0) {
     raddr_ += blkNb;
     rlen_ -= 1;
   }
+  MemResponse r;
+  r.valid = rlen_ > 0;
+  r.value = rlen_ > 0 ? raddr_ : dead_beef_;
+  r.id    = rid_;
   return r;
 }
 

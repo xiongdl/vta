@@ -199,13 +199,16 @@ when(dpiReqQueue.io.deq.fire) {
     io.dpi.req.ar_valid := readDelay.io.issue
   }
   io.axi.ar.ready := dpiReqQueue.io.enq.ready
-  io.axi.r.valid := io.dpi.rd.valid
+  // The DPI callback returns the pre-handshake valid state.  Mask it once the
+  // final beat moves this bridge back to idle, otherwise that stale value is
+  // exposed as a duplicate AXI R beat in the following cycle.
+  io.axi.r.valid := rstate === readData && io.dpi.rd.valid
   io.axi.r.bits.data := io.dpi.rd.bits.data
   io.axi.r.bits.last := (ar_len === 0.U && io.dpi.rd.valid)
   io.axi.r.bits.resp := 0.U
   io.axi.r.bits.user := 0.U
   io.axi.r.bits.id := io.dpi.rd.bits.id
-  io.dpi.rd.ready := io.axi.r.ready
+  io.dpi.rd.ready := rstate === readData && io.axi.r.ready
   readDelay.io.start := dpiReqQueue.io.deq.fire
 
   //Write Request

@@ -89,6 +89,16 @@ before and after `VTADeviceRun()`. FSIM and TSIM then emit the same
 `before_manifest.json`/`after_manifest.json` plus allocation binaries. Normal
 execution is unchanged when the variable is absent.
 
+Rebuild the runtime for the backend selected by `config/vta_config.json` before
+capturing an in-tree Python integration test. In particular, the repository
+default selects TSIM, so rebuilding only `vta_fsim` will leave the integration
+process using an older `libvta_tsim` without the export hook:
+
+```bash
+cmake --build ../../tvm/build --target vta_tsim -j4
+VTA_CASE_DUMP_DIR=/tmp/vta-raw python ../../tvm/vta/tests/python/integration/test_benchmark_topi_dense.py
+```
+
 Convert a raw dump into a relocatable SoC package with:
 
 ```bash

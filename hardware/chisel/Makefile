@@ -20,16 +20,21 @@ ifeq (, $(shell which verilator))
 endif
 
 # Change VERILATOR_INC_DIR if Verilator is installed on a different location
+VERILATOR_PREFIX := $(shell dirname $$(dirname $$(which verilator)))
 ifeq (, $(VERILATOR_INC_DIR))
-	ifeq (, $(wildcard /usr/local/share/verilator/include/*))
-		ifeq (, $(wildcard /usr/share/verilator/include/*))
-			$(error "Verilator include directory is not set properly")
-		else
-			VERILATOR_INC_DIR := /usr/share/verilator/include
-		endif
-	else
-			VERILATOR_INC_DIR := /usr/local/share/verilator/include
-	endif
+  ifneq (, $(wildcard $(VERILATOR_PREFIX)/share/verilator/include/verilated.h))
+    VERILATOR_INC_DIR := $(VERILATOR_PREFIX)/share/verilator/include
+  else
+    ifeq (, $(wildcard /usr/local/share/verilator/include/*))
+      ifeq (, $(wildcard /usr/share/verilator/include/*))
+        $(error "Verilator include directory is not set properly")
+      else
+        VERILATOR_INC_DIR := /usr/share/verilator/include
+      endif
+    else
+      VERILATOR_INC_DIR := /usr/local/share/verilator/include
+    endif
+  endif
 endif
 
 CONFIG ?= DefaultDe10Config

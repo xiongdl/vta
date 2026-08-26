@@ -53,6 +53,12 @@ def main():
     try:
         source_commit = subprocess.check_output(
             ["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+        source_dirty = subprocess.check_output(
+            ["git", "-C", str(repo), "status", "--porcelain", "--",
+             "hardware/chisel/src/main/scala", "soc/generator"],
+            text=True).strip()
+        if source_dirty:
+            source_commit += "-dirty"
     except (OSError, subprocess.CalledProcessError):
         source_commit = "unknown"
     manifest = {

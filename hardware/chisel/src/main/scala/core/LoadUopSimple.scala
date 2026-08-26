@@ -56,8 +56,8 @@ class LoadUopSimple(debug: Boolean = false)(implicit val p: Parameters) extends 
   // DRAM address width must be the same as AXI araddr since anything above will
   // be silently truncated, enforce this here.
   val dram_byte_addr = WireInit(UInt(raddr.getWidth.W), dec.dram_offset << log2Ceil(uopBytes))
-  // Here we are assuming io.baddr | dram_byte_addr === io.baddr + dram_byte_addr.
-  val unaligned_addr = io.baddr | dram_byte_addr
+  // dram_offset is relative to baddr and may carry into bits already set in baddr.
+  val unaligned_addr = io.baddr + dram_byte_addr
   val xfer_init_addr = unaligned_addr & ~data_align_bits
   val xfer_next_addr = raddr + xfer_bytes
   val xfer_init_bytes = xmax_bytes - xfer_init_addr % xmax_bytes

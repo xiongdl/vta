@@ -508,9 +508,8 @@ class GenVMECmdWide(tensorType: String = "none", debug: Boolean = false)(
   }
 
   // calculate address of DRAM memory line begin (initial/stride)
-  val maskOffset = VecInit(Seq.fill(M_DRAM_OFFSET_BITS)(true.B)).asUInt
   val dramInitialAddr = (io.dram_offset << log2Ceil(elemBytes)).asTypeOf(UInt(mp.addrBits.W))
-  val xferElemInitAddr = io.baddr | dramInitialAddr // SHOULD have + here?
+  val xferElemInitAddr = io.baddr + dramInitialAddr
   //aling address to CL size
   // lower bits - elem offset in a cachline
   val dramClAddrAlignNotMask = ((BigInt(1) << log2Ceil(clBytes)) - 1).U.asTypeOf(xferElemInitAddr)

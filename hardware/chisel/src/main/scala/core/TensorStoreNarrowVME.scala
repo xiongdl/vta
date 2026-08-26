@@ -77,7 +77,7 @@ class TensorStoreNarrowVME(tensorType: String = "none", debug: Boolean = false)(
   val elemBytes = (p(CoreKey).batch * p(CoreKey).blockOut * p(CoreKey).outBits) / 8
   val pulse_bytes_bits = log2Ceil(mp.dataBits >> 3)
 
-  val xfer_init_addr = io.baddr | (maskOffset & (dec.dram_offset << log2Ceil(elemBytes)))
+  val xfer_init_addr = io.baddr + (maskOffset & (dec.dram_offset << log2Ceil(elemBytes)))
   val xfer_split_addr = waddr_cur + xfer_bytes
   val xfer_stride_addr = waddr_nxt + xstride_bytes
 

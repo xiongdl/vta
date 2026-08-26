@@ -18,6 +18,7 @@ class Conv2DArtifact:
     lowered: tvm.IRModule
     packed_weight: np.ndarray
     packed_bias: np.ndarray
+    packed_requant: tuple
     input_shape: tuple
     output_shape: tuple
     packed_input_shape: tuple
@@ -31,7 +32,7 @@ def _pair(value, name):
     return values
 
 
-def _extract_conv2d(function):
+def _extract_conv2d(function, requant_ratios=None):
     module = tvm.IRModule({"main": function.without_attr("global_symbol")})
     typed = relay.transform.InferType()(module)["main"]
     conv = _find_call(typed.body, "qnn.conv2d")
@@ -54,15 +55,19 @@ def _extract_conv2d(function):
     requant_input_zero_point = _scalar(requantize.args[2])
     requant_output_scale = np.asarray(requantize.args[3].data.numpy())
     requant_output_zero_point = _scalar(requantize.args[4])
-    if input_zero_point != 0 or kernel_zero_point != 0:
-        raise ValueError("VTA conv2d currently requires zero input and kernel zero-points")
-    if not np.allclose(input_scale * kernel_scale, requant_input_scale):
+    if kernel_zero_point != 0:
+        raise ValueError("VTA conv2d currently requires zero kernel zero-point")
+    if requant_ratios is None and not np.allclose(input_scale * kernel_scale, requant_input_scale):
         raise ValueError("qnn.conv2d scales must match the requantize input scale")
-    requant_params = [quantize_multiplier(value) for value in
-                      np.asarray(requant_input_scale / requant_output_scale).reshape(-1)]
-    if len(set(requant_params)) != 1:
-        raise ValueError("VTA conv2d currently requires uniform requantization parameters")
-    requant_multiplier, requant_shift = requant_params[0]
+    ratios = (np.asarray(requant_input_scale / requant_output_scale) if requant_ratios is None
+              else np.asarray(requant_ratios))
+    requant_params = [quantize_multiplier(value) for value in ratios.reshape(-1)]
+    requant_multipliers = np.asarray([item[0] for item in requant_params], dtype="int32")
+    requant_shifts = np.asarray([item[1] for item in requant_params], dtype="int32")
+    if requant_multipliers.size not in (1, int(conv.attrs.channels)):
+        raise ValueError("VTA conv2d requantization parameters must be scalar or per-output-channel")
+    if requant_shifts.size > 1 and np.any(requant_shifts > 0):
+        raise ValueError("VTA per-channel conv2d currently supports non-positive requant shifts")
     if requantize.checked_type.dtype != "int8":
         raise ValueError("VTA conv2d currently requires int8 requantize output")
 
@@ -78,15 +83,17 @@ def _extract_conv2d(function):
             min(clip_bounds[1], int(clip.attrs.a_max)),
         )
     correction = -requant_input_zero_point
-    return (typed, conv, bias, clip_bounds, correction, requant_multiplier,
-            requant_shift, requant_output_zero_point)
+    return (typed, conv, bias, clip_bounds, correction, input_zero_point,
+            requant_multipliers, requant_shifts, requant_output_zero_point)
 
 
-def compile_qnn_conv2d(function, name="vta_qnn_conv2d", residual=False):
+def compile_qnn_conv2d(function, name="vta_qnn_conv2d", residual=False,
+                       requant_ratios=None):
     """Compile one supported QNN conv2d Relay function into a VTA module."""
     env = get_env()
-    (_, conv, raw_bias, clip_bounds, correction, requant_multiplier,
-     requant_shift, output_zero_point) = _extract_conv2d(function)
+    (_, conv, raw_bias, clip_bounds, correction, input_zero_point,
+     requant_multipliers, requant_shifts, output_zero_point) = _extract_conv2d(
+         function, requant_ratios=requant_ratios)
     batch, in_channels, height, width = (int(x) for x in conv.args[0].checked_type.shape)
     out_channels, weight_in_per_group, kernel_h, kernel_w = (
         int(x) for x in conv.args[1].checked_type.shape
@@ -137,7 +144,7 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d", residual=False):
     shortcut = te.placeholder(output_shape, name="shortcut", dtype=env.inp_dtype) if residual else None
     data_buf = topi.nn.pad(
         data, [0, 0, pad_top, pad_left, 0, 0], [0, 0, pad_bottom, pad_right, 0, 0],
-        name="data_buf",
+        pad_value=input_zero_point, name="data_buf",
     )
     weight_buf = te.compute(weight_shape, lambda *idx: weight(*idx), name="weight_buf")
     ic = te.reduce_axis((0, padded_in_channels // env.BLOCK_IN), name="ic")
@@ -156,37 +163,42 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d", residual=False):
         name="accum",
     )
     biased = te.compute(output_shape, lambda *idx: accum(*idx) + bias(*idx), name="biased")
-    # Materialize the Q31 multiplier using signed 16-bit ALU immediates, then
-    # consume it as the second accumulator operand of a rounded Q31 MUL.
-    multiplier_hi = (requant_multiplier + (1 << 15)) >> 16
-    if multiplier_hi >= 1 << 15:
-        multiplier_hi -= 1 << 16
-    multiplier_lo = requant_multiplier - (multiplier_hi << 16)
-    multiplier_zero = te.compute(
-        output_shape,
-        lambda *idx: tvm.tir.call_pure_extern(
-            env.acc_dtype, "VTAALUMul", biased(*idx), tvm.tir.const(0, env.acc_dtype)
-        ),
-        name="requantize_multiplier_zero",
-    )
-    multiplier_high = te.compute(
-        output_shape,
-        lambda *idx: multiplier_zero(*idx) + tvm.tir.const(multiplier_hi, env.acc_dtype),
-        name="requantize_multiplier_high",
-    )
-    multiplier_shifted = te.compute(
-        output_shape,
-        lambda *idx: multiplier_high(*idx) << tvm.tir.const(16, env.acc_dtype),
-        name="requantize_multiplier_shifted",
-    )
-    multiplier_value = te.compute(
-        output_shape,
-        lambda *idx: multiplier_shifted(*idx) + tvm.tir.const(multiplier_lo, env.acc_dtype),
-        name="requantize_multiplier",
-    )
+    per_channel = requant_multipliers.size > 1
+    multiplier_param = None
+    shift_masks = []
+    multiplier_zero = multiplier_high = multiplier_shifted = multiplier_value = None
+    left_shifted = right_shifted = None
+    shift_candidates = []
+    shift_selected = []
+    shift_sums = []
     requant_input = biased
-    left_shifted = None
-    if requant_shift > 0:
+    if per_channel:
+        multiplier_param = te.placeholder(output_shape, name="requant_multiplier", dtype=env.acc_dtype)
+        multiplier_value = multiplier_param
+    else:
+        requant_multiplier, requant_shift = int(requant_multipliers[0]), int(requant_shifts[0])
+        multiplier_hi = (requant_multiplier + (1 << 15)) >> 16
+        if multiplier_hi >= 1 << 15:
+            multiplier_hi -= 1 << 16
+        multiplier_lo = requant_multiplier - (multiplier_hi << 16)
+        multiplier_zero = te.compute(
+            output_shape,
+            lambda *idx: tvm.tir.call_pure_extern(
+                env.acc_dtype, "VTAALUMul", biased(*idx), tvm.tir.const(0, env.acc_dtype)
+            ), name="requantize_multiplier_zero")
+        multiplier_high = te.compute(
+            output_shape,
+            lambda *idx: multiplier_zero(*idx) + tvm.tir.const(multiplier_hi, env.acc_dtype),
+            name="requantize_multiplier_high")
+        multiplier_shifted = te.compute(
+            output_shape,
+            lambda *idx: multiplier_high(*idx) << tvm.tir.const(16, env.acc_dtype),
+            name="requantize_multiplier_shifted")
+        multiplier_value = te.compute(
+            output_shape,
+            lambda *idx: multiplier_shifted(*idx) + tvm.tir.const(multiplier_lo, env.acc_dtype),
+            name="requantize_multiplier")
+    if not per_channel and requant_shift > 0:
         left_shifted = te.compute(
             output_shape,
             lambda *idx: biased(*idx) << tvm.tir.const(requant_shift, env.acc_dtype),
@@ -201,8 +213,35 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d", residual=False):
         name="requantize_high_mul",
     )
     scaled = high_multiplied
-    right_shifted = None
-    if requant_shift < 0:
+    if per_channel:
+        def shift_expr(source, amount):
+            return lambda *idx: tvm.tir.call_pure_extern(
+                env.acc_dtype, "VTARoundingShiftRight", source(*idx), amount)
+
+        def select_expr(source, mask):
+            return lambda *idx: tvm.tir.call_pure_extern(
+                env.acc_dtype, "VTAALUMul", source(*idx), mask(*idx))
+
+        def add_expr(left, right):
+            return lambda *idx: left(*idx) + right(*idx)
+
+        for index, shift in enumerate(sorted(set(int(value) for value in requant_shifts))):
+            mask = te.placeholder(output_shape, name=f"requant_mask_{index}", dtype=env.acc_dtype)
+            shift_masks.append(mask)
+            candidate = te.compute(
+                output_shape, shift_expr(high_multiplied, -shift),
+                name=f"requantize_shift_{index}")
+            selected = te.compute(
+                output_shape, select_expr(candidate, mask),
+                name=f"requantize_select_{index}")
+            shift_candidates.append(candidate)
+            shift_selected.append(selected)
+        scaled = shift_selected[0]
+        for index, selected in enumerate(shift_selected[1:], start=1):
+            scaled = te.compute(output_shape, add_expr(scaled, selected),
+                                name=f"requantize_merge_{index}")
+            shift_sums.append(scaled)
+    elif requant_shift < 0:
         right_shifted = te.compute(
             output_shape,
             lambda *idx: tvm.tir.call_pure_extern(
@@ -245,8 +284,11 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d", residual=False):
     requant_stages = ()
     if left_shifted is not None:
         requant_stages += (left_shifted,)
-    requant_stages += (multiplier_zero, multiplier_high, multiplier_shifted,
-                       multiplier_value)
+    if per_channel:
+        requant_stages += tuple(shift_candidates + shift_selected + shift_sums)
+    else:
+        requant_stages += (multiplier_zero, multiplier_high, multiplier_shifted,
+                           multiplier_value)
     requant_stages += (high_multiplied,)
     if right_shifted is not None:
         requant_stages += (right_shifted,)
@@ -264,6 +306,12 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d", residual=False):
         schedule[stage].pragma(schedule[stage].op.axis[0], env.alu)
     bias_buf = schedule.cache_read(bias, env.acc_scope, [biased])
     schedule[bias_buf].pragma(schedule[bias_buf].op.axis[0], env.dma_copy)
+    if per_channel:
+        multiplier_buf = schedule.cache_read(multiplier_param, env.acc_scope, [high_multiplied])
+        schedule[multiplier_buf].pragma(schedule[multiplier_buf].op.axis[0], env.dma_copy)
+        for mask, selected in zip(shift_masks, shift_selected):
+            mask_buf = schedule.cache_read(mask, env.acc_scope, [selected])
+            schedule[mask_buf].pragma(schedule[mask_buf].op.axis[0], env.dma_copy)
     if residual:
         schedule[shortcut_buf].pragma(schedule[shortcut_buf].op.axis[0], env.dma_copy)
     schedule[data_buf].compute_at(schedule[accum], ic)
@@ -275,7 +323,10 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d", residual=False):
     schedule[accum].tensorize(bi, env.gemm)
     schedule[output].pragma(schedule[output].op.axis[0], env.dma_copy)
 
-    args = [data, weight, bias] + ([shortcut] if residual else []) + [output]
+    args = [data, weight, bias]
+    if per_channel:
+        args += [multiplier_param] + shift_masks
+    args += ([shortcut] if residual else []) + [output]
     lowered = lower(schedule, args, simple_mode=True)
     module = build(schedule, args, tvm.target.Target("ext_dev", host=env.target_host), name=name)
     grouped_weight = conv.args[1].data.numpy().astype(env.wgt_dtype)
@@ -302,7 +353,9 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d", residual=False):
     ).transpose(0, 2, 4, 5, 1, 3)
     if raw_bias is None:
         raw_bias = np.zeros((out_channels,), dtype=env.acc_dtype)
-    raw_bias = raw_bias.astype(env.acc_dtype) + np.asarray(correction, env.acc_dtype)
+    input_correction = -int(input_zero_point) * raw_weight.astype("int32").sum(axis=(1, 2, 3))
+    raw_bias = (raw_bias.astype(env.acc_dtype) + np.asarray(correction, env.acc_dtype)
+                + input_correction.astype(env.acc_dtype))
     packed_bias = np.broadcast_to(
         np.pad(raw_bias, (0, padded_out_channels - out_channels)).reshape(
             1, padded_out_channels, 1, 1
@@ -317,11 +370,26 @@ def compile_qnn_conv2d(function, name="vta_qnn_conv2d", residual=False):
         out_height,
         out_width,
     ).transpose(0, 2, 4, 5, 1, 3).astype(env.acc_dtype)
+    packed_requant = ()
+    if per_channel:
+        def pack_channel_plane(values):
+            padded = np.pad(np.asarray(values, dtype=env.acc_dtype),
+                            (0, padded_out_channels - out_channels))
+            logical = np.broadcast_to(padded.reshape(1, -1, 1, 1),
+                                      (batch, padded_out_channels, out_height, out_width)).copy()
+            return logical.reshape(batch // env.BATCH, env.BATCH,
+                                   padded_out_channels // env.BLOCK_OUT, env.BLOCK_OUT,
+                                   out_height, out_width).transpose(0, 2, 4, 5, 1, 3)
+        planes = [pack_channel_plane(requant_multipliers)]
+        for shift in sorted(set(int(value) for value in requant_shifts)):
+            planes.append(pack_channel_plane(requant_shifts == shift))
+        packed_requant = tuple(planes)
     return Conv2DArtifact(
         module,
         lowered,
         packed_weight,
         packed_bias,
+        packed_requant,
         (batch, in_channels, height, width),
         (batch, out_channels, out_height, out_width),
         data_shape,

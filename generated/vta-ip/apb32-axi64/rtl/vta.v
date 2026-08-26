@@ -309,12 +309,12 @@ module Queue(
   output        io_enq_ready,
   input         io_enq_valid,
   input  [31:0] io_enq_bits_addr,
-  input  [3:0]  io_enq_bits_len,
+  input  [7:0]  io_enq_bits_len,
   input  [20:0] io_enq_bits_tag,
   input         io_deq_ready,
   output        io_deq_valid,
   output [31:0] io_deq_bits_addr,
-  output [3:0]  io_deq_bits_len,
+  output [7:0]  io_deq_bits_len,
   output [20:0] io_deq_bits_tag
 );
 `ifdef RANDOMIZE_MEM_INIT
@@ -333,11 +333,11 @@ module Queue(
   wire  ram_addr_MPORT_addr; // @[Decoupled.scala 259:95]
   wire  ram_addr_MPORT_mask; // @[Decoupled.scala 259:95]
   wire  ram_addr_MPORT_en; // @[Decoupled.scala 259:95]
-  reg [3:0] ram_len [0:0]; // @[Decoupled.scala 259:95]
+  reg [7:0] ram_len [0:0]; // @[Decoupled.scala 259:95]
   wire  ram_len_io_deq_bits_MPORT_en; // @[Decoupled.scala 259:95]
   wire  ram_len_io_deq_bits_MPORT_addr; // @[Decoupled.scala 259:95]
-  wire [3:0] ram_len_io_deq_bits_MPORT_data; // @[Decoupled.scala 259:95]
-  wire [3:0] ram_len_MPORT_data; // @[Decoupled.scala 259:95]
+  wire [7:0] ram_len_io_deq_bits_MPORT_data; // @[Decoupled.scala 259:95]
+  wire [7:0] ram_len_MPORT_data; // @[Decoupled.scala 259:95]
   wire  ram_len_MPORT_addr; // @[Decoupled.scala 259:95]
   wire  ram_len_MPORT_mask; // @[Decoupled.scala 259:95]
   wire  ram_len_MPORT_en; // @[Decoupled.scala 259:95]
@@ -436,7 +436,7 @@ initial begin
     ram_addr[initvar] = _RAND_0[31:0];
   _RAND_1 = {1{`RANDOM}};
   for (initvar = 0; initvar < 1; initvar = initvar+1)
-    ram_len[initvar] = _RAND_1[3:0];
+    ram_len[initvar] = _RAND_1[7:0];
   _RAND_2 = {1{`RANDOM}};
   for (initvar = 0; initvar < 1; initvar = initvar+1)
     ram_tag[initvar] = _RAND_2[20:0];
@@ -629,7 +629,7 @@ module VME(
   input         io_mem_aw_ready,
   output        io_mem_aw_valid,
   output [31:0] io_mem_aw_bits_addr,
-  output [3:0]  io_mem_aw_bits_len,
+  output [7:0]  io_mem_aw_bits_len,
   input         io_mem_w_ready,
   output        io_mem_w_valid,
   output [63:0] io_mem_w_bits_data,
@@ -642,7 +642,7 @@ module VME(
   output        io_mem_ar_valid,
   output [31:0] io_mem_ar_bits_addr,
   output [7:0]  io_mem_ar_bits_id,
-  output [3:0]  io_mem_ar_bits_len,
+  output [7:0]  io_mem_ar_bits_len,
   output        io_mem_r_ready,
   input         io_mem_r_valid,
   input  [63:0] io_mem_r_bits_data,
@@ -652,7 +652,7 @@ module VME(
   output        io_vme_rd_0_cmd_ready,
   input         io_vme_rd_0_cmd_valid,
   input  [31:0] io_vme_rd_0_cmd_bits_addr,
-  input  [3:0]  io_vme_rd_0_cmd_bits_len,
+  input  [7:0]  io_vme_rd_0_cmd_bits_len,
   input         io_vme_rd_0_data_ready,
   output        io_vme_rd_0_data_valid,
   output [63:0] io_vme_rd_0_data_bits_data,
@@ -660,7 +660,7 @@ module VME(
   output        io_vme_rd_1_cmd_ready,
   input         io_vme_rd_1_cmd_valid,
   input  [31:0] io_vme_rd_1_cmd_bits_addr,
-  input  [3:0]  io_vme_rd_1_cmd_bits_len,
+  input  [7:0]  io_vme_rd_1_cmd_bits_len,
   input  [20:0] io_vme_rd_1_cmd_bits_tag,
   output        io_vme_rd_1_data_valid,
   output [63:0] io_vme_rd_1_data_bits_data,
@@ -669,7 +669,7 @@ module VME(
   output        io_vme_rd_2_cmd_ready,
   input         io_vme_rd_2_cmd_valid,
   input  [31:0] io_vme_rd_2_cmd_bits_addr,
-  input  [3:0]  io_vme_rd_2_cmd_bits_len,
+  input  [7:0]  io_vme_rd_2_cmd_bits_len,
   input  [20:0] io_vme_rd_2_cmd_bits_tag,
   output        io_vme_rd_2_data_valid,
   output [63:0] io_vme_rd_2_data_bits_data,
@@ -677,7 +677,7 @@ module VME(
   output        io_vme_rd_3_cmd_ready,
   input         io_vme_rd_3_cmd_valid,
   input  [31:0] io_vme_rd_3_cmd_bits_addr,
-  input  [3:0]  io_vme_rd_3_cmd_bits_len,
+  input  [7:0]  io_vme_rd_3_cmd_bits_len,
   input  [20:0] io_vme_rd_3_cmd_bits_tag,
   output        io_vme_rd_3_data_valid,
   output [63:0] io_vme_rd_3_data_bits_data,
@@ -685,7 +685,7 @@ module VME(
   output        io_vme_rd_4_cmd_ready,
   input         io_vme_rd_4_cmd_valid,
   input  [31:0] io_vme_rd_4_cmd_bits_addr,
-  input  [3:0]  io_vme_rd_4_cmd_bits_len,
+  input  [7:0]  io_vme_rd_4_cmd_bits_len,
   input  [20:0] io_vme_rd_4_cmd_bits_tag,
   output        io_vme_rd_4_data_valid,
   output [63:0] io_vme_rd_4_data_bits_data,
@@ -693,7 +693,7 @@ module VME(
   output        io_vme_wr_0_cmd_ready,
   input         io_vme_wr_0_cmd_valid,
   input  [31:0] io_vme_wr_0_cmd_bits_addr,
-  input  [3:0]  io_vme_wr_0_cmd_bits_len,
+  input  [7:0]  io_vme_wr_0_cmd_bits_len,
   output        io_vme_wr_0_data_ready,
   input         io_vme_wr_0_data_valid,
   input  [63:0] io_vme_wr_0_data_bits_data,
@@ -764,60 +764,60 @@ module VME(
   wire  VMEcmd_Qs_0_io_enq_ready; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_0_io_enq_valid; // @[VME.scala 243:11]
   wire [31:0] VMEcmd_Qs_0_io_enq_bits_addr; // @[VME.scala 243:11]
-  wire [3:0] VMEcmd_Qs_0_io_enq_bits_len; // @[VME.scala 243:11]
+  wire [7:0] VMEcmd_Qs_0_io_enq_bits_len; // @[VME.scala 243:11]
   wire [20:0] VMEcmd_Qs_0_io_enq_bits_tag; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_0_io_deq_ready; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_0_io_deq_valid; // @[VME.scala 243:11]
   wire [31:0] VMEcmd_Qs_0_io_deq_bits_addr; // @[VME.scala 243:11]
-  wire [3:0] VMEcmd_Qs_0_io_deq_bits_len; // @[VME.scala 243:11]
+  wire [7:0] VMEcmd_Qs_0_io_deq_bits_len; // @[VME.scala 243:11]
   wire [20:0] VMEcmd_Qs_0_io_deq_bits_tag; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_1_clock; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_1_reset; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_1_io_enq_ready; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_1_io_enq_valid; // @[VME.scala 243:11]
   wire [31:0] VMEcmd_Qs_1_io_enq_bits_addr; // @[VME.scala 243:11]
-  wire [3:0] VMEcmd_Qs_1_io_enq_bits_len; // @[VME.scala 243:11]
+  wire [7:0] VMEcmd_Qs_1_io_enq_bits_len; // @[VME.scala 243:11]
   wire [20:0] VMEcmd_Qs_1_io_enq_bits_tag; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_1_io_deq_ready; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_1_io_deq_valid; // @[VME.scala 243:11]
   wire [31:0] VMEcmd_Qs_1_io_deq_bits_addr; // @[VME.scala 243:11]
-  wire [3:0] VMEcmd_Qs_1_io_deq_bits_len; // @[VME.scala 243:11]
+  wire [7:0] VMEcmd_Qs_1_io_deq_bits_len; // @[VME.scala 243:11]
   wire [20:0] VMEcmd_Qs_1_io_deq_bits_tag; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_2_clock; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_2_reset; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_2_io_enq_ready; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_2_io_enq_valid; // @[VME.scala 243:11]
   wire [31:0] VMEcmd_Qs_2_io_enq_bits_addr; // @[VME.scala 243:11]
-  wire [3:0] VMEcmd_Qs_2_io_enq_bits_len; // @[VME.scala 243:11]
+  wire [7:0] VMEcmd_Qs_2_io_enq_bits_len; // @[VME.scala 243:11]
   wire [20:0] VMEcmd_Qs_2_io_enq_bits_tag; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_2_io_deq_ready; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_2_io_deq_valid; // @[VME.scala 243:11]
   wire [31:0] VMEcmd_Qs_2_io_deq_bits_addr; // @[VME.scala 243:11]
-  wire [3:0] VMEcmd_Qs_2_io_deq_bits_len; // @[VME.scala 243:11]
+  wire [7:0] VMEcmd_Qs_2_io_deq_bits_len; // @[VME.scala 243:11]
   wire [20:0] VMEcmd_Qs_2_io_deq_bits_tag; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_3_clock; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_3_reset; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_3_io_enq_ready; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_3_io_enq_valid; // @[VME.scala 243:11]
   wire [31:0] VMEcmd_Qs_3_io_enq_bits_addr; // @[VME.scala 243:11]
-  wire [3:0] VMEcmd_Qs_3_io_enq_bits_len; // @[VME.scala 243:11]
+  wire [7:0] VMEcmd_Qs_3_io_enq_bits_len; // @[VME.scala 243:11]
   wire [20:0] VMEcmd_Qs_3_io_enq_bits_tag; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_3_io_deq_ready; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_3_io_deq_valid; // @[VME.scala 243:11]
   wire [31:0] VMEcmd_Qs_3_io_deq_bits_addr; // @[VME.scala 243:11]
-  wire [3:0] VMEcmd_Qs_3_io_deq_bits_len; // @[VME.scala 243:11]
+  wire [7:0] VMEcmd_Qs_3_io_deq_bits_len; // @[VME.scala 243:11]
   wire [20:0] VMEcmd_Qs_3_io_deq_bits_tag; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_4_clock; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_4_reset; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_4_io_enq_ready; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_4_io_enq_valid; // @[VME.scala 243:11]
   wire [31:0] VMEcmd_Qs_4_io_enq_bits_addr; // @[VME.scala 243:11]
-  wire [3:0] VMEcmd_Qs_4_io_enq_bits_len; // @[VME.scala 243:11]
+  wire [7:0] VMEcmd_Qs_4_io_enq_bits_len; // @[VME.scala 243:11]
   wire [20:0] VMEcmd_Qs_4_io_enq_bits_tag; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_4_io_deq_ready; // @[VME.scala 243:11]
   wire  VMEcmd_Qs_4_io_deq_valid; // @[VME.scala 243:11]
   wire [31:0] VMEcmd_Qs_4_io_deq_bits_addr; // @[VME.scala 243:11]
-  wire [3:0] VMEcmd_Qs_4_io_deq_bits_len; // @[VME.scala 243:11]
+  wire [7:0] VMEcmd_Qs_4_io_deq_bits_len; // @[VME.scala 243:11]
   wire [20:0] VMEcmd_Qs_4_io_deq_bits_tag; // @[VME.scala 243:11]
   wire  responseQs_0_clock; // @[VME.scala 329:11]
   wire  responseQs_0_reset; // @[VME.scala 329:11]
@@ -956,7 +956,7 @@ module VME(
     VMEcmd_Qs_3_io_deq_valid | VMEcmd_Qs_4_io_deq_valid; // @[VME.scala 270:69]
   reg  arPending; // @[VME.scala 271:26]
   reg [31:0] arAddr; // @[VME.scala 272:19]
-  reg [3:0] arLen; // @[VME.scala 273:18]
+  reg [7:0] arLen; // @[VME.scala 273:18]
   reg [3:0] arId; // @[VME.scala 274:17]
   wire  issueRead = ~arPending & any_cmd_valid & |availableEntries; // @[VME.scala 275:47]
   wire  _VMEcmd_Qs_0_io_deq_ready_T = vme_select == 3'h0; // @[VME.scala 279:59]
@@ -971,28 +971,28 @@ module VME(
   wire [2:0] _GEN_75 = _VMEcmd_Qs_3_io_deq_ready_T & any_cmd_valid ? 3'h3 : _GEN_67; // @[VME.scala 302:46 303:39]
   wire [2:0] _GEN_83 = _VMEcmd_Qs_2_io_deq_ready_T & any_cmd_valid ? 3'h2 : _GEN_75; // @[VME.scala 302:46 303:39]
   wire [31:0] _GEN_64 = issueRead ? VMEcmd_Qs_4_io_deq_bits_addr : arAddr; // @[VME.scala 305:23 306:16 272:19]
-  wire [3:0] _GEN_65 = issueRead ? VMEcmd_Qs_4_io_deq_bits_len : arLen; // @[VME.scala 305:23 307:15 273:18]
+  wire [7:0] _GEN_65 = issueRead ? VMEcmd_Qs_4_io_deq_bits_len : arLen; // @[VME.scala 305:23 307:15 273:18]
   wire [3:0] _GEN_66 = issueRead ? firstPostn : arId; // @[VME.scala 305:23 308:14 274:17]
   wire [31:0] _GEN_69 = _VMEcmd_Qs_4_io_deq_ready_T & any_cmd_valid ? _GEN_64 : arAddr; // @[VME.scala 272:19 302:46]
-  wire [3:0] _GEN_70 = _VMEcmd_Qs_4_io_deq_ready_T & any_cmd_valid ? _GEN_65 : arLen; // @[VME.scala 273:18 302:46]
+  wire [7:0] _GEN_70 = _VMEcmd_Qs_4_io_deq_ready_T & any_cmd_valid ? _GEN_65 : arLen; // @[VME.scala 273:18 302:46]
   wire [3:0] _GEN_71 = _VMEcmd_Qs_4_io_deq_ready_T & any_cmd_valid ? _GEN_66 : arId; // @[VME.scala 274:17 302:46]
   wire [31:0] _GEN_72 = issueRead ? VMEcmd_Qs_3_io_deq_bits_addr : _GEN_69; // @[VME.scala 305:23 306:16]
-  wire [3:0] _GEN_73 = issueRead ? VMEcmd_Qs_3_io_deq_bits_len : _GEN_70; // @[VME.scala 305:23 307:15]
+  wire [7:0] _GEN_73 = issueRead ? VMEcmd_Qs_3_io_deq_bits_len : _GEN_70; // @[VME.scala 305:23 307:15]
   wire [3:0] _GEN_74 = issueRead ? firstPostn : _GEN_71; // @[VME.scala 305:23 308:14]
   wire [31:0] _GEN_77 = _VMEcmd_Qs_3_io_deq_ready_T & any_cmd_valid ? _GEN_72 : _GEN_69; // @[VME.scala 302:46]
-  wire [3:0] _GEN_78 = _VMEcmd_Qs_3_io_deq_ready_T & any_cmd_valid ? _GEN_73 : _GEN_70; // @[VME.scala 302:46]
+  wire [7:0] _GEN_78 = _VMEcmd_Qs_3_io_deq_ready_T & any_cmd_valid ? _GEN_73 : _GEN_70; // @[VME.scala 302:46]
   wire [3:0] _GEN_79 = _VMEcmd_Qs_3_io_deq_ready_T & any_cmd_valid ? _GEN_74 : _GEN_71; // @[VME.scala 302:46]
   wire [31:0] _GEN_80 = issueRead ? VMEcmd_Qs_2_io_deq_bits_addr : _GEN_77; // @[VME.scala 305:23 306:16]
-  wire [3:0] _GEN_81 = issueRead ? VMEcmd_Qs_2_io_deq_bits_len : _GEN_78; // @[VME.scala 305:23 307:15]
+  wire [7:0] _GEN_81 = issueRead ? VMEcmd_Qs_2_io_deq_bits_len : _GEN_78; // @[VME.scala 305:23 307:15]
   wire [3:0] _GEN_82 = issueRead ? firstPostn : _GEN_79; // @[VME.scala 305:23 308:14]
   wire [31:0] _GEN_85 = _VMEcmd_Qs_2_io_deq_ready_T & any_cmd_valid ? _GEN_80 : _GEN_77; // @[VME.scala 302:46]
-  wire [3:0] _GEN_86 = _VMEcmd_Qs_2_io_deq_ready_T & any_cmd_valid ? _GEN_81 : _GEN_78; // @[VME.scala 302:46]
+  wire [7:0] _GEN_86 = _VMEcmd_Qs_2_io_deq_ready_T & any_cmd_valid ? _GEN_81 : _GEN_78; // @[VME.scala 302:46]
   wire [3:0] _GEN_87 = _VMEcmd_Qs_2_io_deq_ready_T & any_cmd_valid ? _GEN_82 : _GEN_79; // @[VME.scala 302:46]
   wire [31:0] _GEN_88 = issueRead ? VMEcmd_Qs_1_io_deq_bits_addr : _GEN_85; // @[VME.scala 305:23 306:16]
-  wire [3:0] _GEN_89 = issueRead ? VMEcmd_Qs_1_io_deq_bits_len : _GEN_86; // @[VME.scala 305:23 307:15]
+  wire [7:0] _GEN_89 = issueRead ? VMEcmd_Qs_1_io_deq_bits_len : _GEN_86; // @[VME.scala 305:23 307:15]
   wire [3:0] _GEN_90 = issueRead ? firstPostn : _GEN_87; // @[VME.scala 305:23 308:14]
   wire [31:0] _GEN_93 = _VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid ? _GEN_88 : _GEN_85; // @[VME.scala 302:46]
-  wire [3:0] _GEN_94 = _VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid ? _GEN_89 : _GEN_86; // @[VME.scala 302:46]
+  wire [7:0] _GEN_94 = _VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid ? _GEN_89 : _GEN_86; // @[VME.scala 302:46]
   wire [3:0] _GEN_95 = _VMEcmd_Qs_1_io_deq_ready_T & any_cmd_valid ? _GEN_90 : _GEN_87; // @[VME.scala 302:46]
   wire  _GEN_104 = issueRead | arPending; // @[VME.scala 312:19 271:26 312:31]
   wire  _T_10 = io_mem_ar_ready & io_mem_ar_valid; // @[Decoupled.scala 50:35]
@@ -1059,88 +1059,88 @@ module VME(
   wire [15:0] _issuedEntries_T = issuedEntries | issuedEntry; // @[VME.scala 348:35]
   wire [15:0] _issuedEntries_T_1 = ~freedEntry; // @[VME.scala 348:52]
   wire [15:0] _issuedEntries_T_2 = _issuedEntries_T & _issuedEntries_T_1; // @[VME.scala 348:50]
-  reg [4:0] beatsRemaining_0; // @[VME.scala 350:27]
-  reg [4:0] beatsRemaining_1; // @[VME.scala 350:27]
-  reg [4:0] beatsRemaining_2; // @[VME.scala 350:27]
-  reg [4:0] beatsRemaining_3; // @[VME.scala 350:27]
-  reg [4:0] beatsRemaining_4; // @[VME.scala 350:27]
-  reg [4:0] beatsRemaining_5; // @[VME.scala 350:27]
-  reg [4:0] beatsRemaining_6; // @[VME.scala 350:27]
-  reg [4:0] beatsRemaining_7; // @[VME.scala 350:27]
-  reg [4:0] beatsRemaining_8; // @[VME.scala 350:27]
-  reg [4:0] beatsRemaining_9; // @[VME.scala 350:27]
-  reg [4:0] beatsRemaining_10; // @[VME.scala 350:27]
-  reg [4:0] beatsRemaining_11; // @[VME.scala 350:27]
-  reg [4:0] beatsRemaining_12; // @[VME.scala 350:27]
-  reg [4:0] beatsRemaining_13; // @[VME.scala 350:27]
-  reg [4:0] beatsRemaining_14; // @[VME.scala 350:27]
-  reg [4:0] beatsRemaining_15; // @[VME.scala 350:27]
-  wire [4:0] _beatsRemaining_T = arLen + 4'h1; // @[VME.scala 352:35]
-  wire [4:0] _GEN_138 = 4'h0 == arId ? _beatsRemaining_T : beatsRemaining_0; // @[VME.scala 352:{26,26} 350:27]
-  wire [4:0] _GEN_139 = 4'h1 == arId ? _beatsRemaining_T : beatsRemaining_1; // @[VME.scala 352:{26,26} 350:27]
-  wire [4:0] _GEN_140 = 4'h2 == arId ? _beatsRemaining_T : beatsRemaining_2; // @[VME.scala 352:{26,26} 350:27]
-  wire [4:0] _GEN_141 = 4'h3 == arId ? _beatsRemaining_T : beatsRemaining_3; // @[VME.scala 352:{26,26} 350:27]
-  wire [4:0] _GEN_142 = 4'h4 == arId ? _beatsRemaining_T : beatsRemaining_4; // @[VME.scala 352:{26,26} 350:27]
-  wire [4:0] _GEN_143 = 4'h5 == arId ? _beatsRemaining_T : beatsRemaining_5; // @[VME.scala 352:{26,26} 350:27]
-  wire [4:0] _GEN_144 = 4'h6 == arId ? _beatsRemaining_T : beatsRemaining_6; // @[VME.scala 352:{26,26} 350:27]
-  wire [4:0] _GEN_145 = 4'h7 == arId ? _beatsRemaining_T : beatsRemaining_7; // @[VME.scala 352:{26,26} 350:27]
-  wire [4:0] _GEN_146 = 4'h8 == arId ? _beatsRemaining_T : beatsRemaining_8; // @[VME.scala 352:{26,26} 350:27]
-  wire [4:0] _GEN_147 = 4'h9 == arId ? _beatsRemaining_T : beatsRemaining_9; // @[VME.scala 352:{26,26} 350:27]
-  wire [4:0] _GEN_148 = 4'ha == arId ? _beatsRemaining_T : beatsRemaining_10; // @[VME.scala 352:{26,26} 350:27]
-  wire [4:0] _GEN_149 = 4'hb == arId ? _beatsRemaining_T : beatsRemaining_11; // @[VME.scala 352:{26,26} 350:27]
-  wire [4:0] _GEN_150 = 4'hc == arId ? _beatsRemaining_T : beatsRemaining_12; // @[VME.scala 352:{26,26} 350:27]
-  wire [4:0] _GEN_151 = 4'hd == arId ? _beatsRemaining_T : beatsRemaining_13; // @[VME.scala 352:{26,26} 350:27]
-  wire [4:0] _GEN_152 = 4'he == arId ? _beatsRemaining_T : beatsRemaining_14; // @[VME.scala 352:{26,26} 350:27]
-  wire [4:0] _GEN_153 = 4'hf == arId ? _beatsRemaining_T : beatsRemaining_15; // @[VME.scala 352:{26,26} 350:27]
-  wire [4:0] _GEN_154 = _T_10 ? _GEN_138 : beatsRemaining_0; // @[VME.scala 351:24 350:27]
-  wire [4:0] _GEN_155 = _T_10 ? _GEN_139 : beatsRemaining_1; // @[VME.scala 351:24 350:27]
-  wire [4:0] _GEN_156 = _T_10 ? _GEN_140 : beatsRemaining_2; // @[VME.scala 351:24 350:27]
-  wire [4:0] _GEN_157 = _T_10 ? _GEN_141 : beatsRemaining_3; // @[VME.scala 351:24 350:27]
-  wire [4:0] _GEN_158 = _T_10 ? _GEN_142 : beatsRemaining_4; // @[VME.scala 351:24 350:27]
-  wire [4:0] _GEN_159 = _T_10 ? _GEN_143 : beatsRemaining_5; // @[VME.scala 351:24 350:27]
-  wire [4:0] _GEN_160 = _T_10 ? _GEN_144 : beatsRemaining_6; // @[VME.scala 351:24 350:27]
-  wire [4:0] _GEN_161 = _T_10 ? _GEN_145 : beatsRemaining_7; // @[VME.scala 351:24 350:27]
-  wire [4:0] _GEN_162 = _T_10 ? _GEN_146 : beatsRemaining_8; // @[VME.scala 351:24 350:27]
-  wire [4:0] _GEN_163 = _T_10 ? _GEN_147 : beatsRemaining_9; // @[VME.scala 351:24 350:27]
-  wire [4:0] _GEN_164 = _T_10 ? _GEN_148 : beatsRemaining_10; // @[VME.scala 351:24 350:27]
-  wire [4:0] _GEN_165 = _T_10 ? _GEN_149 : beatsRemaining_11; // @[VME.scala 351:24 350:27]
-  wire [4:0] _GEN_166 = _T_10 ? _GEN_150 : beatsRemaining_12; // @[VME.scala 351:24 350:27]
-  wire [4:0] _GEN_167 = _T_10 ? _GEN_151 : beatsRemaining_13; // @[VME.scala 351:24 350:27]
-  wire [4:0] _GEN_168 = _T_10 ? _GEN_152 : beatsRemaining_14; // @[VME.scala 351:24 350:27]
-  wire [4:0] _GEN_169 = _T_10 ? _GEN_153 : beatsRemaining_15; // @[VME.scala 351:24 350:27]
-  wire [4:0] _GEN_171 = 4'h1 == ridIndex ? beatsRemaining_1 : beatsRemaining_0; // @[VME.scala 355:{27,27}]
-  wire [4:0] _GEN_172 = 4'h2 == ridIndex ? beatsRemaining_2 : _GEN_171; // @[VME.scala 355:{27,27}]
-  wire [4:0] _GEN_173 = 4'h3 == ridIndex ? beatsRemaining_3 : _GEN_172; // @[VME.scala 355:{27,27}]
-  wire [4:0] _GEN_174 = 4'h4 == ridIndex ? beatsRemaining_4 : _GEN_173; // @[VME.scala 355:{27,27}]
-  wire [4:0] _GEN_175 = 4'h5 == ridIndex ? beatsRemaining_5 : _GEN_174; // @[VME.scala 355:{27,27}]
-  wire [4:0] _GEN_176 = 4'h6 == ridIndex ? beatsRemaining_6 : _GEN_175; // @[VME.scala 355:{27,27}]
-  wire [4:0] _GEN_177 = 4'h7 == ridIndex ? beatsRemaining_7 : _GEN_176; // @[VME.scala 355:{27,27}]
-  wire [4:0] _GEN_178 = 4'h8 == ridIndex ? beatsRemaining_8 : _GEN_177; // @[VME.scala 355:{27,27}]
-  wire [4:0] _GEN_179 = 4'h9 == ridIndex ? beatsRemaining_9 : _GEN_178; // @[VME.scala 355:{27,27}]
-  wire [4:0] _GEN_180 = 4'ha == ridIndex ? beatsRemaining_10 : _GEN_179; // @[VME.scala 355:{27,27}]
-  wire [4:0] _GEN_181 = 4'hb == ridIndex ? beatsRemaining_11 : _GEN_180; // @[VME.scala 355:{27,27}]
-  wire [4:0] _GEN_182 = 4'hc == ridIndex ? beatsRemaining_12 : _GEN_181; // @[VME.scala 355:{27,27}]
-  wire [4:0] _GEN_183 = 4'hd == ridIndex ? beatsRemaining_13 : _GEN_182; // @[VME.scala 355:{27,27}]
-  wire [4:0] _GEN_184 = 4'he == ridIndex ? beatsRemaining_14 : _GEN_183; // @[VME.scala 355:{27,27}]
-  wire [4:0] _GEN_185 = 4'hf == ridIndex ? beatsRemaining_15 : _GEN_184; // @[VME.scala 355:{27,27}]
-  wire [4:0] currentBeats = issuingSameSlot ? _beatsRemaining_T : _GEN_185; // @[VME.scala 355:27]
+  reg [8:0] beatsRemaining_0; // @[VME.scala 350:27]
+  reg [8:0] beatsRemaining_1; // @[VME.scala 350:27]
+  reg [8:0] beatsRemaining_2; // @[VME.scala 350:27]
+  reg [8:0] beatsRemaining_3; // @[VME.scala 350:27]
+  reg [8:0] beatsRemaining_4; // @[VME.scala 350:27]
+  reg [8:0] beatsRemaining_5; // @[VME.scala 350:27]
+  reg [8:0] beatsRemaining_6; // @[VME.scala 350:27]
+  reg [8:0] beatsRemaining_7; // @[VME.scala 350:27]
+  reg [8:0] beatsRemaining_8; // @[VME.scala 350:27]
+  reg [8:0] beatsRemaining_9; // @[VME.scala 350:27]
+  reg [8:0] beatsRemaining_10; // @[VME.scala 350:27]
+  reg [8:0] beatsRemaining_11; // @[VME.scala 350:27]
+  reg [8:0] beatsRemaining_12; // @[VME.scala 350:27]
+  reg [8:0] beatsRemaining_13; // @[VME.scala 350:27]
+  reg [8:0] beatsRemaining_14; // @[VME.scala 350:27]
+  reg [8:0] beatsRemaining_15; // @[VME.scala 350:27]
+  wire [8:0] _beatsRemaining_T = arLen + 8'h1; // @[VME.scala 352:35]
+  wire [8:0] _GEN_138 = 4'h0 == arId ? _beatsRemaining_T : beatsRemaining_0; // @[VME.scala 352:{26,26} 350:27]
+  wire [8:0] _GEN_139 = 4'h1 == arId ? _beatsRemaining_T : beatsRemaining_1; // @[VME.scala 352:{26,26} 350:27]
+  wire [8:0] _GEN_140 = 4'h2 == arId ? _beatsRemaining_T : beatsRemaining_2; // @[VME.scala 352:{26,26} 350:27]
+  wire [8:0] _GEN_141 = 4'h3 == arId ? _beatsRemaining_T : beatsRemaining_3; // @[VME.scala 352:{26,26} 350:27]
+  wire [8:0] _GEN_142 = 4'h4 == arId ? _beatsRemaining_T : beatsRemaining_4; // @[VME.scala 352:{26,26} 350:27]
+  wire [8:0] _GEN_143 = 4'h5 == arId ? _beatsRemaining_T : beatsRemaining_5; // @[VME.scala 352:{26,26} 350:27]
+  wire [8:0] _GEN_144 = 4'h6 == arId ? _beatsRemaining_T : beatsRemaining_6; // @[VME.scala 352:{26,26} 350:27]
+  wire [8:0] _GEN_145 = 4'h7 == arId ? _beatsRemaining_T : beatsRemaining_7; // @[VME.scala 352:{26,26} 350:27]
+  wire [8:0] _GEN_146 = 4'h8 == arId ? _beatsRemaining_T : beatsRemaining_8; // @[VME.scala 352:{26,26} 350:27]
+  wire [8:0] _GEN_147 = 4'h9 == arId ? _beatsRemaining_T : beatsRemaining_9; // @[VME.scala 352:{26,26} 350:27]
+  wire [8:0] _GEN_148 = 4'ha == arId ? _beatsRemaining_T : beatsRemaining_10; // @[VME.scala 352:{26,26} 350:27]
+  wire [8:0] _GEN_149 = 4'hb == arId ? _beatsRemaining_T : beatsRemaining_11; // @[VME.scala 352:{26,26} 350:27]
+  wire [8:0] _GEN_150 = 4'hc == arId ? _beatsRemaining_T : beatsRemaining_12; // @[VME.scala 352:{26,26} 350:27]
+  wire [8:0] _GEN_151 = 4'hd == arId ? _beatsRemaining_T : beatsRemaining_13; // @[VME.scala 352:{26,26} 350:27]
+  wire [8:0] _GEN_152 = 4'he == arId ? _beatsRemaining_T : beatsRemaining_14; // @[VME.scala 352:{26,26} 350:27]
+  wire [8:0] _GEN_153 = 4'hf == arId ? _beatsRemaining_T : beatsRemaining_15; // @[VME.scala 352:{26,26} 350:27]
+  wire [8:0] _GEN_154 = _T_10 ? _GEN_138 : beatsRemaining_0; // @[VME.scala 351:24 350:27]
+  wire [8:0] _GEN_155 = _T_10 ? _GEN_139 : beatsRemaining_1; // @[VME.scala 351:24 350:27]
+  wire [8:0] _GEN_156 = _T_10 ? _GEN_140 : beatsRemaining_2; // @[VME.scala 351:24 350:27]
+  wire [8:0] _GEN_157 = _T_10 ? _GEN_141 : beatsRemaining_3; // @[VME.scala 351:24 350:27]
+  wire [8:0] _GEN_158 = _T_10 ? _GEN_142 : beatsRemaining_4; // @[VME.scala 351:24 350:27]
+  wire [8:0] _GEN_159 = _T_10 ? _GEN_143 : beatsRemaining_5; // @[VME.scala 351:24 350:27]
+  wire [8:0] _GEN_160 = _T_10 ? _GEN_144 : beatsRemaining_6; // @[VME.scala 351:24 350:27]
+  wire [8:0] _GEN_161 = _T_10 ? _GEN_145 : beatsRemaining_7; // @[VME.scala 351:24 350:27]
+  wire [8:0] _GEN_162 = _T_10 ? _GEN_146 : beatsRemaining_8; // @[VME.scala 351:24 350:27]
+  wire [8:0] _GEN_163 = _T_10 ? _GEN_147 : beatsRemaining_9; // @[VME.scala 351:24 350:27]
+  wire [8:0] _GEN_164 = _T_10 ? _GEN_148 : beatsRemaining_10; // @[VME.scala 351:24 350:27]
+  wire [8:0] _GEN_165 = _T_10 ? _GEN_149 : beatsRemaining_11; // @[VME.scala 351:24 350:27]
+  wire [8:0] _GEN_166 = _T_10 ? _GEN_150 : beatsRemaining_12; // @[VME.scala 351:24 350:27]
+  wire [8:0] _GEN_167 = _T_10 ? _GEN_151 : beatsRemaining_13; // @[VME.scala 351:24 350:27]
+  wire [8:0] _GEN_168 = _T_10 ? _GEN_152 : beatsRemaining_14; // @[VME.scala 351:24 350:27]
+  wire [8:0] _GEN_169 = _T_10 ? _GEN_153 : beatsRemaining_15; // @[VME.scala 351:24 350:27]
+  wire [8:0] _GEN_171 = 4'h1 == ridIndex ? beatsRemaining_1 : beatsRemaining_0; // @[VME.scala 355:{27,27}]
+  wire [8:0] _GEN_172 = 4'h2 == ridIndex ? beatsRemaining_2 : _GEN_171; // @[VME.scala 355:{27,27}]
+  wire [8:0] _GEN_173 = 4'h3 == ridIndex ? beatsRemaining_3 : _GEN_172; // @[VME.scala 355:{27,27}]
+  wire [8:0] _GEN_174 = 4'h4 == ridIndex ? beatsRemaining_4 : _GEN_173; // @[VME.scala 355:{27,27}]
+  wire [8:0] _GEN_175 = 4'h5 == ridIndex ? beatsRemaining_5 : _GEN_174; // @[VME.scala 355:{27,27}]
+  wire [8:0] _GEN_176 = 4'h6 == ridIndex ? beatsRemaining_6 : _GEN_175; // @[VME.scala 355:{27,27}]
+  wire [8:0] _GEN_177 = 4'h7 == ridIndex ? beatsRemaining_7 : _GEN_176; // @[VME.scala 355:{27,27}]
+  wire [8:0] _GEN_178 = 4'h8 == ridIndex ? beatsRemaining_8 : _GEN_177; // @[VME.scala 355:{27,27}]
+  wire [8:0] _GEN_179 = 4'h9 == ridIndex ? beatsRemaining_9 : _GEN_178; // @[VME.scala 355:{27,27}]
+  wire [8:0] _GEN_180 = 4'ha == ridIndex ? beatsRemaining_10 : _GEN_179; // @[VME.scala 355:{27,27}]
+  wire [8:0] _GEN_181 = 4'hb == ridIndex ? beatsRemaining_11 : _GEN_180; // @[VME.scala 355:{27,27}]
+  wire [8:0] _GEN_182 = 4'hc == ridIndex ? beatsRemaining_12 : _GEN_181; // @[VME.scala 355:{27,27}]
+  wire [8:0] _GEN_183 = 4'hd == ridIndex ? beatsRemaining_13 : _GEN_182; // @[VME.scala 355:{27,27}]
+  wire [8:0] _GEN_184 = 4'he == ridIndex ? beatsRemaining_14 : _GEN_183; // @[VME.scala 355:{27,27}]
+  wire [8:0] _GEN_185 = 4'hf == ridIndex ? beatsRemaining_15 : _GEN_184; // @[VME.scala 355:{27,27}]
+  wire [8:0] currentBeats = issuingSameSlot ? _beatsRemaining_T : _GEN_185; // @[VME.scala 355:27]
   wire  _T_15 = ~reset; // @[VME.scala 356:11]
-  wire [4:0] _beatsRemaining_T_2 = currentBeats - 5'h1; // @[VME.scala 360:46]
+  wire [8:0] _beatsRemaining_T_2 = currentBeats - 9'h1; // @[VME.scala 360:46]
   wire  _T_22 = ~ridInRange; // @[VME.scala 363:10]
   wire  _T_23 = ~slotAllocated; // @[VME.scala 363:25]
   wire  _T_25 = ~slotIssued; // @[VME.scala 363:43]
   wire  _T_27 = ~clientInRange; // @[VME.scala 363:58]
   wire  _T_28 = ~ridInRange | ~slotAllocated | ~slotIssued | ~clientInRange; // @[VME.scala 363:55]
-  reg [3:0] wr_len; // @[VME.scala 376:23]
+  reg [7:0] wr_len; // @[VME.scala 376:23]
   reg [31:0] wr_addr; // @[VME.scala 377:24]
   reg [1:0] wstate; // @[VME.scala 379:23]
-  reg [3:0] wr_cnt; // @[VME.scala 380:23]
+  reg [7:0] wr_cnt; // @[VME.scala 380:23]
   wire  _io_vme_wr_0_cmd_ready_T = wstate == 2'h0; // @[VME.scala 381:36]
   wire  _io_vme_wr_0_data_ready_T = wstate == 2'h2; // @[VME.scala 383:37]
   wire  _io_mem_w_bits_last_T = wr_cnt == wr_len; // @[VME.scala 391:32]
   wire  _T_56 = io_vme_wr_0_cmd_ready & io_vme_wr_0_cmd_valid; // @[Decoupled.scala 50:35]
   wire  _T_58 = io_mem_w_ready & io_mem_w_valid; // @[Decoupled.scala 50:35]
-  wire [3:0] _wr_cnt_T_1 = wr_cnt + 4'h1; // @[VME.scala 407:22]
+  wire [7:0] _wr_cnt_T_1 = wr_cnt + 8'h1; // @[VME.scala 407:22]
   wire [1:0] _GEN_224 = io_vme_wr_0_data_valid & io_mem_w_ready & _io_mem_w_bits_last_T ? 2'h3 : wstate; // @[VME.scala 421:76 422:16 379:23]
   wire [1:0] _GEN_225 = io_mem_b_valid ? 2'h0 : wstate; // @[VME.scala 426:28 427:16 379:23]
   wire [1:0] _GEN_226 = 2'h3 == wstate ? _GEN_225 : wstate; // @[VME.scala 409:17 379:23]
@@ -1935,7 +1935,7 @@ module VME(
       beatsRemaining_15 <= _GEN_169;
     end
     if (reset) begin // @[VME.scala 376:23]
-      wr_len <= 4'h0; // @[VME.scala 376:23]
+      wr_len <= 8'h0; // @[VME.scala 376:23]
     end else if (_T_56) begin // @[VME.scala 399:31]
       wr_len <= io_vme_wr_0_cmd_bits_len; // @[VME.scala 400:12]
     end
@@ -1960,9 +1960,9 @@ module VME(
       wstate <= _GEN_226;
     end
     if (reset) begin // @[VME.scala 380:23]
-      wr_cnt <= 4'h0; // @[VME.scala 380:23]
+      wr_cnt <= 8'h0; // @[VME.scala 380:23]
     end else if (_io_vme_wr_0_cmd_ready_T) begin // @[VME.scala 403:31]
-      wr_cnt <= 4'h0; // @[VME.scala 404:12]
+      wr_cnt <= 8'h0; // @[VME.scala 404:12]
     end else if (_T_58) begin // @[VME.scala 406:27]
       wr_cnt <= _wr_cnt_T_1; // @[VME.scala 407:12]
     end
@@ -1970,7 +1970,7 @@ module VME(
     `ifdef PRINTF_COND
       if (`PRINTF_COND) begin
     `endif
-        if (_freedEntry_T & ~reset & ~(currentBeats != 5'h0)) begin
+        if (_freedEntry_T & ~reset & ~(currentBeats != 9'h0)) begin
           $fwrite(32'h80000002,
             "Assertion failed: VME received a read beat for a completed request\n    at VME.scala:356 assert(currentBeats =/= 0.U,\n"
             ); // @[VME.scala 356:11]
@@ -1983,7 +1983,7 @@ module VME(
     `ifdef PRINTF_COND
       if (`PRINTF_COND) begin
     `endif
-        if (_GEN_233 & ~(io_mem_r_bits_last == (currentBeats == 5'h1))) begin
+        if (_GEN_233 & ~(io_mem_r_bits_last == (currentBeats == 9'h1))) begin
           $fwrite(32'h80000002,
             "Assertion failed: VME AXI RLAST does not match ARLEN\n    at VME.scala:358 assert(io.mem.r.bits.last === (currentBeats === 1.U),\n"
             ); // @[VME.scala 358:11]
@@ -2203,51 +2203,51 @@ initial begin
   _RAND_34 = {1{`RANDOM}};
   arAddr = _RAND_34[31:0];
   _RAND_35 = {1{`RANDOM}};
-  arLen = _RAND_35[3:0];
+  arLen = _RAND_35[7:0];
   _RAND_36 = {1{`RANDOM}};
   arId = _RAND_36[3:0];
   _RAND_37 = {1{`RANDOM}};
   issuedEntries = _RAND_37[15:0];
   _RAND_38 = {1{`RANDOM}};
-  beatsRemaining_0 = _RAND_38[4:0];
+  beatsRemaining_0 = _RAND_38[8:0];
   _RAND_39 = {1{`RANDOM}};
-  beatsRemaining_1 = _RAND_39[4:0];
+  beatsRemaining_1 = _RAND_39[8:0];
   _RAND_40 = {1{`RANDOM}};
-  beatsRemaining_2 = _RAND_40[4:0];
+  beatsRemaining_2 = _RAND_40[8:0];
   _RAND_41 = {1{`RANDOM}};
-  beatsRemaining_3 = _RAND_41[4:0];
+  beatsRemaining_3 = _RAND_41[8:0];
   _RAND_42 = {1{`RANDOM}};
-  beatsRemaining_4 = _RAND_42[4:0];
+  beatsRemaining_4 = _RAND_42[8:0];
   _RAND_43 = {1{`RANDOM}};
-  beatsRemaining_5 = _RAND_43[4:0];
+  beatsRemaining_5 = _RAND_43[8:0];
   _RAND_44 = {1{`RANDOM}};
-  beatsRemaining_6 = _RAND_44[4:0];
+  beatsRemaining_6 = _RAND_44[8:0];
   _RAND_45 = {1{`RANDOM}};
-  beatsRemaining_7 = _RAND_45[4:0];
+  beatsRemaining_7 = _RAND_45[8:0];
   _RAND_46 = {1{`RANDOM}};
-  beatsRemaining_8 = _RAND_46[4:0];
+  beatsRemaining_8 = _RAND_46[8:0];
   _RAND_47 = {1{`RANDOM}};
-  beatsRemaining_9 = _RAND_47[4:0];
+  beatsRemaining_9 = _RAND_47[8:0];
   _RAND_48 = {1{`RANDOM}};
-  beatsRemaining_10 = _RAND_48[4:0];
+  beatsRemaining_10 = _RAND_48[8:0];
   _RAND_49 = {1{`RANDOM}};
-  beatsRemaining_11 = _RAND_49[4:0];
+  beatsRemaining_11 = _RAND_49[8:0];
   _RAND_50 = {1{`RANDOM}};
-  beatsRemaining_12 = _RAND_50[4:0];
+  beatsRemaining_12 = _RAND_50[8:0];
   _RAND_51 = {1{`RANDOM}};
-  beatsRemaining_13 = _RAND_51[4:0];
+  beatsRemaining_13 = _RAND_51[8:0];
   _RAND_52 = {1{`RANDOM}};
-  beatsRemaining_14 = _RAND_52[4:0];
+  beatsRemaining_14 = _RAND_52[8:0];
   _RAND_53 = {1{`RANDOM}};
-  beatsRemaining_15 = _RAND_53[4:0];
+  beatsRemaining_15 = _RAND_53[8:0];
   _RAND_54 = {1{`RANDOM}};
-  wr_len = _RAND_54[3:0];
+  wr_len = _RAND_54[7:0];
   _RAND_55 = {1{`RANDOM}};
   wr_addr = _RAND_55[31:0];
   _RAND_56 = {1{`RANDOM}};
   wstate = _RAND_56[1:0];
   _RAND_57 = {1{`RANDOM}};
-  wr_cnt = _RAND_57[3:0];
+  wr_cnt = _RAND_57[7:0];
 `endif // RANDOMIZE_REG_INIT
   `endif // RANDOMIZE
 end // initial
@@ -2258,11 +2258,11 @@ end // initial
   always @(posedge clock) begin
     //
     if (_freedEntry_T & ~reset) begin
-      assert(currentBeats != 5'h0); // @[VME.scala 356:11]
+      assert(currentBeats != 9'h0); // @[VME.scala 356:11]
     end
     //
     if (_freedEntry_T & _T_15) begin
-      assert(io_mem_r_bits_last == (currentBeats == 5'h1)); // @[VME.scala 358:11]
+      assert(io_mem_r_bits_last == (currentBeats == 9'h1)); // @[VME.scala 358:11]
     end
     //
     if (io_mem_r_valid & _T_15) begin
@@ -3178,7 +3178,7 @@ module FetchInstMemNarrow(
   input          io_vme_rd_cmd_ready,
   output         io_vme_rd_cmd_valid,
   output [31:0]  io_vme_rd_cmd_bits_addr,
-  output [3:0]   io_vme_rd_cmd_bits_len,
+  output [7:0]   io_vme_rd_cmd_bits_len,
   output         io_vme_rd_data_ready,
   input          io_vme_rd_data_valid,
   input  [63:0]  io_vme_rd_data_bits_data,
@@ -3229,45 +3229,41 @@ module FetchInstMemNarrow(
   reg [31:0] address; // @[FetchInstMem.scala 273:20]
   reg [31:0] remaining; // @[FetchInstMem.scala 274:22]
   reg [5:0] selectedInsts; // @[FetchInstMem.scala 275:26]
-  reg [4:0] selectedBeats; // @[FetchInstMem.scala 276:26]
-  reg [4:0] beatsLeft; // @[FetchInstMem.scala 277:22]
+  reg [8:0] selectedBeats; // @[FetchInstMem.scala 276:26]
+  reg [8:0] beatsLeft; // @[FetchInstMem.scala 277:22]
   reg  instBeat; // @[FetchInstMem.scala 278:25]
   reg [63:0] parts_0; // @[FetchInstMem.scala 279:18]
   reg [63:0] parts_1; // @[FetchInstMem.scala 279:18]
   wire [5:0] wantedInsts = remaining > 32'h8 ? 6'h8 : remaining[5:0]; // @[FetchInstMem.scala 281:24]
-  wire [4:0] _io_vme_rd_cmd_bits_len_T_1 = selectedBeats - 5'h1; // @[FetchInstMem.scala 288:44]
+  wire [8:0] _io_vme_rd_cmd_bits_len_T_1 = selectedBeats - 9'h1; // @[FetchInstMem.scala 288:44]
   wire [63:0] completedParts_0 = ~instBeat ? io_vme_rd_data_bits_data : parts_0; // @[FetchInstMem.scala 292:18 293:{28,28}]
   wire [63:0] completedParts_1 = instBeat ? io_vme_rd_data_bits_data : parts_1; // @[FetchInstMem.scala 292:18 293:{28,28}]
   wire  _core_io_write_valid_T = state == 2'h3; // @[FetchInstMem.scala 295:32]
   wire  _io_vme_rd_data_ready_T_2 = ~instBeat | core_io_write_ready; // @[FetchInstMem.scala 298:21]
   wire  dataFire = io_vme_rd_data_ready & io_vme_rd_data_valid; // @[Decoupled.scala 50:35]
-  wire [4:0] _beatsLeft_T_1 = beatsLeft - 5'h1; // @[FetchInstMem.scala 308:28]
-  wire  _T = beatsLeft == 5'h1; // @[FetchInstMem.scala 309:50]
-  wire  _T_1 = io_vme_rd_data_bits_last != (beatsLeft == 5'h1); // @[FetchInstMem.scala 309:35]
+  wire [8:0] _beatsLeft_T_1 = beatsLeft - 9'h1; // @[FetchInstMem.scala 308:28]
+  wire  _T = beatsLeft == 9'h1; // @[FetchInstMem.scala 309:50]
+  wire  _T_1 = io_vme_rd_data_bits_last != (beatsLeft == 9'h1); // @[FetchInstMem.scala 309:35]
   wire  _T_3 = ~reset; // @[FetchInstMem.scala 310:13]
-  wire [4:0] _GEN_8 = dataFire ? _beatsLeft_T_1 : beatsLeft; // @[FetchInstMem.scala 301:18 308:15 277:22]
+  wire [8:0] _GEN_8 = dataFire ? _beatsLeft_T_1 : beatsLeft; // @[FetchInstMem.scala 301:18 308:15 277:22]
   wire [31:0] _T_9 = io_ins_baddr & 32'h7f; // @[FetchInstMem.scala 322:26]
   wire  _T_16 = core_io_reserve_ready & core_io_reserve_valid; // @[Decoupled.scala 50:35]
   wire [7:0] _selectedBeats_T = wantedInsts * 2'h2; // @[FetchInstMem.scala 332:40]
-  wire [7:0] _GEN_10 = _T_16 ? _selectedBeats_T : {{3'd0}, selectedBeats}; // @[FetchInstMem.scala 330:36 332:25 276:26]
   wire [1:0] _GEN_11 = _T_16 ? 2'h2 : state; // @[FetchInstMem.scala 330:36 333:17 272:22]
   wire  _T_18 = io_vme_rd_cmd_ready & io_vme_rd_cmd_valid; // @[Decoupled.scala 50:35]
   wire [31:0] _GEN_41 = {{26'd0}, selectedInsts}; // @[FetchInstMem.scala 338:34]
   wire [31:0] _remaining_T_1 = remaining - _GEN_41; // @[FetchInstMem.scala 338:34]
-  wire [8:0] _address_T = selectedBeats * 4'h8; // @[FetchInstMem.scala 339:46]
-  wire [31:0] _GEN_42 = {{23'd0}, _address_T}; // @[FetchInstMem.scala 339:30]
+  wire [12:0] _address_T = selectedBeats * 4'h8; // @[FetchInstMem.scala 339:46]
+  wire [31:0] _GEN_42 = {{19'd0}, _address_T}; // @[FetchInstMem.scala 339:30]
   wire [31:0] _address_T_2 = address + _GEN_42; // @[FetchInstMem.scala 339:30]
   wire [31:0] _GEN_12 = _T_18 ? _remaining_T_1 : remaining; // @[FetchInstMem.scala 337:34 338:21 274:22]
   wire [31:0] _GEN_13 = _T_18 ? _address_T_2 : address; // @[FetchInstMem.scala 337:34 339:19 273:20]
-  wire [4:0] _GEN_14 = _T_18 ? selectedBeats : _GEN_8; // @[FetchInstMem.scala 337:34 340:21]
+  wire [8:0] _GEN_14 = _T_18 ? selectedBeats : _GEN_8; // @[FetchInstMem.scala 337:34 340:21]
   wire [1:0] _GEN_15 = _T_18 ? 2'h3 : state; // @[FetchInstMem.scala 337:34 341:17 272:22]
   wire [1:0] _state_T_3 = remaining == 32'h0 ? 2'h0 : 2'h1; // @[FetchInstMem.scala 346:23]
   wire [1:0] _GEN_16 = dataFire & _T ? _state_T_3 : state; // @[FetchInstMem.scala 345:45 346:17 272:22]
   wire [1:0] _GEN_17 = 2'h3 == state ? _GEN_16 : state; // @[FetchInstMem.scala 325:19 272:22]
   wire [1:0] _GEN_21 = 2'h2 == state ? _GEN_15 : _GEN_17; // @[FetchInstMem.scala 325:19]
-  wire [7:0] _GEN_23 = 2'h1 == state ? _GEN_10 : {{3'd0}, selectedBeats}; // @[FetchInstMem.scala 325:19 276:26]
-  wire [7:0] _GEN_29 = 2'h0 == state ? {{3'd0}, selectedBeats} : _GEN_23; // @[FetchInstMem.scala 325:19 276:26]
-  wire [7:0] _GEN_39 = launch ? {{3'd0}, selectedBeats} : _GEN_29; // @[FetchInstMem.scala 317:16 276:26]
   FetchInstMemCore core ( // @[FetchInstMem.scala 268:20]
     .clock(core_clock),
     .reset(core_reset),
@@ -3290,7 +3286,7 @@ module FetchInstMemNarrow(
   );
   assign io_vme_rd_cmd_valid = state == 2'h2; // @[FetchInstMem.scala 286:32]
   assign io_vme_rd_cmd_bits_addr = address; // @[FetchInstMem.scala 287:27]
-  assign io_vme_rd_cmd_bits_len = _io_vme_rd_cmd_bits_len_T_1[3:0]; // @[FetchInstMem.scala 288:50]
+  assign io_vme_rd_cmd_bits_len = _io_vme_rd_cmd_bits_len_T_1[7:0]; // @[FetchInstMem.scala 288:50]
   assign io_vme_rd_data_ready = _core_io_write_valid_T & _io_vme_rd_data_ready_T_2; // @[FetchInstMem.scala 297:46]
   assign io_inst_ld_valid = core_io_inst_ld_valid; // @[FetchInstMem.scala 270:11]
   assign io_inst_ld_bits = core_io_inst_ld_bits; // @[FetchInstMem.scala 270:11]
@@ -3356,7 +3352,15 @@ module FetchInstMemNarrow(
         end
       end
     end
-    selectedBeats <= _GEN_39[4:0];
+    if (!(launch)) begin // @[FetchInstMem.scala 317:16]
+      if (!(2'h0 == state)) begin // @[FetchInstMem.scala 325:19]
+        if (2'h1 == state) begin // @[FetchInstMem.scala 325:19]
+          if (_T_16) begin // @[FetchInstMem.scala 330:36]
+            selectedBeats <= {{1'd0}, _selectedBeats_T}; // @[FetchInstMem.scala 332:25]
+          end
+        end
+      end
+    end
     if (launch) begin // @[FetchInstMem.scala 317:16]
       beatsLeft <= _GEN_8;
     end else if (2'h0 == state) begin // @[FetchInstMem.scala 325:19]
@@ -3475,9 +3479,9 @@ initial begin
   _RAND_4 = {1{`RANDOM}};
   selectedInsts = _RAND_4[5:0];
   _RAND_5 = {1{`RANDOM}};
-  selectedBeats = _RAND_5[4:0];
+  selectedBeats = _RAND_5[8:0];
   _RAND_6 = {1{`RANDOM}};
-  beatsLeft = _RAND_6[4:0];
+  beatsLeft = _RAND_6[8:0];
   _RAND_7 = {1{`RANDOM}};
   instBeat = _RAND_7[0:0];
   _RAND_8 = {2{`RANDOM}};
@@ -3511,7 +3515,7 @@ module Fetch(
   input          io_vme_rd_cmd_ready,
   output         io_vme_rd_cmd_valid,
   output [31:0]  io_vme_rd_cmd_bits_addr,
-  output [3:0]   io_vme_rd_cmd_bits_len,
+  output [7:0]   io_vme_rd_cmd_bits_len,
   output         io_vme_rd_data_ready,
   input          io_vme_rd_data_valid,
   input  [63:0]  io_vme_rd_data_bits_data,
@@ -3534,7 +3538,7 @@ module Fetch(
   wire  fetch_io_vme_rd_cmd_ready; // @[Fetch.scala 51:23]
   wire  fetch_io_vme_rd_cmd_valid; // @[Fetch.scala 51:23]
   wire [31:0] fetch_io_vme_rd_cmd_bits_addr; // @[Fetch.scala 51:23]
-  wire [3:0] fetch_io_vme_rd_cmd_bits_len; // @[Fetch.scala 51:23]
+  wire [7:0] fetch_io_vme_rd_cmd_bits_len; // @[Fetch.scala 51:23]
   wire  fetch_io_vme_rd_data_ready; // @[Fetch.scala 51:23]
   wire  fetch_io_vme_rd_data_valid; // @[Fetch.scala 51:23]
   wire [63:0] fetch_io_vme_rd_data_bits_data; // @[Fetch.scala 51:23]
@@ -3774,9 +3778,9 @@ module GenVMECmd(
   input          io_vmeCmd_ready,
   output         io_vmeCmd_valid,
   output [31:0]  io_vmeCmd_bits_addr,
-  output [3:0]   io_vmeCmd_bits_len,
+  output [7:0]   io_vmeCmd_bits_len,
   output [20:0]  io_vmeCmd_bits_tag,
-  output [4:0]   io_readLen,
+  output [8:0]   io_readLen,
   output         io_done
 );
 `ifdef RANDOMIZE_REG_INIT
@@ -3802,11 +3806,11 @@ module GenVMECmd(
   wire [35:0] regularInitAddr = {dec_dram_offset, 4'h0}; // @[TensorLoadNarrowVME.scala 612:41]
   wire [35:0] _xfer_init_addr_T_1 = 36'hffffffff & regularInitAddr; // @[TensorLoadNarrowVME.scala 614:47]
   wire [35:0] _GEN_31 = {{4'd0}, io_baddr}; // @[TensorLoadNarrowVME.scala 614:33]
-  wire [35:0] xfer_init_addr = _GEN_31 | _xfer_init_addr_T_1; // @[TensorLoadNarrowVME.scala 614:33]
-  wire [31:0] _GEN_0 = rdCmdExtAddr % 32'h80; // @[TensorLoadNarrowVME.scala 618:53]
-  wire [7:0] _firstMaxTransfer_T = _GEN_0[7:0]; // @[TensorLoadNarrowVME.scala 618:53]
-  wire [7:0] _firstMaxTransfer_T_2 = 8'h80 - _firstMaxTransfer_T; // @[TensorLoadNarrowVME.scala 618:38]
-  wire [4:0] firstMaxTransfer = _firstMaxTransfer_T_2[7:3]; // @[TensorLoadNarrowVME.scala 618:67]
+  wire [35:0] xfer_init_addr = _GEN_31 + _xfer_init_addr_T_1; // @[TensorLoadNarrowVME.scala 614:33]
+  wire [31:0] _GEN_0 = rdCmdExtAddr % 32'h800; // @[TensorLoadNarrowVME.scala 618:53]
+  wire [11:0] _firstMaxTransfer_T = _GEN_0[11:0]; // @[TensorLoadNarrowVME.scala 618:53]
+  wire [11:0] _firstMaxTransfer_T_2 = 12'h800 - _firstMaxTransfer_T; // @[TensorLoadNarrowVME.scala 618:38]
+  wire [8:0] firstMaxTransfer = _firstMaxTransfer_T_2[11:3]; // @[TensorLoadNarrowVME.scala 618:67]
   reg [10:0] rdCmdStartIdx; // @[TensorLoadNarrowVME.scala 627:26]
   reg  commandsDone; // @[TensorLoadNarrowVME.scala 629:29]
   wire [16:0] regularBlocksReadSize = {dec_xsize, 1'h0}; // @[TensorLoadNarrowVME.scala 631:41]
@@ -3816,12 +3820,12 @@ module GenVMECmd(
   reg [15:0] srcRowIdx; // @[TensorLoadNarrowVME.scala 639:22]
   wire [15:0] _srcRowIdx_T_1 = srcRowIdx + 16'h1; // @[TensorLoadNarrowVME.scala 643:28]
   wire [16:0] blocksRemained = regularBlocksReadSize - blocksReadNb; // @[TensorLoadNarrowVME.scala 671:39]
-  wire [16:0] _GEN_32 = {{12'd0}, firstMaxTransfer}; // @[TensorLoadNarrowVME.scala 673:25]
-  wire [16:0] _GEN_8 = blocksRemained < _GEN_32 ? blocksRemained : {{12'd0}, firstMaxTransfer}; // @[TensorLoadNarrowVME.scala 673:45 674:15 676:15]
-  wire [16:0] _GEN_9 = blocksRemained < 17'h10 ? blocksRemained : 17'h10; // @[TensorLoadNarrowVME.scala 679:40 680:15 682:15]
+  wire [16:0] _GEN_32 = {{8'd0}, firstMaxTransfer}; // @[TensorLoadNarrowVME.scala 673:25]
+  wire [16:0] _GEN_8 = blocksRemained < _GEN_32 ? blocksRemained : {{8'd0}, firstMaxTransfer}; // @[TensorLoadNarrowVME.scala 673:45 674:15 676:15]
+  wire [16:0] _GEN_9 = blocksRemained < 17'h100 ? blocksRemained : 17'h100; // @[TensorLoadNarrowVME.scala 679:40 680:15 682:15]
   wire [16:0] _GEN_10 = newReadRow ? _GEN_8 : _GEN_9; // @[TensorLoadNarrowVME.scala 672:21]
-  wire [4:0] readLen = _GEN_10[4:0]; // @[TensorLoadNarrowVME.scala 628:21]
-  wire [16:0] _GEN_33 = {{12'd0}, readLen}; // @[TensorLoadNarrowVME.scala 664:41]
+  wire [8:0] readLen = _GEN_10[8:0]; // @[TensorLoadNarrowVME.scala 628:21]
+  wire [16:0] _GEN_33 = {{8'd0}, readLen}; // @[TensorLoadNarrowVME.scala 664:41]
   wire [16:0] _T_8 = regularBlocksReadSize - _GEN_33; // @[TensorLoadNarrowVME.scala 664:41]
   wire [15:0] _T_11 = dec_ysize - 16'h1; // @[TensorLoadNarrowVME.scala 664:80]
   wire  _T_14 = io_vmeCmd_ready & io_vmeCmd_valid; // @[Decoupled.scala 50:35]
@@ -3855,8 +3859,8 @@ module GenVMECmd(
   wire [19:0] regularRowBytes = {dec_xstride, 4'h0}; // @[TensorLoadNarrowVME.scala 715:41]
   wire [31:0] _GEN_43 = {{12'd0}, regularRowBytes}; // @[TensorLoadNarrowVME.scala 717:41]
   wire [31:0] memRow = rdCmdExtAddrRowBegin + _GEN_43; // @[TensorLoadNarrowVME.scala 717:41]
-  wire [7:0] _rdCmdExtAddr_T = {readLen, 3'h0}; // @[TensorLoadNarrowVME.scala 724:47]
-  wire [31:0] _GEN_44 = {{24'd0}, _rdCmdExtAddr_T}; // @[TensorLoadNarrowVME.scala 724:36]
+  wire [11:0] _rdCmdExtAddr_T = {readLen, 3'h0}; // @[TensorLoadNarrowVME.scala 724:47]
+  wire [31:0] _GEN_44 = {{20'd0}, _rdCmdExtAddr_T}; // @[TensorLoadNarrowVME.scala 724:36]
   wire [31:0] _rdCmdExtAddr_T_2 = rdCmdExtAddr + _GEN_44; // @[TensorLoadNarrowVME.scala 724:36]
   wire [31:0] _GEN_16 = stride ? memRow : _rdCmdExtAddr_T_2; // @[TensorLoadNarrowVME.scala 714:18 718:20 724:20]
   wire [31:0] _GEN_17 = stride ? memRow : rdCmdExtAddrRowBegin; // @[TensorLoadNarrowVME.scala 714:18 707:24 719:28]
@@ -3869,15 +3873,15 @@ module GenVMECmd(
   wire [11:0] _rdCmdDestBlockIdx_T = {rdCmdStartIdx, 1'h0}; // @[TensorLoadNarrowVME.scala 755:42]
   wire [11:0] _GEN_26 = startIssueCmdRead ? _rdCmdDestBlockIdx_T : rdCmdDestBlockIdxNext; // @[TensorLoadNarrowVME.scala 747:21 754:29 755:25]
   wire [11:0] rdCmdDestBlockIdx = rdCmdStartIdxValid ? _GEN_26 : rdCmdDestBlockIdxNext; // @[TensorLoadNarrowVME.scala 747:21 752:28]
-  wire [11:0] _GEN_45 = {{7'd0}, readLen}; // @[TensorLoadNarrowVME.scala 756:49]
+  wire [11:0] _GEN_45 = {{3'd0}, readLen}; // @[TensorLoadNarrowVME.scala 756:49]
   wire [11:0] _rdCmdDestBlockIdxNext_T_1 = rdCmdDestBlockIdx + _GEN_45; // @[TensorLoadNarrowVME.scala 756:49]
   wire [11:0] _rdCmdDestBlockIdxNext_T_3 = rdCmdDestBlockIdxNext + _GEN_45; // @[TensorLoadNarrowVME.scala 759:53]
-  wire [4:0] _io_vmeCmd_bits_len_T_1 = readLen - 5'h1; // @[TensorLoadNarrowVME.scala 777:33]
+  wire [8:0] _io_vmeCmd_bits_len_T_1 = readLen - 9'h1; // @[TensorLoadNarrowVME.scala 777:33]
   assign io_vmeCmd_valid = _rdCmdStartIdxValid_T_5 & _rdCmdStartIdxValid_T_6; // @[TensorLoadNarrowVME.scala 694:15]
   assign io_vmeCmd_bits_addr = rdCmdExtAddr; // @[TensorLoadNarrowVME.scala 776:23]
-  assign io_vmeCmd_bits_len = _io_vmeCmd_bits_len_T_1[3:0]; // @[TensorLoadNarrowVME.scala 777:22]
+  assign io_vmeCmd_bits_len = _io_vmeCmd_bits_len_T_1[7:0]; // @[TensorLoadNarrowVME.scala 777:22]
   assign io_vmeCmd_bits_tag = {{9'd0}, rdCmdDestBlockIdx}; // @[TensorLoadNarrowVME.scala 782:22]
-  assign io_readLen = _GEN_10[4:0]; // @[TensorLoadNarrowVME.scala 628:21]
+  assign io_readLen = _GEN_10[8:0]; // @[TensorLoadNarrowVME.scala 628:21]
   assign io_done = commandsDone; // @[TensorLoadNarrowVME.scala 784:11]
   always @(posedge clock) begin
     rdCmdExtAddr <= _GEN_22[31:0];
@@ -4327,7 +4331,7 @@ module TensorLoadNarrowVME(
   input          io_vme_rd_cmd_ready,
   output         io_vme_rd_cmd_valid,
   output [31:0]  io_vme_rd_cmd_bits_addr,
-  output [3:0]   io_vme_rd_cmd_bits_len,
+  output [7:0]   io_vme_rd_cmd_bits_len,
   output [20:0]  io_vme_rd_cmd_bits_tag,
   output         io_vme_rd_data_ready,
   input          io_vme_rd_data_valid,
@@ -4381,9 +4385,9 @@ module TensorLoadNarrowVME(
   wire  vmeCmd_io_vmeCmd_ready; // @[TensorLoadNarrowVME.scala 76:23]
   wire  vmeCmd_io_vmeCmd_valid; // @[TensorLoadNarrowVME.scala 76:23]
   wire [31:0] vmeCmd_io_vmeCmd_bits_addr; // @[TensorLoadNarrowVME.scala 76:23]
-  wire [3:0] vmeCmd_io_vmeCmd_bits_len; // @[TensorLoadNarrowVME.scala 76:23]
+  wire [7:0] vmeCmd_io_vmeCmd_bits_len; // @[TensorLoadNarrowVME.scala 76:23]
   wire [20:0] vmeCmd_io_vmeCmd_bits_tag; // @[TensorLoadNarrowVME.scala 76:23]
-  wire [4:0] vmeCmd_io_readLen; // @[TensorLoadNarrowVME.scala 76:23]
+  wire [8:0] vmeCmd_io_readLen; // @[TensorLoadNarrowVME.scala 76:23]
   wire  vmeCmd_io_done; // @[TensorLoadNarrowVME.scala 76:23]
   wire  readData_clock; // @[TensorLoadNarrowVME.scala 106:24]
   wire  readData_reset; // @[TensorLoadNarrowVME.scala 106:24]
@@ -4435,7 +4439,7 @@ module TensorLoadNarrowVME(
   wire  _T = io_vme_rd_cmd_ready & io_vme_rd_cmd_valid; // @[Decoupled.scala 50:35]
   wire  _T_1 = state & _T; // @[TensorLoadNarrowVME.scala 91:21]
   wire  _T_3 = state & _T & ~vmeDataFirePipe; // @[TensorLoadNarrowVME.scala 91:43]
-  wire [11:0] _GEN_22 = {{7'd0}, vmeCmd_io_readLen}; // @[TensorLoadNarrowVME.scala 92:38]
+  wire [11:0] _GEN_22 = {{3'd0}, vmeCmd_io_readLen}; // @[TensorLoadNarrowVME.scala 92:38]
   wire [11:0] _blocksInFlight_T_1 = blocksInFlight + _GEN_22; // @[TensorLoadNarrowVME.scala 92:38]
   wire  _T_6 = _T_1 & vmeDataFirePipe; // @[TensorLoadNarrowVME.scala 93:43]
   wire [11:0] _blocksInFlight_T_5 = _blocksInFlight_T_1 - 12'h1; // @[TensorLoadNarrowVME.scala 94:48]
@@ -4706,7 +4710,7 @@ module TensorLoadInp(
   input          io_vme_rd_cmd_ready,
   output         io_vme_rd_cmd_valid,
   output [31:0]  io_vme_rd_cmd_bits_addr,
-  output [3:0]   io_vme_rd_cmd_bits_len,
+  output [7:0]   io_vme_rd_cmd_bits_len,
   output [20:0]  io_vme_rd_cmd_bits_tag,
   input          io_vme_rd_data_valid,
   input  [63:0]  io_vme_rd_data_bits_data,
@@ -4740,7 +4744,7 @@ module TensorLoadInp(
   wire  tensorLoad_io_vme_rd_cmd_ready; // @[TensorLoad.scala 71:28]
   wire  tensorLoad_io_vme_rd_cmd_valid; // @[TensorLoad.scala 71:28]
   wire [31:0] tensorLoad_io_vme_rd_cmd_bits_addr; // @[TensorLoad.scala 71:28]
-  wire [3:0] tensorLoad_io_vme_rd_cmd_bits_len; // @[TensorLoad.scala 71:28]
+  wire [7:0] tensorLoad_io_vme_rd_cmd_bits_len; // @[TensorLoad.scala 71:28]
   wire [20:0] tensorLoad_io_vme_rd_cmd_bits_tag; // @[TensorLoad.scala 71:28]
   wire  tensorLoad_io_vme_rd_data_ready; // @[TensorLoad.scala 71:28]
   wire  tensorLoad_io_vme_rd_data_valid; // @[TensorLoad.scala 71:28]
@@ -4845,9 +4849,9 @@ module GenVMECmd_1(
   input          io_vmeCmd_ready,
   output         io_vmeCmd_valid,
   output [31:0]  io_vmeCmd_bits_addr,
-  output [3:0]   io_vmeCmd_bits_len,
+  output [7:0]   io_vmeCmd_bits_len,
   output [20:0]  io_vmeCmd_bits_tag,
-  output [4:0]   io_readLen,
+  output [8:0]   io_readLen,
   output         io_done
 );
 `ifdef RANDOMIZE_REG_INIT
@@ -4873,11 +4877,11 @@ module GenVMECmd_1(
   wire [39:0] regularInitAddr = {dec_dram_offset, 8'h0}; // @[TensorLoadNarrowVME.scala 612:41]
   wire [39:0] _xfer_init_addr_T_1 = 40'hffffffff & regularInitAddr; // @[TensorLoadNarrowVME.scala 614:47]
   wire [39:0] _GEN_31 = {{8'd0}, io_baddr}; // @[TensorLoadNarrowVME.scala 614:33]
-  wire [39:0] xfer_init_addr = _GEN_31 | _xfer_init_addr_T_1; // @[TensorLoadNarrowVME.scala 614:33]
-  wire [31:0] _GEN_0 = rdCmdExtAddr % 32'h80; // @[TensorLoadNarrowVME.scala 618:53]
-  wire [7:0] _firstMaxTransfer_T = _GEN_0[7:0]; // @[TensorLoadNarrowVME.scala 618:53]
-  wire [7:0] _firstMaxTransfer_T_2 = 8'h80 - _firstMaxTransfer_T; // @[TensorLoadNarrowVME.scala 618:38]
-  wire [4:0] firstMaxTransfer = _firstMaxTransfer_T_2[7:3]; // @[TensorLoadNarrowVME.scala 618:67]
+  wire [39:0] xfer_init_addr = _GEN_31 + _xfer_init_addr_T_1; // @[TensorLoadNarrowVME.scala 614:33]
+  wire [31:0] _GEN_0 = rdCmdExtAddr % 32'h800; // @[TensorLoadNarrowVME.scala 618:53]
+  wire [11:0] _firstMaxTransfer_T = _GEN_0[11:0]; // @[TensorLoadNarrowVME.scala 618:53]
+  wire [11:0] _firstMaxTransfer_T_2 = 12'h800 - _firstMaxTransfer_T; // @[TensorLoadNarrowVME.scala 618:38]
+  wire [8:0] firstMaxTransfer = _firstMaxTransfer_T_2[11:3]; // @[TensorLoadNarrowVME.scala 618:67]
   reg [9:0] rdCmdStartIdx; // @[TensorLoadNarrowVME.scala 627:26]
   reg  commandsDone; // @[TensorLoadNarrowVME.scala 629:29]
   wire [20:0] regularBlocksReadSize = {dec_xsize, 5'h0}; // @[TensorLoadNarrowVME.scala 631:41]
@@ -4887,12 +4891,12 @@ module GenVMECmd_1(
   reg [15:0] srcRowIdx; // @[TensorLoadNarrowVME.scala 639:22]
   wire [15:0] _srcRowIdx_T_1 = srcRowIdx + 16'h1; // @[TensorLoadNarrowVME.scala 643:28]
   wire [20:0] blocksRemained = regularBlocksReadSize - blocksReadNb; // @[TensorLoadNarrowVME.scala 671:39]
-  wire [20:0] _GEN_32 = {{16'd0}, firstMaxTransfer}; // @[TensorLoadNarrowVME.scala 673:25]
-  wire [20:0] _GEN_8 = blocksRemained < _GEN_32 ? blocksRemained : {{16'd0}, firstMaxTransfer}; // @[TensorLoadNarrowVME.scala 673:45 674:15 676:15]
-  wire [20:0] _GEN_9 = blocksRemained < 21'h10 ? blocksRemained : 21'h10; // @[TensorLoadNarrowVME.scala 679:40 680:15 682:15]
+  wire [20:0] _GEN_32 = {{12'd0}, firstMaxTransfer}; // @[TensorLoadNarrowVME.scala 673:25]
+  wire [20:0] _GEN_8 = blocksRemained < _GEN_32 ? blocksRemained : {{12'd0}, firstMaxTransfer}; // @[TensorLoadNarrowVME.scala 673:45 674:15 676:15]
+  wire [20:0] _GEN_9 = blocksRemained < 21'h100 ? blocksRemained : 21'h100; // @[TensorLoadNarrowVME.scala 679:40 680:15 682:15]
   wire [20:0] _GEN_10 = newReadRow ? _GEN_8 : _GEN_9; // @[TensorLoadNarrowVME.scala 672:21]
-  wire [4:0] readLen = _GEN_10[4:0]; // @[TensorLoadNarrowVME.scala 628:21]
-  wire [20:0] _GEN_33 = {{16'd0}, readLen}; // @[TensorLoadNarrowVME.scala 664:41]
+  wire [8:0] readLen = _GEN_10[8:0]; // @[TensorLoadNarrowVME.scala 628:21]
+  wire [20:0] _GEN_33 = {{12'd0}, readLen}; // @[TensorLoadNarrowVME.scala 664:41]
   wire [20:0] _T_8 = regularBlocksReadSize - _GEN_33; // @[TensorLoadNarrowVME.scala 664:41]
   wire [15:0] _T_11 = dec_ysize - 16'h1; // @[TensorLoadNarrowVME.scala 664:80]
   wire  _T_14 = io_vmeCmd_ready & io_vmeCmd_valid; // @[Decoupled.scala 50:35]
@@ -4926,8 +4930,8 @@ module GenVMECmd_1(
   wire [23:0] regularRowBytes = {dec_xstride, 8'h0}; // @[TensorLoadNarrowVME.scala 715:41]
   wire [31:0] _GEN_43 = {{8'd0}, regularRowBytes}; // @[TensorLoadNarrowVME.scala 717:41]
   wire [31:0] memRow = rdCmdExtAddrRowBegin + _GEN_43; // @[TensorLoadNarrowVME.scala 717:41]
-  wire [7:0] _rdCmdExtAddr_T = {readLen, 3'h0}; // @[TensorLoadNarrowVME.scala 724:47]
-  wire [31:0] _GEN_44 = {{24'd0}, _rdCmdExtAddr_T}; // @[TensorLoadNarrowVME.scala 724:36]
+  wire [11:0] _rdCmdExtAddr_T = {readLen, 3'h0}; // @[TensorLoadNarrowVME.scala 724:47]
+  wire [31:0] _GEN_44 = {{20'd0}, _rdCmdExtAddr_T}; // @[TensorLoadNarrowVME.scala 724:36]
   wire [31:0] _rdCmdExtAddr_T_2 = rdCmdExtAddr + _GEN_44; // @[TensorLoadNarrowVME.scala 724:36]
   wire [31:0] _GEN_16 = stride ? memRow : _rdCmdExtAddr_T_2; // @[TensorLoadNarrowVME.scala 714:18 718:20 724:20]
   wire [31:0] _GEN_17 = stride ? memRow : rdCmdExtAddrRowBegin; // @[TensorLoadNarrowVME.scala 714:18 707:24 719:28]
@@ -4940,15 +4944,15 @@ module GenVMECmd_1(
   wire [14:0] _rdCmdDestBlockIdx_T = {rdCmdStartIdx, 5'h0}; // @[TensorLoadNarrowVME.scala 755:42]
   wire [14:0] _GEN_26 = startIssueCmdRead ? _rdCmdDestBlockIdx_T : rdCmdDestBlockIdxNext; // @[TensorLoadNarrowVME.scala 747:21 754:29 755:25]
   wire [14:0] rdCmdDestBlockIdx = rdCmdStartIdxValid ? _GEN_26 : rdCmdDestBlockIdxNext; // @[TensorLoadNarrowVME.scala 747:21 752:28]
-  wire [14:0] _GEN_45 = {{10'd0}, readLen}; // @[TensorLoadNarrowVME.scala 756:49]
+  wire [14:0] _GEN_45 = {{6'd0}, readLen}; // @[TensorLoadNarrowVME.scala 756:49]
   wire [14:0] _rdCmdDestBlockIdxNext_T_1 = rdCmdDestBlockIdx + _GEN_45; // @[TensorLoadNarrowVME.scala 756:49]
   wire [14:0] _rdCmdDestBlockIdxNext_T_3 = rdCmdDestBlockIdxNext + _GEN_45; // @[TensorLoadNarrowVME.scala 759:53]
-  wire [4:0] _io_vmeCmd_bits_len_T_1 = readLen - 5'h1; // @[TensorLoadNarrowVME.scala 777:33]
+  wire [8:0] _io_vmeCmd_bits_len_T_1 = readLen - 9'h1; // @[TensorLoadNarrowVME.scala 777:33]
   assign io_vmeCmd_valid = _rdCmdStartIdxValid_T_5 & _rdCmdStartIdxValid_T_6; // @[TensorLoadNarrowVME.scala 694:15]
   assign io_vmeCmd_bits_addr = rdCmdExtAddr; // @[TensorLoadNarrowVME.scala 776:23]
-  assign io_vmeCmd_bits_len = _io_vmeCmd_bits_len_T_1[3:0]; // @[TensorLoadNarrowVME.scala 777:22]
+  assign io_vmeCmd_bits_len = _io_vmeCmd_bits_len_T_1[7:0]; // @[TensorLoadNarrowVME.scala 777:22]
   assign io_vmeCmd_bits_tag = {{6'd0}, rdCmdDestBlockIdx}; // @[TensorLoadNarrowVME.scala 782:22]
-  assign io_readLen = _GEN_10[4:0]; // @[TensorLoadNarrowVME.scala 628:21]
+  assign io_readLen = _GEN_10[8:0]; // @[TensorLoadNarrowVME.scala 628:21]
   assign io_done = commandsDone; // @[TensorLoadNarrowVME.scala 784:11]
   always @(posedge clock) begin
     rdCmdExtAddr <= _GEN_22[31:0];
@@ -5401,7 +5405,7 @@ module TensorLoadNarrowVME_1(
   input          io_vme_rd_cmd_ready,
   output         io_vme_rd_cmd_valid,
   output [31:0]  io_vme_rd_cmd_bits_addr,
-  output [3:0]   io_vme_rd_cmd_bits_len,
+  output [7:0]   io_vme_rd_cmd_bits_len,
   output [20:0]  io_vme_rd_cmd_bits_tag,
   output         io_vme_rd_data_ready,
   input          io_vme_rd_data_valid,
@@ -5785,9 +5789,9 @@ module TensorLoadNarrowVME_1(
   wire  vmeCmd_io_vmeCmd_ready; // @[TensorLoadNarrowVME.scala 76:23]
   wire  vmeCmd_io_vmeCmd_valid; // @[TensorLoadNarrowVME.scala 76:23]
   wire [31:0] vmeCmd_io_vmeCmd_bits_addr; // @[TensorLoadNarrowVME.scala 76:23]
-  wire [3:0] vmeCmd_io_vmeCmd_bits_len; // @[TensorLoadNarrowVME.scala 76:23]
+  wire [7:0] vmeCmd_io_vmeCmd_bits_len; // @[TensorLoadNarrowVME.scala 76:23]
   wire [20:0] vmeCmd_io_vmeCmd_bits_tag; // @[TensorLoadNarrowVME.scala 76:23]
-  wire [4:0] vmeCmd_io_readLen; // @[TensorLoadNarrowVME.scala 76:23]
+  wire [8:0] vmeCmd_io_readLen; // @[TensorLoadNarrowVME.scala 76:23]
   wire  vmeCmd_io_done; // @[TensorLoadNarrowVME.scala 76:23]
   wire  readData_clock; // @[TensorLoadNarrowVME.scala 106:24]
   wire  readData_reset; // @[TensorLoadNarrowVME.scala 106:24]
@@ -6139,7 +6143,7 @@ module TensorLoadNarrowVME_1(
   wire  _T = io_vme_rd_cmd_ready & io_vme_rd_cmd_valid; // @[Decoupled.scala 50:35]
   wire  _T_1 = state & _T; // @[TensorLoadNarrowVME.scala 91:21]
   wire  _T_3 = state & _T & ~vmeDataFirePipe; // @[TensorLoadNarrowVME.scala 91:43]
-  wire [14:0] _GEN_202 = {{10'd0}, vmeCmd_io_readLen}; // @[TensorLoadNarrowVME.scala 92:38]
+  wire [14:0] _GEN_202 = {{6'd0}, vmeCmd_io_readLen}; // @[TensorLoadNarrowVME.scala 92:38]
   wire [14:0] _blocksInFlight_T_1 = blocksInFlight + _GEN_202; // @[TensorLoadNarrowVME.scala 92:38]
   wire  _T_6 = _T_1 & vmeDataFirePipe; // @[TensorLoadNarrowVME.scala 93:43]
   wire [14:0] _blocksInFlight_T_5 = _blocksInFlight_T_1 - 15'h1; // @[TensorLoadNarrowVME.scala 94:48]
@@ -7376,7 +7380,7 @@ module TensorLoadWgt(
   input          io_vme_rd_cmd_ready,
   output         io_vme_rd_cmd_valid,
   output [31:0]  io_vme_rd_cmd_bits_addr,
-  output [3:0]   io_vme_rd_cmd_bits_len,
+  output [7:0]   io_vme_rd_cmd_bits_len,
   output [20:0]  io_vme_rd_cmd_bits_tag,
   input          io_vme_rd_data_valid,
   input  [63:0]  io_vme_rd_data_bits_data,
@@ -7650,7 +7654,7 @@ module TensorLoadWgt(
   wire  tensorLoad_io_vme_rd_cmd_ready; // @[TensorLoad.scala 71:28]
   wire  tensorLoad_io_vme_rd_cmd_valid; // @[TensorLoad.scala 71:28]
   wire [31:0] tensorLoad_io_vme_rd_cmd_bits_addr; // @[TensorLoad.scala 71:28]
-  wire [3:0] tensorLoad_io_vme_rd_cmd_bits_len; // @[TensorLoad.scala 71:28]
+  wire [7:0] tensorLoad_io_vme_rd_cmd_bits_len; // @[TensorLoad.scala 71:28]
   wire [20:0] tensorLoad_io_vme_rd_cmd_bits_tag; // @[TensorLoad.scala 71:28]
   wire  tensorLoad_io_vme_rd_data_ready; // @[TensorLoad.scala 71:28]
   wire  tensorLoad_io_vme_rd_data_valid; // @[TensorLoad.scala 71:28]
@@ -8478,7 +8482,7 @@ module Load(
   input          io_vme_rd_0_cmd_ready,
   output         io_vme_rd_0_cmd_valid,
   output [31:0]  io_vme_rd_0_cmd_bits_addr,
-  output [3:0]   io_vme_rd_0_cmd_bits_len,
+  output [7:0]   io_vme_rd_0_cmd_bits_len,
   output [20:0]  io_vme_rd_0_cmd_bits_tag,
   input          io_vme_rd_0_data_valid,
   input  [63:0]  io_vme_rd_0_data_bits_data,
@@ -8486,7 +8490,7 @@ module Load(
   input          io_vme_rd_1_cmd_ready,
   output         io_vme_rd_1_cmd_valid,
   output [31:0]  io_vme_rd_1_cmd_bits_addr,
-  output [3:0]   io_vme_rd_1_cmd_bits_len,
+  output [7:0]   io_vme_rd_1_cmd_bits_len,
   output [20:0]  io_vme_rd_1_cmd_bits_tag,
   input          io_vme_rd_1_data_valid,
   input  [63:0]  io_vme_rd_1_data_bits_data,
@@ -8801,7 +8805,7 @@ module Load(
   wire  tensorLoad_0_io_vme_rd_cmd_ready; // @[Load.scala 58:32]
   wire  tensorLoad_0_io_vme_rd_cmd_valid; // @[Load.scala 58:32]
   wire [31:0] tensorLoad_0_io_vme_rd_cmd_bits_addr; // @[Load.scala 58:32]
-  wire [3:0] tensorLoad_0_io_vme_rd_cmd_bits_len; // @[Load.scala 58:32]
+  wire [7:0] tensorLoad_0_io_vme_rd_cmd_bits_len; // @[Load.scala 58:32]
   wire [20:0] tensorLoad_0_io_vme_rd_cmd_bits_tag; // @[Load.scala 58:32]
   wire  tensorLoad_0_io_vme_rd_data_valid; // @[Load.scala 58:32]
   wire [63:0] tensorLoad_0_io_vme_rd_data_bits_data; // @[Load.scala 58:32]
@@ -8834,7 +8838,7 @@ module Load(
   wire  tensorLoad_1_io_vme_rd_cmd_ready; // @[Load.scala 58:32]
   wire  tensorLoad_1_io_vme_rd_cmd_valid; // @[Load.scala 58:32]
   wire [31:0] tensorLoad_1_io_vme_rd_cmd_bits_addr; // @[Load.scala 58:32]
-  wire [3:0] tensorLoad_1_io_vme_rd_cmd_bits_len; // @[Load.scala 58:32]
+  wire [7:0] tensorLoad_1_io_vme_rd_cmd_bits_len; // @[Load.scala 58:32]
   wire [20:0] tensorLoad_1_io_vme_rd_cmd_bits_tag; // @[Load.scala 58:32]
   wire  tensorLoad_1_io_vme_rd_data_valid; // @[Load.scala 58:32]
   wire [63:0] tensorLoad_1_io_vme_rd_data_bits_data; // @[Load.scala 58:32]
@@ -9829,9 +9833,9 @@ module GenVMECmdWide(
   input  [31:0] io_baddr,
   output        io_vmeCmd_valid,
   output [31:0] io_vmeCmd_bits_addr,
-  output [3:0]  io_vmeCmd_bits_len,
+  output [7:0]  io_vmeCmd_bits_len,
   output [20:0] io_vmeCmd_bits_tag,
-  output [4:0]  io_readLen,
+  output [8:0]  io_readLen,
   output        io_done,
   input  [15:0] io_ysize,
   input  [15:0] io_xsize,
@@ -9854,139 +9858,139 @@ module GenVMECmdWide(
 `endif // RANDOMIZE_REG_INIT
   reg [15:0] dramLineIdx; // @[TensorLoadWideVME.scala 501:24]
   wire [15:0] _dramLineIdx_T_1 = dramLineIdx + 16'h1; // @[TensorLoadWideVME.scala 505:32]
-  reg [14:0] clReadIdx; // @[TensorLoadWideVME.scala 591:22]
-  wire [17:0] rdLineBytes = {io_xsize, 2'h0}; // @[TensorLoadWideVME.scala 552:30]
-  reg [31:0] rdLineElemBeginAddr; // @[TensorLoadWideVME.scala 520:32]
-  wire [31:0] _GEN_0 = rdLineElemBeginAddr % 32'h8; // @[TensorLoadWideVME.scala 562:51]
-  wire [3:0] rd1stPulseOffsetBytes = _GEN_0[3:0]; // @[TensorLoadWideVME.scala 562:51]
-  wire [17:0] _GEN_30 = {{14'd0}, rd1stPulseOffsetBytes}; // @[TensorLoadWideVME.scala 570:22]
-  wire [17:0] _rdLineClNb_T_1 = rdLineBytes + _GEN_30; // @[TensorLoadWideVME.scala 570:22]
-  wire [17:0] _GEN_1 = _rdLineClNb_T_1 % 18'h8; // @[TensorLoadWideVME.scala 570:47]
-  wire [3:0] _rdLineClNb_T_2 = _GEN_1[3:0]; // @[TensorLoadWideVME.scala 570:47]
-  wire [14:0] rdLineClNbTmp = _rdLineClNb_T_1[17:3]; // @[TensorLoadWideVME.scala 568:61]
-  wire [14:0] _rdLineClNb_T_5 = rdLineClNbTmp + 15'h1; // @[TensorLoadWideVME.scala 570:97]
-  wire [14:0] rdLineClNb = _rdLineClNb_T_2 == 4'h0 ? rdLineClNbTmp : _rdLineClNb_T_5; // @[TensorLoadWideVME.scala 570:8]
-  wire  newReadRow = clReadIdx == 15'h0; // @[TensorLoadWideVME.scala 592:30]
-  wire [14:0] clRemained = rdLineClNb - clReadIdx; // @[TensorLoadWideVME.scala 642:31]
-  wire [31:0] rdLineClBeginAddr = rdLineElemBeginAddr & 32'hfffffff8; // @[TensorLoadWideVME.scala 521:47]
-  wire [31:0] _GEN_2 = rdLineClBeginAddr % 32'h80; // @[TensorLoadWideVME.scala 557:62]
-  wire [7:0] _rdLen1stMaxTransBytes_T = _GEN_2[7:0]; // @[TensorLoadWideVME.scala 557:62]
-  wire [7:0] rdLen1stMaxTransBytes = 8'h80 - _rdLen1stMaxTransBytes_T; // @[TensorLoadWideVME.scala 557:42]
-  wire [4:0] rdLen1stMaxTransClNb = rdLen1stMaxTransBytes[7:3]; // @[TensorLoadWideVME.scala 559:52]
-  wire [14:0] _GEN_32 = {{10'd0}, rdLen1stMaxTransClNb}; // @[TensorLoadWideVME.scala 644:21]
-  wire [14:0] _GEN_16 = clRemained < _GEN_32 ? clRemained : {{10'd0}, rdLen1stMaxTransClNb}; // @[TensorLoadWideVME.scala 644:45 645:13 647:13]
-  wire [14:0] _GEN_17 = clRemained < 15'h10 ? clRemained : 15'h10; // @[TensorLoadWideVME.scala 650:36 651:13 653:13]
-  wire [14:0] _GEN_18 = newReadRow ? _GEN_16 : _GEN_17; // @[TensorLoadWideVME.scala 643:21]
-  wire [4:0] rdLen = _GEN_18[4:0]; // @[TensorLoadWideVME.scala 537:19]
-  wire [14:0] _GEN_33 = {{10'd0}, rdLen}; // @[TensorLoadWideVME.scala 635:34]
-  wire [14:0] _T_28 = rdLineClNb - _GEN_33; // @[TensorLoadWideVME.scala 635:34]
-  wire  _T_29 = clReadIdx == _T_28; // @[TensorLoadWideVME.scala 635:19]
-  wire [15:0] _T_31 = io_ysize - 16'h1; // @[TensorLoadWideVME.scala 635:72]
-  wire  stride = clReadIdx == _T_28 & dramLineIdx != _T_31 & io_updateState; // @[TensorLoadWideVME.scala 635:79]
-  wire [33:0] _dramInitialAddr_T = {io_dram_offset, 2'h0}; // @[TensorLoadWideVME.scala 512:41]
-  wire [31:0] dramInitialAddr = _dramInitialAddr_T[31:0]; // @[TensorLoadWideVME.scala 512:{73,73}]
-  wire [31:0] xferElemInitAddr = io_baddr | dramInitialAddr; // @[TensorLoadWideVME.scala 513:35]
-  wire [31:0] xferClInitAddr = xferElemInitAddr & 32'hfffffff8; // @[TensorLoadWideVME.scala 519:41]
-  wire [17:0] _nextLineBeginElemAddr_T = {io_xstride, 2'h0}; // @[TensorLoadWideVME.scala 523:65]
-  wire [31:0] _GEN_34 = {{14'd0}, _nextLineBeginElemAddr_T}; // @[TensorLoadWideVME.scala 523:51]
-  wire [31:0] nextLineBeginElemAddr = rdLineElemBeginAddr + _GEN_34; // @[TensorLoadWideVME.scala 523:51]
-  wire [31:0] nextLineBeginClAddr = nextLineBeginElemAddr & 32'hfffffff8; // @[TensorLoadWideVME.scala 524:51]
-  reg [31:0] rdLineAddr; // @[TensorLoadWideVME.scala 538:23]
-  wire [7:0] _rdLineAddr_T = {rdLen, 3'h0}; // @[TensorLoadWideVME.scala 545:41]
-  wire [31:0] _GEN_35 = {{24'd0}, _rdLineAddr_T}; // @[TensorLoadWideVME.scala 545:32]
-  wire [31:0] _rdLineAddr_T_2 = rdLineAddr + _GEN_35; // @[TensorLoadWideVME.scala 545:32]
-  wire  _T_3 = ~reset; // @[TensorLoadWideVME.scala 563:9]
-  wire [31:0] _GEN_36 = {{14'd0}, rdLineBytes}; // @[TensorLoadWideVME.scala 573:48]
-  wire [31:0] _rdLastPulseBytes_T_1 = rdLineElemBeginAddr + _GEN_36; // @[TensorLoadWideVME.scala 573:48]
-  wire [31:0] _GEN_3 = _rdLastPulseBytes_T_1 % 32'h8; // @[TensorLoadWideVME.scala 573:63]
-  wire [3:0] rdLastPulseBytes = _GEN_3[3:0]; // @[TensorLoadWideVME.scala 573:63]
-  wire [1:0] rdLastPulseTensNb = rdLastPulseBytes[3:2] == 2'h0 ? 2'h2 : rdLastPulseBytes[3:2]; // @[TensorLoadWideVME.scala 578:28]
-  reg [10:0] rdCmdStartIdx; // @[TensorLoadWideVME.scala 588:26]
-  reg  commandsDone; // @[TensorLoadWideVME.scala 589:29]
-  wire [14:0] nextClIdx = clReadIdx + _GEN_33; // @[TensorLoadWideVME.scala 600:31]
-  wire  _GEN_7 = nextClIdx == rdLineClNb & dramLineIdx == _T_31 | commandsDone; // @[TensorLoadWideVME.scala 595:16 602:71 603:20]
-  wire  _GEN_9 = io_updateState ? _GEN_7 : commandsDone; // @[TensorLoadWideVME.scala 595:16 599:31]
-  wire  _GEN_11 = io_start | stride ? 1'h0 : _GEN_9; // @[TensorLoadWideVME.scala 596:29 598:18]
-  wire [1:0] rdCmd1stPluseOffsetTensNb = newReadRow ? rd1stPulseOffsetBytes[3:2] : 2'h0; // @[TensorLoadWideVME.scala 619:20 621:31 624:31]
-  wire [1:0] rdCmdLastPluseTensNb = _T_29 ? rdLastPulseTensNb : 2'h2; // @[TensorLoadWideVME.scala 626:43 628:26 631:26]
-  wire [15:0] _GEN_40 = {{12'd0}, io_xpad_0}; // @[TensorLoadWideVME.scala 657:29]
-  wire [15:0] _totalWidth_T_1 = io_xsize + _GEN_40; // @[TensorLoadWideVME.scala 657:29]
-  wire [15:0] _GEN_41 = {{12'd0}, io_xpad_1}; // @[TensorLoadWideVME.scala 657:41]
-  wire [15:0] totalWidth = _totalWidth_T_1 + _GEN_41; // @[TensorLoadWideVME.scala 657:41]
-  reg [19:0] currentRowIdx; // @[TensorLoadWideVME.scala 661:26]
-  wire [19:0] _GEN_42 = {{16'd0}, io_ypad_0}; // @[TensorLoadWideVME.scala 663:39]
-  wire [15:0] _GEN_43 = {{12'd0}, io_ypad_0}; // @[TensorLoadWideVME.scala 664:31]
-  wire [15:0] _rdCmdStartIdxValid_T_2 = io_ysize + _GEN_43; // @[TensorLoadWideVME.scala 664:31]
-  wire [19:0] _GEN_44 = {{4'd0}, _rdCmdStartIdxValid_T_2}; // @[TensorLoadWideVME.scala 664:19]
-  wire  _rdCmdStartIdxValid_T_3 = currentRowIdx < _GEN_44; // @[TensorLoadWideVME.scala 664:19]
-  wire  _rdCmdStartIdxValid_T_4 = currentRowIdx >= _GEN_42 & _rdCmdStartIdxValid_T_3; // @[TensorLoadWideVME.scala 663:52]
-  wire  _rdCmdStartIdxValid_T_5 = _rdCmdStartIdxValid_T_4 & io_isBusy; // @[TensorLoadWideVME.scala 664:44]
-  wire  _rdCmdStartIdxValid_T_6 = ~commandsDone; // @[TensorLoadWideVME.scala 666:5]
-  wire  rdCmdStartIdxValid = _rdCmdStartIdxValid_T_5 & _rdCmdStartIdxValid_T_6; // @[TensorLoadWideVME.scala 665:15]
-  wire [15:0] _rdCmdStartIdx_T_1 = io_sram_offset + _GEN_40; // @[TensorLoadWideVME.scala 669:37]
-  wire [15:0] _GEN_47 = {{5'd0}, rdCmdStartIdx}; // @[TensorLoadWideVME.scala 671:36]
-  wire [15:0] _rdCmdStartIdx_T_3 = _GEN_47 + totalWidth; // @[TensorLoadWideVME.scala 671:36]
-  wire [19:0] _currentRowIdx_T_1 = currentRowIdx + 20'h1; // @[TensorLoadWideVME.scala 672:36]
-  wire [15:0] _GEN_19 = io_isBusy & (currentRowIdx < _GEN_42 | stride) ? _rdCmdStartIdx_T_3 : {{5'd0}, rdCmdStartIdx}; // @[TensorLoadWideVME.scala 670:67 671:19 588:26]
-  wire [15:0] _GEN_22 = io_start ? _rdCmdStartIdx_T_1 : _GEN_19; // @[TensorLoadWideVME.scala 667:19 669:19]
-  wire  startIssueCmdRead = newReadRow & rdCmdStartIdxValid; // @[TensorLoadWideVME.scala 675:19]
-  reg [10:0] rdCmdDestElemIdxNext; // @[TensorLoadWideVME.scala 688:33]
-  wire [5:0] _rdCmdTransactionTensNb_T = {rdLen, 1'h0}; // @[TensorLoadWideVME.scala 694:39]
-  wire [5:0] _GEN_48 = {{4'd0}, rdCmd1stPluseOffsetTensNb}; // @[TensorLoadWideVME.scala 694:71]
-  wire [5:0] rdCmdTransactionTensNb = _rdCmdTransactionTensNb_T - _GEN_48; // @[TensorLoadWideVME.scala 694:71]
-  wire [10:0] _GEN_49 = {{5'd0}, rdCmdTransactionTensNb}; // @[TensorLoadWideVME.scala 700:44]
-  wire [10:0] _rdCmdDestElemIdxNext_T_1 = rdCmdStartIdx + _GEN_49; // @[TensorLoadWideVME.scala 700:44]
-  wire [10:0] _rdCmdDestElemIdxNext_T_3 = rdCmdDestElemIdxNext + _GEN_49; // @[TensorLoadWideVME.scala 703:51]
-  wire [10:0] _GEN_25 = startIssueCmdRead ? rdCmdStartIdx : rdCmdDestElemIdxNext; // @[TensorLoadWideVME.scala 690:20 698:29 699:24]
-  wire [10:0] rdCmdDestElemIdx = rdCmdStartIdxValid ? _GEN_25 : rdCmdDestElemIdxNext; // @[TensorLoadWideVME.scala 690:20 696:28]
-  wire [4:0] _io_vmeCmd_bits_len_T_1 = rdLen - 5'h1; // @[TensorLoadWideVME.scala 716:31]
-  wire [31:0] _GEN_4 = rdLineAddr % 32'h80; // @[TensorLoadWideVME.scala 717:87]
-  wire [7:0] _T_49 = _GEN_4[7:0]; // @[TensorLoadWideVME.scala 717:87]
-  wire [7:0] _T_51 = 8'h80 - _T_49; // @[TensorLoadWideVME.scala 717:74]
+  reg [14:0] clReadIdx; // @[TensorLoadWideVME.scala 590:22]
+  wire [17:0] rdLineBytes = {io_xsize, 2'h0}; // @[TensorLoadWideVME.scala 551:30]
+  reg [31:0] rdLineElemBeginAddr; // @[TensorLoadWideVME.scala 519:32]
+  wire [31:0] _GEN_0 = rdLineElemBeginAddr % 32'h8; // @[TensorLoadWideVME.scala 561:51]
+  wire [3:0] rd1stPulseOffsetBytes = _GEN_0[3:0]; // @[TensorLoadWideVME.scala 561:51]
+  wire [17:0] _GEN_30 = {{14'd0}, rd1stPulseOffsetBytes}; // @[TensorLoadWideVME.scala 569:22]
+  wire [17:0] _rdLineClNb_T_1 = rdLineBytes + _GEN_30; // @[TensorLoadWideVME.scala 569:22]
+  wire [17:0] _GEN_1 = _rdLineClNb_T_1 % 18'h8; // @[TensorLoadWideVME.scala 569:47]
+  wire [3:0] _rdLineClNb_T_2 = _GEN_1[3:0]; // @[TensorLoadWideVME.scala 569:47]
+  wire [14:0] rdLineClNbTmp = _rdLineClNb_T_1[17:3]; // @[TensorLoadWideVME.scala 567:61]
+  wire [14:0] _rdLineClNb_T_5 = rdLineClNbTmp + 15'h1; // @[TensorLoadWideVME.scala 569:97]
+  wire [14:0] rdLineClNb = _rdLineClNb_T_2 == 4'h0 ? rdLineClNbTmp : _rdLineClNb_T_5; // @[TensorLoadWideVME.scala 569:8]
+  wire  newReadRow = clReadIdx == 15'h0; // @[TensorLoadWideVME.scala 591:30]
+  wire [14:0] clRemained = rdLineClNb - clReadIdx; // @[TensorLoadWideVME.scala 641:31]
+  wire [31:0] rdLineClBeginAddr = rdLineElemBeginAddr & 32'hfffffff8; // @[TensorLoadWideVME.scala 520:47]
+  wire [31:0] _GEN_2 = rdLineClBeginAddr % 32'h800; // @[TensorLoadWideVME.scala 556:62]
+  wire [11:0] _rdLen1stMaxTransBytes_T = _GEN_2[11:0]; // @[TensorLoadWideVME.scala 556:62]
+  wire [11:0] rdLen1stMaxTransBytes = 12'h800 - _rdLen1stMaxTransBytes_T; // @[TensorLoadWideVME.scala 556:42]
+  wire [8:0] rdLen1stMaxTransClNb = rdLen1stMaxTransBytes[11:3]; // @[TensorLoadWideVME.scala 558:52]
+  wire [14:0] _GEN_32 = {{6'd0}, rdLen1stMaxTransClNb}; // @[TensorLoadWideVME.scala 643:21]
+  wire [14:0] _GEN_16 = clRemained < _GEN_32 ? clRemained : {{6'd0}, rdLen1stMaxTransClNb}; // @[TensorLoadWideVME.scala 643:45 644:13 646:13]
+  wire [14:0] _GEN_17 = clRemained < 15'h100 ? clRemained : 15'h100; // @[TensorLoadWideVME.scala 649:36 650:13 652:13]
+  wire [14:0] _GEN_18 = newReadRow ? _GEN_16 : _GEN_17; // @[TensorLoadWideVME.scala 642:21]
+  wire [8:0] rdLen = _GEN_18[8:0]; // @[TensorLoadWideVME.scala 536:19]
+  wire [14:0] _GEN_33 = {{6'd0}, rdLen}; // @[TensorLoadWideVME.scala 634:34]
+  wire [14:0] _T_28 = rdLineClNb - _GEN_33; // @[TensorLoadWideVME.scala 634:34]
+  wire  _T_29 = clReadIdx == _T_28; // @[TensorLoadWideVME.scala 634:19]
+  wire [15:0] _T_31 = io_ysize - 16'h1; // @[TensorLoadWideVME.scala 634:72]
+  wire  stride = clReadIdx == _T_28 & dramLineIdx != _T_31 & io_updateState; // @[TensorLoadWideVME.scala 634:79]
+  wire [33:0] _dramInitialAddr_T = {io_dram_offset, 2'h0}; // @[TensorLoadWideVME.scala 511:41]
+  wire [31:0] dramInitialAddr = _dramInitialAddr_T[31:0]; // @[TensorLoadWideVME.scala 511:{73,73}]
+  wire [31:0] xferElemInitAddr = io_baddr + dramInitialAddr; // @[TensorLoadWideVME.scala 512:35]
+  wire [31:0] xferClInitAddr = xferElemInitAddr & 32'hfffffff8; // @[TensorLoadWideVME.scala 518:41]
+  wire [17:0] _nextLineBeginElemAddr_T = {io_xstride, 2'h0}; // @[TensorLoadWideVME.scala 522:65]
+  wire [31:0] _GEN_34 = {{14'd0}, _nextLineBeginElemAddr_T}; // @[TensorLoadWideVME.scala 522:51]
+  wire [31:0] nextLineBeginElemAddr = rdLineElemBeginAddr + _GEN_34; // @[TensorLoadWideVME.scala 522:51]
+  wire [31:0] nextLineBeginClAddr = nextLineBeginElemAddr & 32'hfffffff8; // @[TensorLoadWideVME.scala 523:51]
+  reg [31:0] rdLineAddr; // @[TensorLoadWideVME.scala 537:23]
+  wire [11:0] _rdLineAddr_T = {rdLen, 3'h0}; // @[TensorLoadWideVME.scala 544:41]
+  wire [31:0] _GEN_35 = {{20'd0}, _rdLineAddr_T}; // @[TensorLoadWideVME.scala 544:32]
+  wire [31:0] _rdLineAddr_T_2 = rdLineAddr + _GEN_35; // @[TensorLoadWideVME.scala 544:32]
+  wire  _T_3 = ~reset; // @[TensorLoadWideVME.scala 562:9]
+  wire [31:0] _GEN_36 = {{14'd0}, rdLineBytes}; // @[TensorLoadWideVME.scala 572:48]
+  wire [31:0] _rdLastPulseBytes_T_1 = rdLineElemBeginAddr + _GEN_36; // @[TensorLoadWideVME.scala 572:48]
+  wire [31:0] _GEN_3 = _rdLastPulseBytes_T_1 % 32'h8; // @[TensorLoadWideVME.scala 572:63]
+  wire [3:0] rdLastPulseBytes = _GEN_3[3:0]; // @[TensorLoadWideVME.scala 572:63]
+  wire [1:0] rdLastPulseTensNb = rdLastPulseBytes[3:2] == 2'h0 ? 2'h2 : rdLastPulseBytes[3:2]; // @[TensorLoadWideVME.scala 577:28]
+  reg [10:0] rdCmdStartIdx; // @[TensorLoadWideVME.scala 587:26]
+  reg  commandsDone; // @[TensorLoadWideVME.scala 588:29]
+  wire [14:0] nextClIdx = clReadIdx + _GEN_33; // @[TensorLoadWideVME.scala 599:31]
+  wire  _GEN_7 = nextClIdx == rdLineClNb & dramLineIdx == _T_31 | commandsDone; // @[TensorLoadWideVME.scala 594:16 601:71 602:20]
+  wire  _GEN_9 = io_updateState ? _GEN_7 : commandsDone; // @[TensorLoadWideVME.scala 594:16 598:31]
+  wire  _GEN_11 = io_start | stride ? 1'h0 : _GEN_9; // @[TensorLoadWideVME.scala 595:29 597:18]
+  wire [1:0] rdCmd1stPluseOffsetTensNb = newReadRow ? rd1stPulseOffsetBytes[3:2] : 2'h0; // @[TensorLoadWideVME.scala 618:20 620:31 623:31]
+  wire [1:0] rdCmdLastPluseTensNb = _T_29 ? rdLastPulseTensNb : 2'h2; // @[TensorLoadWideVME.scala 625:43 627:26 630:26]
+  wire [15:0] _GEN_40 = {{12'd0}, io_xpad_0}; // @[TensorLoadWideVME.scala 656:29]
+  wire [15:0] _totalWidth_T_1 = io_xsize + _GEN_40; // @[TensorLoadWideVME.scala 656:29]
+  wire [15:0] _GEN_41 = {{12'd0}, io_xpad_1}; // @[TensorLoadWideVME.scala 656:41]
+  wire [15:0] totalWidth = _totalWidth_T_1 + _GEN_41; // @[TensorLoadWideVME.scala 656:41]
+  reg [19:0] currentRowIdx; // @[TensorLoadWideVME.scala 660:26]
+  wire [19:0] _GEN_42 = {{16'd0}, io_ypad_0}; // @[TensorLoadWideVME.scala 662:39]
+  wire [15:0] _GEN_43 = {{12'd0}, io_ypad_0}; // @[TensorLoadWideVME.scala 663:31]
+  wire [15:0] _rdCmdStartIdxValid_T_2 = io_ysize + _GEN_43; // @[TensorLoadWideVME.scala 663:31]
+  wire [19:0] _GEN_44 = {{4'd0}, _rdCmdStartIdxValid_T_2}; // @[TensorLoadWideVME.scala 663:19]
+  wire  _rdCmdStartIdxValid_T_3 = currentRowIdx < _GEN_44; // @[TensorLoadWideVME.scala 663:19]
+  wire  _rdCmdStartIdxValid_T_4 = currentRowIdx >= _GEN_42 & _rdCmdStartIdxValid_T_3; // @[TensorLoadWideVME.scala 662:52]
+  wire  _rdCmdStartIdxValid_T_5 = _rdCmdStartIdxValid_T_4 & io_isBusy; // @[TensorLoadWideVME.scala 663:44]
+  wire  _rdCmdStartIdxValid_T_6 = ~commandsDone; // @[TensorLoadWideVME.scala 665:5]
+  wire  rdCmdStartIdxValid = _rdCmdStartIdxValid_T_5 & _rdCmdStartIdxValid_T_6; // @[TensorLoadWideVME.scala 664:15]
+  wire [15:0] _rdCmdStartIdx_T_1 = io_sram_offset + _GEN_40; // @[TensorLoadWideVME.scala 668:37]
+  wire [15:0] _GEN_47 = {{5'd0}, rdCmdStartIdx}; // @[TensorLoadWideVME.scala 670:36]
+  wire [15:0] _rdCmdStartIdx_T_3 = _GEN_47 + totalWidth; // @[TensorLoadWideVME.scala 670:36]
+  wire [19:0] _currentRowIdx_T_1 = currentRowIdx + 20'h1; // @[TensorLoadWideVME.scala 671:36]
+  wire [15:0] _GEN_19 = io_isBusy & (currentRowIdx < _GEN_42 | stride) ? _rdCmdStartIdx_T_3 : {{5'd0}, rdCmdStartIdx}; // @[TensorLoadWideVME.scala 669:67 670:19 587:26]
+  wire [15:0] _GEN_22 = io_start ? _rdCmdStartIdx_T_1 : _GEN_19; // @[TensorLoadWideVME.scala 666:19 668:19]
+  wire  startIssueCmdRead = newReadRow & rdCmdStartIdxValid; // @[TensorLoadWideVME.scala 674:19]
+  reg [10:0] rdCmdDestElemIdxNext; // @[TensorLoadWideVME.scala 687:33]
+  wire [9:0] _rdCmdTransactionTensNb_T = {rdLen, 1'h0}; // @[TensorLoadWideVME.scala 693:39]
+  wire [9:0] _GEN_48 = {{8'd0}, rdCmd1stPluseOffsetTensNb}; // @[TensorLoadWideVME.scala 693:71]
+  wire [9:0] rdCmdTransactionTensNb = _rdCmdTransactionTensNb_T - _GEN_48; // @[TensorLoadWideVME.scala 693:71]
+  wire [10:0] _GEN_49 = {{1'd0}, rdCmdTransactionTensNb}; // @[TensorLoadWideVME.scala 699:44]
+  wire [10:0] _rdCmdDestElemIdxNext_T_1 = rdCmdStartIdx + _GEN_49; // @[TensorLoadWideVME.scala 699:44]
+  wire [10:0] _rdCmdDestElemIdxNext_T_3 = rdCmdDestElemIdxNext + _GEN_49; // @[TensorLoadWideVME.scala 702:51]
+  wire [10:0] _GEN_25 = startIssueCmdRead ? rdCmdStartIdx : rdCmdDestElemIdxNext; // @[TensorLoadWideVME.scala 689:20 697:29 698:24]
+  wire [10:0] rdCmdDestElemIdx = rdCmdStartIdxValid ? _GEN_25 : rdCmdDestElemIdxNext; // @[TensorLoadWideVME.scala 689:20 695:28]
+  wire [8:0] _io_vmeCmd_bits_len_T_1 = rdLen - 9'h1; // @[TensorLoadWideVME.scala 715:31]
+  wire [31:0] _GEN_4 = rdLineAddr % 32'h800; // @[TensorLoadWideVME.scala 716:87]
+  wire [11:0] _T_49 = _GEN_4[11:0]; // @[TensorLoadWideVME.scala 716:87]
+  wire [11:0] _T_51 = 12'h800 - _T_49; // @[TensorLoadWideVME.scala 716:74]
   wire [14:0] _io_vmeCmd_bits_tag_T_1 = {rdCmdDestElemIdx,rdCmd1stPluseOffsetTensNb,rdCmdLastPluseTensNb}; // @[Cat.scala 31:58]
-  assign io_vmeCmd_valid = _rdCmdStartIdxValid_T_5 & _rdCmdStartIdxValid_T_6; // @[TensorLoadWideVME.scala 665:15]
-  assign io_vmeCmd_bits_addr = rdLineAddr; // @[TensorLoadWideVME.scala 715:23]
-  assign io_vmeCmd_bits_len = _io_vmeCmd_bits_len_T_1[3:0]; // @[TensorLoadWideVME.scala 716:22]
-  assign io_vmeCmd_bits_tag = {{6'd0}, _io_vmeCmd_bits_tag_T_1}; // @[TensorLoadWideVME.scala 721:22]
-  assign io_readLen = _GEN_18[4:0]; // @[TensorLoadWideVME.scala 537:19]
-  assign io_done = commandsDone; // @[TensorLoadWideVME.scala 726:11]
+  assign io_vmeCmd_valid = _rdCmdStartIdxValid_T_5 & _rdCmdStartIdxValid_T_6; // @[TensorLoadWideVME.scala 664:15]
+  assign io_vmeCmd_bits_addr = rdLineAddr; // @[TensorLoadWideVME.scala 714:23]
+  assign io_vmeCmd_bits_len = _io_vmeCmd_bits_len_T_1[7:0]; // @[TensorLoadWideVME.scala 715:22]
+  assign io_vmeCmd_bits_tag = {{6'd0}, _io_vmeCmd_bits_tag_T_1}; // @[TensorLoadWideVME.scala 720:22]
+  assign io_readLen = _GEN_18[8:0]; // @[TensorLoadWideVME.scala 536:19]
+  assign io_done = commandsDone; // @[TensorLoadWideVME.scala 725:11]
   always @(posedge clock) begin
     if (io_start) begin // @[TensorLoadWideVME.scala 502:19]
       dramLineIdx <= 16'h0; // @[TensorLoadWideVME.scala 503:17]
     end else if (stride) begin // @[TensorLoadWideVME.scala 504:23]
       dramLineIdx <= _dramLineIdx_T_1; // @[TensorLoadWideVME.scala 505:17]
     end
-    if (io_start | stride) begin // @[TensorLoadWideVME.scala 596:29]
-      clReadIdx <= 15'h0; // @[TensorLoadWideVME.scala 597:15]
-    end else if (io_updateState) begin // @[TensorLoadWideVME.scala 599:31]
-      clReadIdx <= nextClIdx; // @[TensorLoadWideVME.scala 601:15]
+    if (io_start | stride) begin // @[TensorLoadWideVME.scala 595:29]
+      clReadIdx <= 15'h0; // @[TensorLoadWideVME.scala 596:15]
+    end else if (io_updateState) begin // @[TensorLoadWideVME.scala 598:31]
+      clReadIdx <= nextClIdx; // @[TensorLoadWideVME.scala 600:15]
     end
-    if (io_start) begin // @[TensorLoadWideVME.scala 525:19]
-      rdLineElemBeginAddr <= xferElemInitAddr; // @[TensorLoadWideVME.scala 526:25]
-    end else if (stride) begin // @[TensorLoadWideVME.scala 527:23]
-      rdLineElemBeginAddr <= nextLineBeginElemAddr; // @[TensorLoadWideVME.scala 528:25]
+    if (io_start) begin // @[TensorLoadWideVME.scala 524:19]
+      rdLineElemBeginAddr <= xferElemInitAddr; // @[TensorLoadWideVME.scala 525:25]
+    end else if (stride) begin // @[TensorLoadWideVME.scala 526:23]
+      rdLineElemBeginAddr <= nextLineBeginElemAddr; // @[TensorLoadWideVME.scala 527:25]
     end
-    if (io_start) begin // @[TensorLoadWideVME.scala 539:19]
-      rdLineAddr <= xferClInitAddr; // @[TensorLoadWideVME.scala 540:16]
-    end else if (io_updateState) begin // @[TensorLoadWideVME.scala 541:31]
-      if (stride) begin // @[TensorLoadWideVME.scala 542:18]
-        rdLineAddr <= nextLineBeginClAddr; // @[TensorLoadWideVME.scala 543:18]
+    if (io_start) begin // @[TensorLoadWideVME.scala 538:19]
+      rdLineAddr <= xferClInitAddr; // @[TensorLoadWideVME.scala 539:16]
+    end else if (io_updateState) begin // @[TensorLoadWideVME.scala 540:31]
+      if (stride) begin // @[TensorLoadWideVME.scala 541:18]
+        rdLineAddr <= nextLineBeginClAddr; // @[TensorLoadWideVME.scala 542:18]
       end else begin
-        rdLineAddr <= _rdLineAddr_T_2; // @[TensorLoadWideVME.scala 545:18]
+        rdLineAddr <= _rdLineAddr_T_2; // @[TensorLoadWideVME.scala 544:18]
       end
     end
     rdCmdStartIdx <= _GEN_22[10:0];
-    commandsDone <= reset | _GEN_11; // @[TensorLoadWideVME.scala 589:{29,29}]
-    if (io_start) begin // @[TensorLoadWideVME.scala 667:19]
-      currentRowIdx <= 20'h0; // @[TensorLoadWideVME.scala 668:19]
-    end else if (io_isBusy & (currentRowIdx < _GEN_42 | stride)) begin // @[TensorLoadWideVME.scala 670:67]
-      currentRowIdx <= _currentRowIdx_T_1; // @[TensorLoadWideVME.scala 672:19]
+    commandsDone <= reset | _GEN_11; // @[TensorLoadWideVME.scala 588:{29,29}]
+    if (io_start) begin // @[TensorLoadWideVME.scala 666:19]
+      currentRowIdx <= 20'h0; // @[TensorLoadWideVME.scala 667:19]
+    end else if (io_isBusy & (currentRowIdx < _GEN_42 | stride)) begin // @[TensorLoadWideVME.scala 669:67]
+      currentRowIdx <= _currentRowIdx_T_1; // @[TensorLoadWideVME.scala 671:19]
     end
-    if (rdCmdStartIdxValid) begin // @[TensorLoadWideVME.scala 696:28]
-      if (startIssueCmdRead) begin // @[TensorLoadWideVME.scala 698:29]
-        rdCmdDestElemIdxNext <= _rdCmdDestElemIdxNext_T_1; // @[TensorLoadWideVME.scala 700:27]
-      end else if (io_updateState) begin // @[TensorLoadWideVME.scala 701:33]
-        rdCmdDestElemIdxNext <= _rdCmdDestElemIdxNext_T_3; // @[TensorLoadWideVME.scala 703:27]
+    if (rdCmdStartIdxValid) begin // @[TensorLoadWideVME.scala 695:28]
+      if (startIssueCmdRead) begin // @[TensorLoadWideVME.scala 697:29]
+        rdCmdDestElemIdxNext <= _rdCmdDestElemIdxNext_T_1; // @[TensorLoadWideVME.scala 699:27]
+      end else if (io_updateState) begin // @[TensorLoadWideVME.scala 700:33]
+        rdCmdDestElemIdxNext <= _rdCmdDestElemIdxNext_T_3; // @[TensorLoadWideVME.scala 702:27]
       end
     end
     `ifndef SYNTHESIS
@@ -9995,8 +9999,8 @@ module GenVMECmdWide(
     `endif
         if (~reset & ~(rd1stPulseOffsetBytes[3:2] <= 2'h2)) begin
           $fwrite(32'h80000002,
-            "Assertion failed: -F- Expecting the number of tensors to skip in CL\n    at TensorLoadWideVME.scala:563 assert(rd1stPulseOffsetBytes >> log2Ceil(elemBytes) <= tp.clSizeRatio.U,\n"
-            ); // @[TensorLoadWideVME.scala 563:9]
+            "Assertion failed: -F- Expecting the number of tensors to skip in CL\n    at TensorLoadWideVME.scala:562 assert(rd1stPulseOffsetBytes >> log2Ceil(elemBytes) <= tp.clSizeRatio.U,\n"
+            ); // @[TensorLoadWideVME.scala 562:9]
         end
     `ifdef PRINTF_COND
       end
@@ -10008,8 +10012,8 @@ module GenVMECmdWide(
     `endif
         if (_T_3 & ~(rdLastPulseBytes[3:2] <= 2'h2)) begin
           $fwrite(32'h80000002,
-            "Assertion failed: -F- Expecting the number of active tensors in CL\n    at TensorLoadWideVME.scala:574 assert(rdLastPulseBytes >> log2Ceil(elemBytes) <= (clBytes/elemBytes).U,\n"
-            ); // @[TensorLoadWideVME.scala 574:9]
+            "Assertion failed: -F- Expecting the number of active tensors in CL\n    at TensorLoadWideVME.scala:573 assert(rdLastPulseBytes >> log2Ceil(elemBytes) <= (clBytes/elemBytes).U,\n"
+            ); // @[TensorLoadWideVME.scala 573:9]
         end
     `ifdef PRINTF_COND
       end
@@ -10021,8 +10025,8 @@ module GenVMECmdWide(
     `endif
         if (_T_3 & ~(~io_isBusy | rdLineClNb >= clReadIdx)) begin
           $fwrite(32'h80000002,
-            "Assertion failed\n    at TensorLoadWideVME.scala:641 assert(!io.isBusy || rdLineClNb >= clReadIdx)// define how many cachelines to read at this cycle\n"
-            ); // @[TensorLoadWideVME.scala 641:9]
+            "Assertion failed\n    at TensorLoadWideVME.scala:640 assert(!io.isBusy || rdLineClNb >= clReadIdx)// define how many cachelines to read at this cycle\n"
+            ); // @[TensorLoadWideVME.scala 640:9]
         end
     `ifdef PRINTF_COND
       end
@@ -10034,8 +10038,8 @@ module GenVMECmdWide(
     `endif
         if (_T_3 & ~(~io_vmeCmd_valid | _rdLineAddr_T <= _T_51)) begin
           $fwrite(32'h80000002,
-            "Assertion failed: -F- uop DRAM page alignment failure. DRAM address + len overlaps mp.lenBits*memBlockSize alignment %x %x\n    at TensorLoadWideVME.scala:717 assert(!io.vmeCmd.valid || ((rdLen << log2Ceil(clBytes)) <= maxTrBytes - rdLineAddr %% maxTrBytes),\n"
-            ,rdLineAddr,rdLen); // @[TensorLoadWideVME.scala 717:9]
+            "Assertion failed: -F- uop DRAM page alignment failure. DRAM address + len overlaps mp.lenBits*memBlockSize alignment %x %x\n    at TensorLoadWideVME.scala:716 assert(!io.vmeCmd.valid || ((rdLen << log2Ceil(clBytes)) <= maxTrBytes - rdLineAddr %% maxTrBytes),\n"
+            ,rdLineAddr,rdLen); // @[TensorLoadWideVME.scala 716:9]
         end
     `ifdef PRINTF_COND
       end
@@ -10104,19 +10108,19 @@ end // initial
   always @(posedge clock) begin
     //
     if (~reset) begin
-      assert(rd1stPulseOffsetBytes[3:2] <= 2'h2); // @[TensorLoadWideVME.scala 563:9]
+      assert(rd1stPulseOffsetBytes[3:2] <= 2'h2); // @[TensorLoadWideVME.scala 562:9]
     end
     //
     if (_T_3) begin
-      assert(rdLastPulseBytes[3:2] <= 2'h2); // @[TensorLoadWideVME.scala 574:9]
+      assert(rdLastPulseBytes[3:2] <= 2'h2); // @[TensorLoadWideVME.scala 573:9]
     end
     //
     if (_T_3) begin
-      assert(~io_isBusy | rdLineClNb >= clReadIdx); // @[TensorLoadWideVME.scala 641:9]
+      assert(~io_isBusy | rdLineClNb >= clReadIdx); // @[TensorLoadWideVME.scala 640:9]
     end
     //
     if (_T_3) begin
-      assert(~io_vmeCmd_valid | _rdLineAddr_T <= _T_51); // @[TensorLoadWideVME.scala 717:9]
+      assert(~io_vmeCmd_valid | _rdLineAddr_T <= _T_51); // @[TensorLoadWideVME.scala 716:9]
     end
   end
 endmodule
@@ -10130,32 +10134,32 @@ module GenVMECmdWideTL(
   input          io_vmeCmd_ready,
   output         io_vmeCmd_valid,
   output [31:0]  io_vmeCmd_bits_addr,
-  output [3:0]   io_vmeCmd_bits_len,
+  output [7:0]   io_vmeCmd_bits_len,
   output [20:0]  io_vmeCmd_bits_tag,
-  output [4:0]   io_readLen,
+  output [8:0]   io_readLen,
   output         io_done
 );
-  wire  cmdGen_clock; // @[TensorLoadWideVME.scala 746:23]
-  wire  cmdGen_reset; // @[TensorLoadWideVME.scala 746:23]
-  wire  cmdGen_io_start; // @[TensorLoadWideVME.scala 746:23]
-  wire  cmdGen_io_isBusy; // @[TensorLoadWideVME.scala 746:23]
-  wire  cmdGen_io_updateState; // @[TensorLoadWideVME.scala 746:23]
-  wire [31:0] cmdGen_io_baddr; // @[TensorLoadWideVME.scala 746:23]
-  wire  cmdGen_io_vmeCmd_valid; // @[TensorLoadWideVME.scala 746:23]
-  wire [31:0] cmdGen_io_vmeCmd_bits_addr; // @[TensorLoadWideVME.scala 746:23]
-  wire [3:0] cmdGen_io_vmeCmd_bits_len; // @[TensorLoadWideVME.scala 746:23]
-  wire [20:0] cmdGen_io_vmeCmd_bits_tag; // @[TensorLoadWideVME.scala 746:23]
-  wire [4:0] cmdGen_io_readLen; // @[TensorLoadWideVME.scala 746:23]
-  wire  cmdGen_io_done; // @[TensorLoadWideVME.scala 746:23]
-  wire [15:0] cmdGen_io_ysize; // @[TensorLoadWideVME.scala 746:23]
-  wire [15:0] cmdGen_io_xsize; // @[TensorLoadWideVME.scala 746:23]
-  wire [15:0] cmdGen_io_xstride; // @[TensorLoadWideVME.scala 746:23]
-  wire [31:0] cmdGen_io_dram_offset; // @[TensorLoadWideVME.scala 746:23]
-  wire [15:0] cmdGen_io_sram_offset; // @[TensorLoadWideVME.scala 746:23]
-  wire [3:0] cmdGen_io_xpad_0; // @[TensorLoadWideVME.scala 746:23]
-  wire [3:0] cmdGen_io_xpad_1; // @[TensorLoadWideVME.scala 746:23]
-  wire [3:0] cmdGen_io_ypad_0; // @[TensorLoadWideVME.scala 746:23]
-  GenVMECmdWide cmdGen ( // @[TensorLoadWideVME.scala 746:23]
+  wire  cmdGen_clock; // @[TensorLoadWideVME.scala 745:23]
+  wire  cmdGen_reset; // @[TensorLoadWideVME.scala 745:23]
+  wire  cmdGen_io_start; // @[TensorLoadWideVME.scala 745:23]
+  wire  cmdGen_io_isBusy; // @[TensorLoadWideVME.scala 745:23]
+  wire  cmdGen_io_updateState; // @[TensorLoadWideVME.scala 745:23]
+  wire [31:0] cmdGen_io_baddr; // @[TensorLoadWideVME.scala 745:23]
+  wire  cmdGen_io_vmeCmd_valid; // @[TensorLoadWideVME.scala 745:23]
+  wire [31:0] cmdGen_io_vmeCmd_bits_addr; // @[TensorLoadWideVME.scala 745:23]
+  wire [7:0] cmdGen_io_vmeCmd_bits_len; // @[TensorLoadWideVME.scala 745:23]
+  wire [20:0] cmdGen_io_vmeCmd_bits_tag; // @[TensorLoadWideVME.scala 745:23]
+  wire [8:0] cmdGen_io_readLen; // @[TensorLoadWideVME.scala 745:23]
+  wire  cmdGen_io_done; // @[TensorLoadWideVME.scala 745:23]
+  wire [15:0] cmdGen_io_ysize; // @[TensorLoadWideVME.scala 745:23]
+  wire [15:0] cmdGen_io_xsize; // @[TensorLoadWideVME.scala 745:23]
+  wire [15:0] cmdGen_io_xstride; // @[TensorLoadWideVME.scala 745:23]
+  wire [31:0] cmdGen_io_dram_offset; // @[TensorLoadWideVME.scala 745:23]
+  wire [15:0] cmdGen_io_sram_offset; // @[TensorLoadWideVME.scala 745:23]
+  wire [3:0] cmdGen_io_xpad_0; // @[TensorLoadWideVME.scala 745:23]
+  wire [3:0] cmdGen_io_xpad_1; // @[TensorLoadWideVME.scala 745:23]
+  wire [3:0] cmdGen_io_ypad_0; // @[TensorLoadWideVME.scala 745:23]
+  GenVMECmdWide cmdGen ( // @[TensorLoadWideVME.scala 745:23]
     .clock(cmdGen_clock),
     .reset(cmdGen_reset),
     .io_start(cmdGen_io_start),
@@ -10177,26 +10181,26 @@ module GenVMECmdWideTL(
     .io_xpad_1(cmdGen_io_xpad_1),
     .io_ypad_0(cmdGen_io_ypad_0)
   );
-  assign io_vmeCmd_valid = cmdGen_io_vmeCmd_valid; // @[TensorLoadWideVME.scala 751:13]
-  assign io_vmeCmd_bits_addr = cmdGen_io_vmeCmd_bits_addr; // @[TensorLoadWideVME.scala 751:13]
-  assign io_vmeCmd_bits_len = cmdGen_io_vmeCmd_bits_len; // @[TensorLoadWideVME.scala 751:13]
-  assign io_vmeCmd_bits_tag = cmdGen_io_vmeCmd_bits_tag; // @[TensorLoadWideVME.scala 751:13]
-  assign io_readLen = cmdGen_io_readLen; // @[TensorLoadWideVME.scala 752:14]
-  assign io_done = cmdGen_io_done; // @[TensorLoadWideVME.scala 753:11]
+  assign io_vmeCmd_valid = cmdGen_io_vmeCmd_valid; // @[TensorLoadWideVME.scala 750:13]
+  assign io_vmeCmd_bits_addr = cmdGen_io_vmeCmd_bits_addr; // @[TensorLoadWideVME.scala 750:13]
+  assign io_vmeCmd_bits_len = cmdGen_io_vmeCmd_bits_len; // @[TensorLoadWideVME.scala 750:13]
+  assign io_vmeCmd_bits_tag = cmdGen_io_vmeCmd_bits_tag; // @[TensorLoadWideVME.scala 750:13]
+  assign io_readLen = cmdGen_io_readLen; // @[TensorLoadWideVME.scala 751:14]
+  assign io_done = cmdGen_io_done; // @[TensorLoadWideVME.scala 752:11]
   assign cmdGen_clock = clock;
   assign cmdGen_reset = reset;
-  assign cmdGen_io_start = io_start; // @[TensorLoadWideVME.scala 748:19]
-  assign cmdGen_io_isBusy = io_isBusy; // @[TensorLoadWideVME.scala 749:20]
+  assign cmdGen_io_start = io_start; // @[TensorLoadWideVME.scala 747:19]
+  assign cmdGen_io_isBusy = io_isBusy; // @[TensorLoadWideVME.scala 748:20]
   assign cmdGen_io_updateState = io_vmeCmd_ready & io_vmeCmd_valid; // @[Decoupled.scala 50:35]
-  assign cmdGen_io_baddr = io_baddr; // @[TensorLoadWideVME.scala 750:19]
-  assign cmdGen_io_ysize = io_inst[79:64]; // @[TensorLoadWideVME.scala 744:29]
-  assign cmdGen_io_xsize = io_inst[95:80]; // @[TensorLoadWideVME.scala 744:29]
-  assign cmdGen_io_xstride = io_inst[111:96]; // @[TensorLoadWideVME.scala 744:29]
-  assign cmdGen_io_dram_offset = io_inst[57:26]; // @[TensorLoadWideVME.scala 744:29]
-  assign cmdGen_io_sram_offset = io_inst[25:10]; // @[TensorLoadWideVME.scala 744:29]
-  assign cmdGen_io_xpad_0 = io_inst[123:120]; // @[TensorLoadWideVME.scala 744:29]
-  assign cmdGen_io_xpad_1 = io_inst[127:124]; // @[TensorLoadWideVME.scala 744:29]
-  assign cmdGen_io_ypad_0 = io_inst[115:112]; // @[TensorLoadWideVME.scala 744:29]
+  assign cmdGen_io_baddr = io_baddr; // @[TensorLoadWideVME.scala 749:19]
+  assign cmdGen_io_ysize = io_inst[79:64]; // @[TensorLoadWideVME.scala 743:29]
+  assign cmdGen_io_xsize = io_inst[95:80]; // @[TensorLoadWideVME.scala 743:29]
+  assign cmdGen_io_xstride = io_inst[111:96]; // @[TensorLoadWideVME.scala 743:29]
+  assign cmdGen_io_dram_offset = io_inst[57:26]; // @[TensorLoadWideVME.scala 743:29]
+  assign cmdGen_io_sram_offset = io_inst[25:10]; // @[TensorLoadWideVME.scala 743:29]
+  assign cmdGen_io_xpad_0 = io_inst[123:120]; // @[TensorLoadWideVME.scala 743:29]
+  assign cmdGen_io_xpad_1 = io_inst[127:124]; // @[TensorLoadWideVME.scala 743:29]
+  assign cmdGen_io_ypad_0 = io_inst[115:112]; // @[TensorLoadWideVME.scala 743:29]
 endmodule
 module ReadVMEDataWide(
   input         clock,
@@ -10382,7 +10386,7 @@ module TensorLoadWideVME(
   input          io_vme_rd_cmd_ready,
   output         io_vme_rd_cmd_valid,
   output [31:0]  io_vme_rd_cmd_bits_addr,
-  output [3:0]   io_vme_rd_cmd_bits_len,
+  output [7:0]   io_vme_rd_cmd_bits_len,
   output [20:0]  io_vme_rd_cmd_bits_tag,
   output         io_vme_rd_data_ready,
   input          io_vme_rd_data_valid,
@@ -10417,9 +10421,9 @@ module TensorLoadWideVME(
   wire  vmeCmd_io_vmeCmd_ready; // @[TensorLoadWideVME.scala 105:23]
   wire  vmeCmd_io_vmeCmd_valid; // @[TensorLoadWideVME.scala 105:23]
   wire [31:0] vmeCmd_io_vmeCmd_bits_addr; // @[TensorLoadWideVME.scala 105:23]
-  wire [3:0] vmeCmd_io_vmeCmd_bits_len; // @[TensorLoadWideVME.scala 105:23]
+  wire [7:0] vmeCmd_io_vmeCmd_bits_len; // @[TensorLoadWideVME.scala 105:23]
   wire [20:0] vmeCmd_io_vmeCmd_bits_tag; // @[TensorLoadWideVME.scala 105:23]
-  wire [4:0] vmeCmd_io_readLen; // @[TensorLoadWideVME.scala 105:23]
+  wire [8:0] vmeCmd_io_readLen; // @[TensorLoadWideVME.scala 105:23]
   wire  vmeCmd_io_done; // @[TensorLoadWideVME.scala 105:23]
   wire  readData_clock; // @[TensorLoadWideVME.scala 150:24]
   wire  readData_reset; // @[TensorLoadWideVME.scala 150:24]
@@ -10473,7 +10477,7 @@ module TensorLoadWideVME(
   wire  _T = io_vme_rd_cmd_ready & io_vme_rd_cmd_valid; // @[Decoupled.scala 50:35]
   wire  _T_1 = state & _T; // @[TensorLoadWideVME.scala 135:21]
   wire  _T_3 = state & _T & ~vmeDataFirePipe; // @[TensorLoadWideVME.scala 135:43]
-  wire [10:0] _GEN_26 = {{6'd0}, vmeCmd_io_readLen}; // @[TensorLoadWideVME.scala 136:30]
+  wire [10:0] _GEN_26 = {{2'd0}, vmeCmd_io_readLen}; // @[TensorLoadWideVME.scala 136:30]
   wire [10:0] _clInFlight_T_1 = clInFlight + _GEN_26; // @[TensorLoadWideVME.scala 136:30]
   wire  _T_6 = _T_1 & vmeDataFirePipe; // @[TensorLoadWideVME.scala 137:43]
   wire [10:0] _clInFlight_T_5 = _clInFlight_T_1 - 11'h1; // @[TensorLoadWideVME.scala 138:40]
@@ -10724,7 +10728,7 @@ module TensorLoadUop(
   input          io_vme_rd_cmd_ready,
   output         io_vme_rd_cmd_valid,
   output [31:0]  io_vme_rd_cmd_bits_addr,
-  output [3:0]   io_vme_rd_cmd_bits_len,
+  output [7:0]   io_vme_rd_cmd_bits_len,
   output [20:0]  io_vme_rd_cmd_bits_tag,
   input          io_vme_rd_data_valid,
   input  [63:0]  io_vme_rd_data_bits_data,
@@ -10744,7 +10748,7 @@ module TensorLoadUop(
   wire  tensorLoad_io_vme_rd_cmd_ready; // @[TensorLoad.scala 65:28]
   wire  tensorLoad_io_vme_rd_cmd_valid; // @[TensorLoad.scala 65:28]
   wire [31:0] tensorLoad_io_vme_rd_cmd_bits_addr; // @[TensorLoad.scala 65:28]
-  wire [3:0] tensorLoad_io_vme_rd_cmd_bits_len; // @[TensorLoad.scala 65:28]
+  wire [7:0] tensorLoad_io_vme_rd_cmd_bits_len; // @[TensorLoad.scala 65:28]
   wire [20:0] tensorLoad_io_vme_rd_cmd_bits_tag; // @[TensorLoad.scala 65:28]
   wire  tensorLoad_io_vme_rd_data_ready; // @[TensorLoad.scala 65:28]
   wire  tensorLoad_io_vme_rd_data_valid; // @[TensorLoad.scala 65:28]
@@ -10807,7 +10811,7 @@ module LoadUopTop(
   input          io_vme_rd_cmd_ready,
   output         io_vme_rd_cmd_valid,
   output [31:0]  io_vme_rd_cmd_bits_addr,
-  output [3:0]   io_vme_rd_cmd_bits_len,
+  output [7:0]   io_vme_rd_cmd_bits_len,
   output [20:0]  io_vme_rd_cmd_bits_tag,
   input          io_vme_rd_data_valid,
   input  [63:0]  io_vme_rd_data_bits_data,
@@ -10829,7 +10833,7 @@ module LoadUopTop(
   wire  loadUop_io_vme_rd_cmd_ready; // @[LoadUop.scala 85:25]
   wire  loadUop_io_vme_rd_cmd_valid; // @[LoadUop.scala 85:25]
   wire [31:0] loadUop_io_vme_rd_cmd_bits_addr; // @[LoadUop.scala 85:25]
-  wire [3:0] loadUop_io_vme_rd_cmd_bits_len; // @[LoadUop.scala 85:25]
+  wire [7:0] loadUop_io_vme_rd_cmd_bits_len; // @[LoadUop.scala 85:25]
   wire [20:0] loadUop_io_vme_rd_cmd_bits_tag; // @[LoadUop.scala 85:25]
   wire  loadUop_io_vme_rd_data_valid; // @[LoadUop.scala 85:25]
   wire [63:0] loadUop_io_vme_rd_data_bits_data; // @[LoadUop.scala 85:25]
@@ -10893,9 +10897,9 @@ module GenVMECmd_2(
   input          io_vmeCmd_ready,
   output         io_vmeCmd_valid,
   output [31:0]  io_vmeCmd_bits_addr,
-  output [3:0]   io_vmeCmd_bits_len,
+  output [7:0]   io_vmeCmd_bits_len,
   output [20:0]  io_vmeCmd_bits_tag,
-  output [4:0]   io_readLen,
+  output [8:0]   io_readLen,
   output         io_done
 );
 `ifdef RANDOMIZE_REG_INIT
@@ -10925,11 +10929,11 @@ module GenVMECmd_2(
   wire [37:0] _xfer_init_addr_T = isAcc8 ? {{2'd0}, acc8InitAddr} : regularInitAddr; // @[TensorLoadNarrowVME.scala 614:52]
   wire [37:0] _xfer_init_addr_T_1 = 38'hffffffff & _xfer_init_addr_T; // @[TensorLoadNarrowVME.scala 614:47]
   wire [37:0] _GEN_31 = {{6'd0}, io_baddr}; // @[TensorLoadNarrowVME.scala 614:33]
-  wire [37:0] xfer_init_addr = _GEN_31 | _xfer_init_addr_T_1; // @[TensorLoadNarrowVME.scala 614:33]
-  wire [31:0] _GEN_0 = rdCmdExtAddr % 32'h80; // @[TensorLoadNarrowVME.scala 618:53]
-  wire [7:0] _firstMaxTransfer_T = _GEN_0[7:0]; // @[TensorLoadNarrowVME.scala 618:53]
-  wire [7:0] _firstMaxTransfer_T_2 = 8'h80 - _firstMaxTransfer_T; // @[TensorLoadNarrowVME.scala 618:38]
-  wire [4:0] firstMaxTransfer = _firstMaxTransfer_T_2[7:3]; // @[TensorLoadNarrowVME.scala 618:67]
+  wire [37:0] xfer_init_addr = _GEN_31 + _xfer_init_addr_T_1; // @[TensorLoadNarrowVME.scala 614:33]
+  wire [31:0] _GEN_0 = rdCmdExtAddr % 32'h800; // @[TensorLoadNarrowVME.scala 618:53]
+  wire [11:0] _firstMaxTransfer_T = _GEN_0[11:0]; // @[TensorLoadNarrowVME.scala 618:53]
+  wire [11:0] _firstMaxTransfer_T_2 = 12'h800 - _firstMaxTransfer_T; // @[TensorLoadNarrowVME.scala 618:38]
+  wire [8:0] firstMaxTransfer = _firstMaxTransfer_T_2[11:3]; // @[TensorLoadNarrowVME.scala 618:67]
   reg [10:0] rdCmdStartIdx; // @[TensorLoadNarrowVME.scala 627:26]
   reg  commandsDone; // @[TensorLoadNarrowVME.scala 629:29]
   wire [18:0] regularBlocksReadSize = {dec_xsize, 3'h0}; // @[TensorLoadNarrowVME.scala 631:41]
@@ -10941,12 +10945,12 @@ module GenVMECmd_2(
   reg [15:0] srcRowIdx; // @[TensorLoadNarrowVME.scala 639:22]
   wire [15:0] _srcRowIdx_T_1 = srcRowIdx + 16'h1; // @[TensorLoadNarrowVME.scala 643:28]
   wire [18:0] blocksRemained = blocksReadSize - blocksReadNb; // @[TensorLoadNarrowVME.scala 671:39]
-  wire [18:0] _GEN_32 = {{14'd0}, firstMaxTransfer}; // @[TensorLoadNarrowVME.scala 673:25]
-  wire [18:0] _GEN_8 = blocksRemained < _GEN_32 ? blocksRemained : {{14'd0}, firstMaxTransfer}; // @[TensorLoadNarrowVME.scala 673:45 674:15 676:15]
-  wire [18:0] _GEN_9 = blocksRemained < 19'h10 ? blocksRemained : 19'h10; // @[TensorLoadNarrowVME.scala 679:40 680:15 682:15]
+  wire [18:0] _GEN_32 = {{10'd0}, firstMaxTransfer}; // @[TensorLoadNarrowVME.scala 673:25]
+  wire [18:0] _GEN_8 = blocksRemained < _GEN_32 ? blocksRemained : {{10'd0}, firstMaxTransfer}; // @[TensorLoadNarrowVME.scala 673:45 674:15 676:15]
+  wire [18:0] _GEN_9 = blocksRemained < 19'h100 ? blocksRemained : 19'h100; // @[TensorLoadNarrowVME.scala 679:40 680:15 682:15]
   wire [18:0] _GEN_10 = newReadRow ? _GEN_8 : _GEN_9; // @[TensorLoadNarrowVME.scala 672:21]
-  wire [4:0] readLen = _GEN_10[4:0]; // @[TensorLoadNarrowVME.scala 628:21]
-  wire [18:0] _GEN_33 = {{14'd0}, readLen}; // @[TensorLoadNarrowVME.scala 664:41]
+  wire [8:0] readLen = _GEN_10[8:0]; // @[TensorLoadNarrowVME.scala 628:21]
+  wire [18:0] _GEN_33 = {{10'd0}, readLen}; // @[TensorLoadNarrowVME.scala 664:41]
   wire [18:0] _T_8 = blocksReadSize - _GEN_33; // @[TensorLoadNarrowVME.scala 664:41]
   wire [15:0] _T_11 = dec_ysize - 16'h1; // @[TensorLoadNarrowVME.scala 664:80]
   wire  _T_14 = io_vmeCmd_ready & io_vmeCmd_valid; // @[Decoupled.scala 50:35]
@@ -10982,8 +10986,8 @@ module GenVMECmd_2(
   wire [21:0] _memRow_T = isAcc8 ? {{2'd0}, acc8RowBytes} : regularRowBytes; // @[TensorLoadNarrowVME.scala 717:46]
   wire [31:0] _GEN_43 = {{10'd0}, _memRow_T}; // @[TensorLoadNarrowVME.scala 717:41]
   wire [31:0] memRow = rdCmdExtAddrRowBegin + _GEN_43; // @[TensorLoadNarrowVME.scala 717:41]
-  wire [7:0] _rdCmdExtAddr_T = {readLen, 3'h0}; // @[TensorLoadNarrowVME.scala 724:47]
-  wire [31:0] _GEN_44 = {{24'd0}, _rdCmdExtAddr_T}; // @[TensorLoadNarrowVME.scala 724:36]
+  wire [11:0] _rdCmdExtAddr_T = {readLen, 3'h0}; // @[TensorLoadNarrowVME.scala 724:47]
+  wire [31:0] _GEN_44 = {{20'd0}, _rdCmdExtAddr_T}; // @[TensorLoadNarrowVME.scala 724:36]
   wire [31:0] _rdCmdExtAddr_T_2 = rdCmdExtAddr + _GEN_44; // @[TensorLoadNarrowVME.scala 724:36]
   wire [31:0] _GEN_16 = stride ? memRow : _rdCmdExtAddr_T_2; // @[TensorLoadNarrowVME.scala 714:18 718:20 724:20]
   wire [31:0] _GEN_17 = stride ? memRow : rdCmdExtAddrRowBegin; // @[TensorLoadNarrowVME.scala 714:18 707:24 719:28]
@@ -10996,15 +11000,15 @@ module GenVMECmd_2(
   wire [13:0] _rdCmdDestBlockIdx_T = {rdCmdStartIdx, 3'h0}; // @[TensorLoadNarrowVME.scala 755:42]
   wire [13:0] _GEN_26 = startIssueCmdRead ? _rdCmdDestBlockIdx_T : rdCmdDestBlockIdxNext; // @[TensorLoadNarrowVME.scala 747:21 754:29 755:25]
   wire [13:0] rdCmdDestBlockIdx = rdCmdStartIdxValid ? _GEN_26 : rdCmdDestBlockIdxNext; // @[TensorLoadNarrowVME.scala 747:21 752:28]
-  wire [13:0] _GEN_45 = {{9'd0}, readLen}; // @[TensorLoadNarrowVME.scala 756:49]
+  wire [13:0] _GEN_45 = {{5'd0}, readLen}; // @[TensorLoadNarrowVME.scala 756:49]
   wire [13:0] _rdCmdDestBlockIdxNext_T_1 = rdCmdDestBlockIdx + _GEN_45; // @[TensorLoadNarrowVME.scala 756:49]
   wire [13:0] _rdCmdDestBlockIdxNext_T_3 = rdCmdDestBlockIdxNext + _GEN_45; // @[TensorLoadNarrowVME.scala 759:53]
-  wire [4:0] _io_vmeCmd_bits_len_T_1 = readLen - 5'h1; // @[TensorLoadNarrowVME.scala 777:33]
+  wire [8:0] _io_vmeCmd_bits_len_T_1 = readLen - 9'h1; // @[TensorLoadNarrowVME.scala 777:33]
   assign io_vmeCmd_valid = _rdCmdStartIdxValid_T_5 & _rdCmdStartIdxValid_T_6; // @[TensorLoadNarrowVME.scala 694:15]
   assign io_vmeCmd_bits_addr = rdCmdExtAddr; // @[TensorLoadNarrowVME.scala 776:23]
-  assign io_vmeCmd_bits_len = _io_vmeCmd_bits_len_T_1[3:0]; // @[TensorLoadNarrowVME.scala 777:22]
+  assign io_vmeCmd_bits_len = _io_vmeCmd_bits_len_T_1[7:0]; // @[TensorLoadNarrowVME.scala 777:22]
   assign io_vmeCmd_bits_tag = {{7'd0}, rdCmdDestBlockIdx}; // @[TensorLoadNarrowVME.scala 782:22]
-  assign io_readLen = _GEN_10[4:0]; // @[TensorLoadNarrowVME.scala 628:21]
+  assign io_readLen = _GEN_10[8:0]; // @[TensorLoadNarrowVME.scala 628:21]
   assign io_done = commandsDone; // @[TensorLoadNarrowVME.scala 784:11]
   always @(posedge clock) begin
     rdCmdExtAddr <= _GEN_22[31:0];
@@ -11260,7 +11264,7 @@ module TensorLoadNarrowVME_2(
   input          io_vme_rd_cmd_ready,
   output         io_vme_rd_cmd_valid,
   output [31:0]  io_vme_rd_cmd_bits_addr,
-  output [3:0]   io_vme_rd_cmd_bits_len,
+  output [7:0]   io_vme_rd_cmd_bits_len,
   output [20:0]  io_vme_rd_cmd_bits_tag,
   output         io_vme_rd_data_ready,
   input          io_vme_rd_data_valid,
@@ -11350,9 +11354,9 @@ module TensorLoadNarrowVME_2(
   wire  vmeCmd_io_vmeCmd_ready; // @[TensorLoadNarrowVME.scala 76:23]
   wire  vmeCmd_io_vmeCmd_valid; // @[TensorLoadNarrowVME.scala 76:23]
   wire [31:0] vmeCmd_io_vmeCmd_bits_addr; // @[TensorLoadNarrowVME.scala 76:23]
-  wire [3:0] vmeCmd_io_vmeCmd_bits_len; // @[TensorLoadNarrowVME.scala 76:23]
+  wire [7:0] vmeCmd_io_vmeCmd_bits_len; // @[TensorLoadNarrowVME.scala 76:23]
   wire [20:0] vmeCmd_io_vmeCmd_bits_tag; // @[TensorLoadNarrowVME.scala 76:23]
-  wire [4:0] vmeCmd_io_readLen; // @[TensorLoadNarrowVME.scala 76:23]
+  wire [8:0] vmeCmd_io_readLen; // @[TensorLoadNarrowVME.scala 76:23]
   wire  vmeCmd_io_done; // @[TensorLoadNarrowVME.scala 76:23]
   wire  readData_clock; // @[TensorLoadNarrowVME.scala 106:24]
   wire  readData_reset; // @[TensorLoadNarrowVME.scala 106:24]
@@ -11467,7 +11471,7 @@ module TensorLoadNarrowVME_2(
   wire  _T = io_vme_rd_cmd_ready & io_vme_rd_cmd_valid; // @[Decoupled.scala 50:35]
   wire  _T_1 = state & _T; // @[TensorLoadNarrowVME.scala 91:21]
   wire  _T_3 = state & _T & ~vmeDataFirePipe; // @[TensorLoadNarrowVME.scala 91:43]
-  wire [13:0] _GEN_58 = {{9'd0}, vmeCmd_io_readLen}; // @[TensorLoadNarrowVME.scala 92:38]
+  wire [13:0] _GEN_58 = {{5'd0}, vmeCmd_io_readLen}; // @[TensorLoadNarrowVME.scala 92:38]
   wire [13:0] _blocksInFlight_T_1 = blocksInFlight + _GEN_58; // @[TensorLoadNarrowVME.scala 92:38]
   wire  _T_6 = _T_1 & vmeDataFirePipe; // @[TensorLoadNarrowVME.scala 93:43]
   wire [13:0] _blocksInFlight_T_5 = _blocksInFlight_T_1 - 14'h1; // @[TensorLoadNarrowVME.scala 94:48]
@@ -11937,7 +11941,7 @@ module TensorLoadAcc(
   input          io_vme_rd_cmd_ready,
   output         io_vme_rd_cmd_valid,
   output [31:0]  io_vme_rd_cmd_bits_addr,
-  output [3:0]   io_vme_rd_cmd_bits_len,
+  output [7:0]   io_vme_rd_cmd_bits_len,
   output [20:0]  io_vme_rd_cmd_bits_tag,
   input          io_vme_rd_data_valid,
   input  [63:0]  io_vme_rd_data_bits_data,
@@ -11989,7 +11993,7 @@ module TensorLoadAcc(
   wire  tensorLoad_io_vme_rd_cmd_ready; // @[TensorLoad.scala 71:28]
   wire  tensorLoad_io_vme_rd_cmd_valid; // @[TensorLoad.scala 71:28]
   wire [31:0] tensorLoad_io_vme_rd_cmd_bits_addr; // @[TensorLoad.scala 71:28]
-  wire [3:0] tensorLoad_io_vme_rd_cmd_bits_len; // @[TensorLoad.scala 71:28]
+  wire [7:0] tensorLoad_io_vme_rd_cmd_bits_len; // @[TensorLoad.scala 71:28]
   wire [20:0] tensorLoad_io_vme_rd_cmd_bits_tag; // @[TensorLoad.scala 71:28]
   wire  tensorLoad_io_vme_rd_data_ready; // @[TensorLoad.scala 71:28]
   wire  tensorLoad_io_vme_rd_data_valid; // @[TensorLoad.scala 71:28]
@@ -19246,7 +19250,7 @@ module Compute(
   input          io_vme_rd_0_cmd_ready,
   output         io_vme_rd_0_cmd_valid,
   output [31:0]  io_vme_rd_0_cmd_bits_addr,
-  output [3:0]   io_vme_rd_0_cmd_bits_len,
+  output [7:0]   io_vme_rd_0_cmd_bits_len,
   output [20:0]  io_vme_rd_0_cmd_bits_tag,
   input          io_vme_rd_0_data_valid,
   input  [63:0]  io_vme_rd_0_data_bits_data,
@@ -19255,7 +19259,7 @@ module Compute(
   input          io_vme_rd_1_cmd_ready,
   output         io_vme_rd_1_cmd_valid,
   output [31:0]  io_vme_rd_1_cmd_bits_addr,
-  output [3:0]   io_vme_rd_1_cmd_bits_len,
+  output [7:0]   io_vme_rd_1_cmd_bits_len,
   output [20:0]  io_vme_rd_1_cmd_bits_tag,
   input          io_vme_rd_1_data_valid,
   input  [63:0]  io_vme_rd_1_data_bits_data,
@@ -19590,7 +19594,7 @@ module Compute(
   wire  loadUop_io_vme_rd_cmd_ready; // @[Compute.scala 61:23]
   wire  loadUop_io_vme_rd_cmd_valid; // @[Compute.scala 61:23]
   wire [31:0] loadUop_io_vme_rd_cmd_bits_addr; // @[Compute.scala 61:23]
-  wire [3:0] loadUop_io_vme_rd_cmd_bits_len; // @[Compute.scala 61:23]
+  wire [7:0] loadUop_io_vme_rd_cmd_bits_len; // @[Compute.scala 61:23]
   wire [20:0] loadUop_io_vme_rd_cmd_bits_tag; // @[Compute.scala 61:23]
   wire  loadUop_io_vme_rd_data_valid; // @[Compute.scala 61:23]
   wire [63:0] loadUop_io_vme_rd_data_bits_data; // @[Compute.scala 61:23]
@@ -19611,7 +19615,7 @@ module Compute(
   wire  tensorAcc_io_vme_rd_cmd_ready; // @[Compute.scala 62:25]
   wire  tensorAcc_io_vme_rd_cmd_valid; // @[Compute.scala 62:25]
   wire [31:0] tensorAcc_io_vme_rd_cmd_bits_addr; // @[Compute.scala 62:25]
-  wire [3:0] tensorAcc_io_vme_rd_cmd_bits_len; // @[Compute.scala 62:25]
+  wire [7:0] tensorAcc_io_vme_rd_cmd_bits_len; // @[Compute.scala 62:25]
   wire [20:0] tensorAcc_io_vme_rd_cmd_bits_tag; // @[Compute.scala 62:25]
   wire  tensorAcc_io_vme_rd_data_valid; // @[Compute.scala 62:25]
   wire [63:0] tensorAcc_io_vme_rd_data_bits_data; // @[Compute.scala 62:25]
@@ -21376,7 +21380,7 @@ module TensorStoreNarrowVME(
   input          io_vme_wr_cmd_ready,
   output         io_vme_wr_cmd_valid,
   output [31:0]  io_vme_wr_cmd_bits_addr,
-  output [3:0]   io_vme_wr_cmd_bits_len,
+  output [7:0]   io_vme_wr_cmd_bits_len,
   input          io_vme_wr_data_ready,
   output         io_vme_wr_data_valid,
   output [63:0]  io_vme_wr_data_bits_data,
@@ -21449,8 +21453,8 @@ module TensorStoreNarrowVME(
   wire [15:0] dec_xstride = io_inst[111:96]; // @[TensorStoreNarrowVME.scala 60:29]
   reg [31:0] waddr_cur; // @[TensorStoreNarrowVME.scala 61:22]
   reg [31:0] waddr_nxt; // @[TensorStoreNarrowVME.scala 62:22]
-  reg [3:0] xcnt; // @[TensorStoreNarrowVME.scala 63:17]
-  reg [3:0] xlen; // @[TensorStoreNarrowVME.scala 64:17]
+  reg [7:0] xcnt; // @[TensorStoreNarrowVME.scala 63:17]
+  reg [7:0] xlen; // @[TensorStoreNarrowVME.scala 64:17]
   reg [15:0] xrem; // @[TensorStoreNarrowVME.scala 65:17]
   wire [16:0] xsize = {dec_xsize, 1'h0}; // @[TensorStoreNarrowVME.scala 66:26]
   reg [15:0] ycnt; // @[TensorStoreNarrowVME.scala 69:17]
@@ -21461,35 +21465,35 @@ module TensorStoreNarrowVME(
   wire [35:0] _xfer_init_addr_T = {dec_dram_offset, 4'h0}; // @[TensorStoreNarrowVME.scala 80:66]
   wire [35:0] _xfer_init_addr_T_1 = 36'hffffffff & _xfer_init_addr_T; // @[TensorStoreNarrowVME.scala 80:47]
   wire [35:0] _GEN_84 = {{4'd0}, io_baddr}; // @[TensorStoreNarrowVME.scala 80:33]
-  wire [35:0] xfer_init_addr = _GEN_84 | _xfer_init_addr_T_1; // @[TensorStoreNarrowVME.scala 80:33]
+  wire [35:0] xfer_init_addr = _GEN_84 + _xfer_init_addr_T_1; // @[TensorStoreNarrowVME.scala 80:33]
   wire [31:0] xfer_split_addr = waddr_cur + xfer_bytes; // @[TensorStoreNarrowVME.scala 81:35]
   wire [31:0] _GEN_85 = {{12'd0}, xstride_bytes}; // @[TensorStoreNarrowVME.scala 82:36]
   wire [31:0] xfer_stride_addr = waddr_nxt + _GEN_85; // @[TensorStoreNarrowVME.scala 82:36]
-  wire [35:0] _GEN_2 = xfer_init_addr % 36'h80; // @[TensorStoreNarrowVME.scala 84:55]
-  wire [7:0] _xfer_init_bytes_T = _GEN_2[7:0]; // @[TensorStoreNarrowVME.scala 84:55]
-  wire [7:0] xfer_init_bytes = 8'h80 - _xfer_init_bytes_T; // @[TensorStoreNarrowVME.scala 84:38]
-  wire [4:0] xfer_init_pulses = xfer_init_bytes[7:3]; // @[TensorStoreNarrowVME.scala 85:43]
-  wire [31:0] _GEN_5 = xfer_split_addr % 32'h80; // @[TensorStoreNarrowVME.scala 86:56]
-  wire [7:0] _xfer_split_bytes_T = _GEN_5[7:0]; // @[TensorStoreNarrowVME.scala 86:56]
-  wire [7:0] xfer_split_bytes = 8'h80 - _xfer_split_bytes_T; // @[TensorStoreNarrowVME.scala 86:38]
-  wire [4:0] xfer_split_pulses = xfer_split_bytes[7:3]; // @[TensorStoreNarrowVME.scala 87:44]
-  wire [31:0] _GEN_15 = xfer_stride_addr % 32'h80; // @[TensorStoreNarrowVME.scala 88:57]
-  wire [7:0] _xfer_stride_bytes_T = _GEN_15[7:0]; // @[TensorStoreNarrowVME.scala 88:57]
-  wire [7:0] xfer_stride_bytes = 8'h80 - _xfer_stride_bytes_T; // @[TensorStoreNarrowVME.scala 88:38]
-  wire [4:0] xfer_stride_pulses = xfer_stride_bytes[7:3]; // @[TensorStoreNarrowVME.scala 89:45]
+  wire [35:0] _GEN_2 = xfer_init_addr % 36'h800; // @[TensorStoreNarrowVME.scala 84:55]
+  wire [11:0] _xfer_init_bytes_T = _GEN_2[11:0]; // @[TensorStoreNarrowVME.scala 84:55]
+  wire [11:0] xfer_init_bytes = 12'h800 - _xfer_init_bytes_T; // @[TensorStoreNarrowVME.scala 84:38]
+  wire [8:0] xfer_init_pulses = xfer_init_bytes[11:3]; // @[TensorStoreNarrowVME.scala 85:43]
+  wire [31:0] _GEN_5 = xfer_split_addr % 32'h800; // @[TensorStoreNarrowVME.scala 86:56]
+  wire [11:0] _xfer_split_bytes_T = _GEN_5[11:0]; // @[TensorStoreNarrowVME.scala 86:56]
+  wire [11:0] xfer_split_bytes = 12'h800 - _xfer_split_bytes_T; // @[TensorStoreNarrowVME.scala 86:38]
+  wire [8:0] xfer_split_pulses = xfer_split_bytes[11:3]; // @[TensorStoreNarrowVME.scala 87:44]
+  wire [31:0] _GEN_15 = xfer_stride_addr % 32'h800; // @[TensorStoreNarrowVME.scala 88:57]
+  wire [11:0] _xfer_stride_bytes_T = _GEN_15[11:0]; // @[TensorStoreNarrowVME.scala 88:57]
+  wire [11:0] xfer_stride_bytes = 12'h800 - _xfer_stride_bytes_T; // @[TensorStoreNarrowVME.scala 88:38]
+  wire [8:0] xfer_stride_pulses = xfer_stride_bytes[11:3]; // @[TensorStoreNarrowVME.scala 89:45]
   reg [2:0] state; // @[TensorStoreNarrowVME.scala 92:22]
   wire  _T = 3'h0 == state; // @[TensorStoreNarrowVME.scala 95:17]
-  wire [16:0] _GEN_86 = {{12'd0}, xfer_init_pulses}; // @[TensorStoreNarrowVME.scala 100:21]
+  wire [16:0] _GEN_86 = {{8'd0}, xfer_init_pulses}; // @[TensorStoreNarrowVME.scala 100:21]
   wire  _T_1 = xsize < _GEN_86; // @[TensorStoreNarrowVME.scala 100:21]
   wire  _T_2 = xsize > 17'h0; // @[TensorStoreNarrowVME.scala 101:24]
   wire  _T_4 = ~reset; // @[TensorStoreNarrowVME.scala 101:17]
   wire  _T_5 = ~(xsize > 17'h0); // @[TensorStoreNarrowVME.scala 101:17]
   wire [16:0] _xlen_T_1 = xsize - 17'h1; // @[TensorStoreNarrowVME.scala 102:25]
-  wire [4:0] _xlen_T_3 = xfer_init_pulses - 5'h1; // @[TensorStoreNarrowVME.scala 105:36]
+  wire [8:0] _xlen_T_3 = xfer_init_pulses - 9'h1; // @[TensorStoreNarrowVME.scala 105:36]
   wire [16:0] _xrem_T_1 = xsize - _GEN_86; // @[TensorStoreNarrowVME.scala 107:25]
-  wire [16:0] _GEN_0 = xsize < _GEN_86 ? _xlen_T_1 : {{12'd0}, _xlen_T_3}; // @[TensorStoreNarrowVME.scala 100:41 102:16 105:16]
+  wire [16:0] _GEN_0 = xsize < _GEN_86 ? _xlen_T_1 : {{8'd0}, _xlen_T_3}; // @[TensorStoreNarrowVME.scala 100:41 102:16 105:16]
   wire [16:0] _GEN_1 = xsize < _GEN_86 ? 17'h0 : _xrem_T_1; // @[TensorStoreNarrowVME.scala 100:41 103:16 107:16]
-  wire [16:0] _GEN_3 = io_start ? _GEN_0 : {{13'd0}, xlen}; // @[TensorStoreNarrowVME.scala 64:17 98:25]
+  wire [16:0] _GEN_3 = io_start ? _GEN_0 : {{9'd0}, xlen}; // @[TensorStoreNarrowVME.scala 64:17 98:25]
   wire [16:0] _GEN_4 = io_start ? _GEN_1 : {{1'd0}, xrem}; // @[TensorStoreNarrowVME.scala 65:17 98:25]
   wire  _T_10 = 3'h1 == state; // @[TensorStoreNarrowVME.scala 95:17]
   wire  _T_11 = 3'h2 == state; // @[TensorStoreNarrowVME.scala 95:17]
@@ -21502,41 +21506,41 @@ module TensorStoreNarrowVME(
   wire  _T_16 = xrem == 16'h0; // @[TensorStoreNarrowVME.scala 130:19]
   wire [15:0] _T_18 = dec_ysize - 16'h1; // @[TensorStoreNarrowVME.scala 131:31]
   wire  _T_19 = ycnt == _T_18; // @[TensorStoreNarrowVME.scala 131:21]
-  wire [16:0] _GEN_89 = {{12'd0}, xfer_stride_pulses}; // @[TensorStoreNarrowVME.scala 136:24]
+  wire [16:0] _GEN_89 = {{8'd0}, xfer_stride_pulses}; // @[TensorStoreNarrowVME.scala 136:24]
   wire  _T_20 = xsize < _GEN_89; // @[TensorStoreNarrowVME.scala 136:24]
-  wire [4:0] _xlen_T_7 = xfer_stride_pulses - 5'h1; // @[TensorStoreNarrowVME.scala 141:42]
+  wire [8:0] _xlen_T_7 = xfer_stride_pulses - 9'h1; // @[TensorStoreNarrowVME.scala 141:42]
   wire [16:0] _xrem_T_3 = xsize - _GEN_89; // @[TensorStoreNarrowVME.scala 143:29]
-  wire [16:0] _GEN_9 = xsize < _GEN_89 ? _xlen_T_1 : {{12'd0}, _xlen_T_7}; // @[TensorStoreNarrowVME.scala 136:46 138:20 141:20]
+  wire [16:0] _GEN_9 = xsize < _GEN_89 ? _xlen_T_1 : {{8'd0}, _xlen_T_7}; // @[TensorStoreNarrowVME.scala 136:46 138:20 141:20]
   wire [16:0] _GEN_10 = xsize < _GEN_89 ? 17'h0 : _xrem_T_3; // @[TensorStoreNarrowVME.scala 136:46 139:20 143:20]
   wire [2:0] _GEN_11 = ycnt == _T_18 ? 3'h0 : 3'h1; // @[TensorStoreNarrowVME.scala 131:38 132:19 134:19]
-  wire [31:0] _GEN_12 = ycnt == _T_18 ? xfer_bytes : {{24'd0}, xfer_stride_bytes}; // @[TensorStoreNarrowVME.scala 131:38 74:23 135:24]
-  wire [16:0] _GEN_13 = ycnt == _T_18 ? {{13'd0}, xlen} : _GEN_9; // @[TensorStoreNarrowVME.scala 131:38 64:17]
+  wire [31:0] _GEN_12 = ycnt == _T_18 ? xfer_bytes : {{20'd0}, xfer_stride_bytes}; // @[TensorStoreNarrowVME.scala 131:38 74:23 135:24]
+  wire [16:0] _GEN_13 = ycnt == _T_18 ? {{9'd0}, xlen} : _GEN_9; // @[TensorStoreNarrowVME.scala 131:38 64:17]
   wire [16:0] _GEN_14 = ycnt == _T_18 ? {{1'd0}, xrem} : _GEN_10; // @[TensorStoreNarrowVME.scala 131:38 65:17]
-  wire [15:0] _GEN_92 = {{11'd0}, xfer_split_pulses}; // @[TensorStoreNarrowVME.scala 147:24]
+  wire [15:0] _GEN_92 = {{7'd0}, xfer_split_pulses}; // @[TensorStoreNarrowVME.scala 147:24]
   wire  _T_29 = xrem < _GEN_92; // @[TensorStoreNarrowVME.scala 147:24]
   wire [15:0] _xlen_T_9 = xrem - 16'h1; // @[TensorStoreNarrowVME.scala 151:24]
-  wire [4:0] _xlen_T_11 = xfer_split_pulses - 5'h1; // @[TensorStoreNarrowVME.scala 157:37]
+  wire [8:0] _xlen_T_11 = xfer_split_pulses - 9'h1; // @[TensorStoreNarrowVME.scala 157:37]
   wire [15:0] _xrem_T_5 = xrem - _GEN_92; // @[TensorStoreNarrowVME.scala 159:24]
-  wire [15:0] _GEN_17 = xrem < _GEN_92 ? _xlen_T_9 : {{11'd0}, _xlen_T_11}; // @[TensorStoreNarrowVME.scala 147:45 151:16 157:16]
+  wire [15:0] _GEN_17 = xrem < _GEN_92 ? _xlen_T_9 : {{7'd0}, _xlen_T_11}; // @[TensorStoreNarrowVME.scala 147:45 151:16 157:16]
   wire [15:0] _GEN_18 = xrem < _GEN_92 ? 16'h0 : _xrem_T_5; // @[TensorStoreNarrowVME.scala 147:45 152:16 159:16]
   wire [2:0] _GEN_19 = xrem == 16'h0 ? _GEN_11 : 3'h1; // @[TensorStoreNarrowVME.scala 130:28]
-  wire [31:0] _GEN_20 = xrem == 16'h0 ? _GEN_12 : {{24'd0}, xfer_split_bytes}; // @[TensorStoreNarrowVME.scala 130:28]
+  wire [31:0] _GEN_20 = xrem == 16'h0 ? _GEN_12 : {{20'd0}, xfer_split_bytes}; // @[TensorStoreNarrowVME.scala 130:28]
   wire [16:0] _GEN_21 = xrem == 16'h0 ? _GEN_13 : {{1'd0}, _GEN_17}; // @[TensorStoreNarrowVME.scala 130:28]
   wire [16:0] _GEN_22 = xrem == 16'h0 ? _GEN_14 : {{1'd0}, _GEN_18}; // @[TensorStoreNarrowVME.scala 130:28]
   wire [2:0] _GEN_23 = io_vme_wr_ack ? _GEN_19 : state; // @[TensorStoreNarrowVME.scala 129:27 92:22]
   wire [31:0] _GEN_24 = io_vme_wr_ack ? _GEN_20 : xfer_bytes; // @[TensorStoreNarrowVME.scala 129:27 74:23]
-  wire [16:0] _GEN_25 = io_vme_wr_ack ? _GEN_21 : {{13'd0}, xlen}; // @[TensorStoreNarrowVME.scala 129:27 64:17]
+  wire [16:0] _GEN_25 = io_vme_wr_ack ? _GEN_21 : {{9'd0}, xlen}; // @[TensorStoreNarrowVME.scala 129:27 64:17]
   wire [16:0] _GEN_26 = io_vme_wr_ack ? _GEN_22 : {{1'd0}, xrem}; // @[TensorStoreNarrowVME.scala 129:27 65:17]
   wire [2:0] _GEN_27 = 3'h4 == state ? _GEN_23 : state; // @[TensorStoreNarrowVME.scala 95:17 92:22]
   wire [31:0] _GEN_28 = 3'h4 == state ? _GEN_24 : xfer_bytes; // @[TensorStoreNarrowVME.scala 95:17 74:23]
-  wire [16:0] _GEN_29 = 3'h4 == state ? _GEN_25 : {{13'd0}, xlen}; // @[TensorStoreNarrowVME.scala 64:17 95:17]
+  wire [16:0] _GEN_29 = 3'h4 == state ? _GEN_25 : {{9'd0}, xlen}; // @[TensorStoreNarrowVME.scala 64:17 95:17]
   wire [16:0] _GEN_30 = 3'h4 == state ? _GEN_26 : {{1'd0}, xrem}; // @[TensorStoreNarrowVME.scala 65:17 95:17]
   wire [2:0] _GEN_31 = 3'h3 == state ? 3'h2 : _GEN_27; // @[TensorStoreNarrowVME.scala 126:13 95:17]
-  wire [16:0] _GEN_33 = 3'h3 == state ? {{13'd0}, xlen} : _GEN_29; // @[TensorStoreNarrowVME.scala 64:17 95:17]
+  wire [16:0] _GEN_33 = 3'h3 == state ? {{9'd0}, xlen} : _GEN_29; // @[TensorStoreNarrowVME.scala 64:17 95:17]
   wire [16:0] _GEN_34 = 3'h3 == state ? {{1'd0}, xrem} : _GEN_30; // @[TensorStoreNarrowVME.scala 65:17 95:17]
-  wire [16:0] _GEN_37 = 3'h2 == state ? {{13'd0}, xlen} : _GEN_33; // @[TensorStoreNarrowVME.scala 64:17 95:17]
+  wire [16:0] _GEN_37 = 3'h2 == state ? {{9'd0}, xlen} : _GEN_33; // @[TensorStoreNarrowVME.scala 64:17 95:17]
   wire [16:0] _GEN_38 = 3'h2 == state ? {{1'd0}, xrem} : _GEN_34; // @[TensorStoreNarrowVME.scala 65:17 95:17]
-  wire [16:0] _GEN_41 = 3'h1 == state ? {{13'd0}, xlen} : _GEN_37; // @[TensorStoreNarrowVME.scala 64:17 95:17]
+  wire [16:0] _GEN_41 = 3'h1 == state ? {{9'd0}, xlen} : _GEN_37; // @[TensorStoreNarrowVME.scala 64:17 95:17]
   wire [16:0] _GEN_42 = 3'h1 == state ? {{1'd0}, xrem} : _GEN_38; // @[TensorStoreNarrowVME.scala 65:17 95:17]
   wire [16:0] _GEN_45 = 3'h0 == state ? _GEN_3 : _GEN_41; // @[TensorStoreNarrowVME.scala 95:17]
   wire [16:0] _GEN_46 = 3'h0 == state ? _GEN_4 : _GEN_42; // @[TensorStoreNarrowVME.scala 95:17]
@@ -21547,7 +21551,7 @@ module TensorStoreNarrowVME(
     io_tensor_wr_0_bits_data_0_12,io_tensor_wr_0_bits_data_0_11,io_tensor_wr_0_bits_data_0_10,
     io_tensor_wr_0_bits_data_0_9,io_tensor_wr_0_bits_data_0_8,inWrData_lo}; // @[TensorStoreNarrowVME.scala 178:49]
   wire  _stride_T_1 = state == 3'h4 & io_vme_wr_ack; // @[TensorStoreNarrowVME.scala 186:36]
-  wire [3:0] _stride_T_3 = xlen + 4'h1; // @[TensorStoreNarrowVME.scala 188:19]
+  wire [7:0] _stride_T_3 = xlen + 8'h1; // @[TensorStoreNarrowVME.scala 188:19]
   wire  _stride_T_4 = xcnt == _stride_T_3; // @[TensorStoreNarrowVME.scala 188:10]
   wire  _stride_T_5 = _stride_T_1 & _stride_T_4; // @[TensorStoreNarrowVME.scala 187:19]
   wire  _stride_T_7 = _stride_T_5 & _T_16; // @[TensorStoreNarrowVME.scala 188:25]
@@ -21580,7 +21584,7 @@ module TensorStoreNarrowVME(
   wire [31:0] _GEN_77 = _stride_T_1 & xrem != 16'h0 ? waddr_nxt : _GEN_75; // @[TensorStoreNarrowVME.scala 233:68 62:22]
   wire [35:0] _GEN_78 = _T_38 ? xfer_init_addr : {{4'd0}, _GEN_76}; // @[TensorStoreNarrowVME.scala 230:25 231:15]
   wire [35:0] _GEN_79 = _T_38 ? xfer_init_addr : {{4'd0}, _GEN_77}; // @[TensorStoreNarrowVME.scala 230:25 232:15]
-  wire [3:0] _xcnt_T_1 = xcnt + 4'h1; // @[TensorStoreNarrowVME.scala 252:18]
+  wire [7:0] _xcnt_T_1 = xcnt + 8'h1; // @[TensorStoreNarrowVME.scala 252:18]
   wire  _GEN_97 = _T & io_start; // @[TensorStoreNarrowVME.scala 101:17]
   wire  _GEN_117 = ~_T & ~_T_10 & ~_T_11 & ~_T_14 & _T_15 & io_vme_wr_ack; // @[TensorStoreNarrowVME.scala 137:21]
   wire  _GEN_120 = ~_T & ~_T_10 & ~_T_11 & ~_T_14 & _T_15 & io_vme_wr_ack & _T_16 & ~_T_19; // @[TensorStoreNarrowVME.scala 137:21]
@@ -21623,11 +21627,11 @@ module TensorStoreNarrowVME(
     waddr_cur <= _GEN_78[31:0];
     waddr_nxt <= _GEN_79[31:0];
     if (_T_39) begin // @[TensorStoreNarrowVME.scala 249:29]
-      xcnt <= 4'h0; // @[TensorStoreNarrowVME.scala 250:10]
+      xcnt <= 8'h0; // @[TensorStoreNarrowVME.scala 250:10]
     end else if (_T_42) begin // @[TensorStoreNarrowVME.scala 251:35]
       xcnt <= _xcnt_T_1; // @[TensorStoreNarrowVME.scala 252:10]
     end
-    xlen <= _GEN_45[3:0];
+    xlen <= _GEN_45[7:0];
     xrem <= _GEN_46[15:0];
     if (state == 3'h0) begin // @[TensorStoreNarrowVME.scala 192:25]
       ycnt <= 16'h0; // @[TensorStoreNarrowVME.scala 193:10]
@@ -21645,7 +21649,7 @@ module TensorStoreNarrowVME(
       set <= _set_T_1; // @[TensorStoreNarrowVME.scala 208:9]
     end
     if (3'h0 == state) begin // @[TensorStoreNarrowVME.scala 95:17]
-      xfer_bytes <= {{24'd0}, xfer_init_bytes}; // @[TensorStoreNarrowVME.scala 97:18]
+      xfer_bytes <= {{20'd0}, xfer_init_bytes}; // @[TensorStoreNarrowVME.scala 97:18]
     end else if (!(3'h1 == state)) begin // @[TensorStoreNarrowVME.scala 95:17]
       if (!(3'h2 == state)) begin // @[TensorStoreNarrowVME.scala 95:17]
         if (!(3'h3 == state)) begin // @[TensorStoreNarrowVME.scala 95:17]
@@ -21797,9 +21801,9 @@ initial begin
   _RAND_7 = {1{`RANDOM}};
   waddr_nxt = _RAND_7[31:0];
   _RAND_8 = {1{`RANDOM}};
-  xcnt = _RAND_8[3:0];
+  xcnt = _RAND_8[7:0];
   _RAND_9 = {1{`RANDOM}};
-  xlen = _RAND_9[3:0];
+  xlen = _RAND_9[7:0];
   _RAND_10 = {1{`RANDOM}};
   xrem = _RAND_10[15:0];
   _RAND_11 = {1{`RANDOM}};
@@ -21860,7 +21864,7 @@ module TensorStoreOut(
   input          io_vme_wr_cmd_ready,
   output         io_vme_wr_cmd_valid,
   output [31:0]  io_vme_wr_cmd_bits_addr,
-  output [3:0]   io_vme_wr_cmd_bits_len,
+  output [7:0]   io_vme_wr_cmd_bits_len,
   input          io_vme_wr_data_ready,
   output         io_vme_wr_data_valid,
   output [63:0]  io_vme_wr_data_bits_data,
@@ -21893,7 +21897,7 @@ module TensorStoreOut(
   wire  tensorStore_io_vme_wr_cmd_ready; // @[TensorStore.scala 59:29]
   wire  tensorStore_io_vme_wr_cmd_valid; // @[TensorStore.scala 59:29]
   wire [31:0] tensorStore_io_vme_wr_cmd_bits_addr; // @[TensorStore.scala 59:29]
-  wire [3:0] tensorStore_io_vme_wr_cmd_bits_len; // @[TensorStore.scala 59:29]
+  wire [7:0] tensorStore_io_vme_wr_cmd_bits_len; // @[TensorStore.scala 59:29]
   wire  tensorStore_io_vme_wr_data_ready; // @[TensorStore.scala 59:29]
   wire  tensorStore_io_vme_wr_data_valid; // @[TensorStore.scala 59:29]
   wire [63:0] tensorStore_io_vme_wr_data_bits_data; // @[TensorStore.scala 59:29]
@@ -21995,7 +21999,7 @@ module Store(
   input          io_vme_wr_cmd_ready,
   output         io_vme_wr_cmd_valid,
   output [31:0]  io_vme_wr_cmd_bits_addr,
-  output [3:0]   io_vme_wr_cmd_bits_len,
+  output [7:0]   io_vme_wr_cmd_bits_len,
   input          io_vme_wr_data_ready,
   output         io_vme_wr_data_valid,
   output [63:0]  io_vme_wr_data_bits_data,
@@ -22049,7 +22053,7 @@ module Store(
   wire  tensorStore_io_vme_wr_cmd_ready; // @[Store.scala 52:27]
   wire  tensorStore_io_vme_wr_cmd_valid; // @[Store.scala 52:27]
   wire [31:0] tensorStore_io_vme_wr_cmd_bits_addr; // @[Store.scala 52:27]
-  wire [3:0] tensorStore_io_vme_wr_cmd_bits_len; // @[Store.scala 52:27]
+  wire [7:0] tensorStore_io_vme_wr_cmd_bits_len; // @[Store.scala 52:27]
   wire  tensorStore_io_vme_wr_data_ready; // @[Store.scala 52:27]
   wire  tensorStore_io_vme_wr_data_valid; // @[Store.scala 52:27]
   wire [63:0] tensorStore_io_vme_wr_data_bits_data; // @[Store.scala 52:27]
@@ -22347,7 +22351,7 @@ module Core(
   input         io_vme_rd_0_cmd_ready,
   output        io_vme_rd_0_cmd_valid,
   output [31:0] io_vme_rd_0_cmd_bits_addr,
-  output [3:0]  io_vme_rd_0_cmd_bits_len,
+  output [7:0]  io_vme_rd_0_cmd_bits_len,
   output        io_vme_rd_0_data_ready,
   input         io_vme_rd_0_data_valid,
   input  [63:0] io_vme_rd_0_data_bits_data,
@@ -22355,7 +22359,7 @@ module Core(
   input         io_vme_rd_1_cmd_ready,
   output        io_vme_rd_1_cmd_valid,
   output [31:0] io_vme_rd_1_cmd_bits_addr,
-  output [3:0]  io_vme_rd_1_cmd_bits_len,
+  output [7:0]  io_vme_rd_1_cmd_bits_len,
   output [20:0] io_vme_rd_1_cmd_bits_tag,
   input         io_vme_rd_1_data_valid,
   input  [63:0] io_vme_rd_1_data_bits_data,
@@ -22364,7 +22368,7 @@ module Core(
   input         io_vme_rd_2_cmd_ready,
   output        io_vme_rd_2_cmd_valid,
   output [31:0] io_vme_rd_2_cmd_bits_addr,
-  output [3:0]  io_vme_rd_2_cmd_bits_len,
+  output [7:0]  io_vme_rd_2_cmd_bits_len,
   output [20:0] io_vme_rd_2_cmd_bits_tag,
   input         io_vme_rd_2_data_valid,
   input  [63:0] io_vme_rd_2_data_bits_data,
@@ -22372,7 +22376,7 @@ module Core(
   input         io_vme_rd_3_cmd_ready,
   output        io_vme_rd_3_cmd_valid,
   output [31:0] io_vme_rd_3_cmd_bits_addr,
-  output [3:0]  io_vme_rd_3_cmd_bits_len,
+  output [7:0]  io_vme_rd_3_cmd_bits_len,
   output [20:0] io_vme_rd_3_cmd_bits_tag,
   input         io_vme_rd_3_data_valid,
   input  [63:0] io_vme_rd_3_data_bits_data,
@@ -22380,7 +22384,7 @@ module Core(
   input         io_vme_rd_4_cmd_ready,
   output        io_vme_rd_4_cmd_valid,
   output [31:0] io_vme_rd_4_cmd_bits_addr,
-  output [3:0]  io_vme_rd_4_cmd_bits_len,
+  output [7:0]  io_vme_rd_4_cmd_bits_len,
   output [20:0] io_vme_rd_4_cmd_bits_tag,
   input         io_vme_rd_4_data_valid,
   input  [63:0] io_vme_rd_4_data_bits_data,
@@ -22388,7 +22392,7 @@ module Core(
   input         io_vme_wr_0_cmd_ready,
   output        io_vme_wr_0_cmd_valid,
   output [31:0] io_vme_wr_0_cmd_bits_addr,
-  output [3:0]  io_vme_wr_0_cmd_bits_len,
+  output [7:0]  io_vme_wr_0_cmd_bits_len,
   input         io_vme_wr_0_data_ready,
   output        io_vme_wr_0_data_valid,
   output [63:0] io_vme_wr_0_data_bits_data,
@@ -22405,7 +22409,7 @@ module Core(
   wire  fetch_io_vme_rd_cmd_ready; // @[Core.scala 68:21]
   wire  fetch_io_vme_rd_cmd_valid; // @[Core.scala 68:21]
   wire [31:0] fetch_io_vme_rd_cmd_bits_addr; // @[Core.scala 68:21]
-  wire [3:0] fetch_io_vme_rd_cmd_bits_len; // @[Core.scala 68:21]
+  wire [7:0] fetch_io_vme_rd_cmd_bits_len; // @[Core.scala 68:21]
   wire  fetch_io_vme_rd_data_ready; // @[Core.scala 68:21]
   wire  fetch_io_vme_rd_data_valid; // @[Core.scala 68:21]
   wire [63:0] fetch_io_vme_rd_data_bits_data; // @[Core.scala 68:21]
@@ -22431,7 +22435,7 @@ module Core(
   wire  load_io_vme_rd_0_cmd_ready; // @[Core.scala 69:20]
   wire  load_io_vme_rd_0_cmd_valid; // @[Core.scala 69:20]
   wire [31:0] load_io_vme_rd_0_cmd_bits_addr; // @[Core.scala 69:20]
-  wire [3:0] load_io_vme_rd_0_cmd_bits_len; // @[Core.scala 69:20]
+  wire [7:0] load_io_vme_rd_0_cmd_bits_len; // @[Core.scala 69:20]
   wire [20:0] load_io_vme_rd_0_cmd_bits_tag; // @[Core.scala 69:20]
   wire  load_io_vme_rd_0_data_valid; // @[Core.scala 69:20]
   wire [63:0] load_io_vme_rd_0_data_bits_data; // @[Core.scala 69:20]
@@ -22439,7 +22443,7 @@ module Core(
   wire  load_io_vme_rd_1_cmd_ready; // @[Core.scala 69:20]
   wire  load_io_vme_rd_1_cmd_valid; // @[Core.scala 69:20]
   wire [31:0] load_io_vme_rd_1_cmd_bits_addr; // @[Core.scala 69:20]
-  wire [3:0] load_io_vme_rd_1_cmd_bits_len; // @[Core.scala 69:20]
+  wire [7:0] load_io_vme_rd_1_cmd_bits_len; // @[Core.scala 69:20]
   wire [20:0] load_io_vme_rd_1_cmd_bits_tag; // @[Core.scala 69:20]
   wire  load_io_vme_rd_1_data_valid; // @[Core.scala 69:20]
   wire [63:0] load_io_vme_rd_1_data_bits_data; // @[Core.scala 69:20]
@@ -22736,7 +22740,7 @@ module Core(
   wire  compute_io_vme_rd_0_cmd_ready; // @[Core.scala 70:23]
   wire  compute_io_vme_rd_0_cmd_valid; // @[Core.scala 70:23]
   wire [31:0] compute_io_vme_rd_0_cmd_bits_addr; // @[Core.scala 70:23]
-  wire [3:0] compute_io_vme_rd_0_cmd_bits_len; // @[Core.scala 70:23]
+  wire [7:0] compute_io_vme_rd_0_cmd_bits_len; // @[Core.scala 70:23]
   wire [20:0] compute_io_vme_rd_0_cmd_bits_tag; // @[Core.scala 70:23]
   wire  compute_io_vme_rd_0_data_valid; // @[Core.scala 70:23]
   wire [63:0] compute_io_vme_rd_0_data_bits_data; // @[Core.scala 70:23]
@@ -22745,7 +22749,7 @@ module Core(
   wire  compute_io_vme_rd_1_cmd_ready; // @[Core.scala 70:23]
   wire  compute_io_vme_rd_1_cmd_valid; // @[Core.scala 70:23]
   wire [31:0] compute_io_vme_rd_1_cmd_bits_addr; // @[Core.scala 70:23]
-  wire [3:0] compute_io_vme_rd_1_cmd_bits_len; // @[Core.scala 70:23]
+  wire [7:0] compute_io_vme_rd_1_cmd_bits_len; // @[Core.scala 70:23]
   wire [20:0] compute_io_vme_rd_1_cmd_bits_tag; // @[Core.scala 70:23]
   wire  compute_io_vme_rd_1_data_valid; // @[Core.scala 70:23]
   wire [63:0] compute_io_vme_rd_1_data_bits_data; // @[Core.scala 70:23]
@@ -23059,7 +23063,7 @@ module Core(
   wire  store_io_vme_wr_cmd_ready; // @[Core.scala 71:21]
   wire  store_io_vme_wr_cmd_valid; // @[Core.scala 71:21]
   wire [31:0] store_io_vme_wr_cmd_bits_addr; // @[Core.scala 71:21]
-  wire [3:0] store_io_vme_wr_cmd_bits_len; // @[Core.scala 71:21]
+  wire [7:0] store_io_vme_wr_cmd_bits_len; // @[Core.scala 71:21]
   wire  store_io_vme_wr_data_ready; // @[Core.scala 71:21]
   wire  store_io_vme_wr_data_valid; // @[Core.scala 71:21]
   wire [63:0] store_io_vme_wr_data_bits_data; // @[Core.scala 71:21]
@@ -24248,7 +24252,7 @@ module VTAShellInternal(
   input         io_vme_rd_0_cmd_ready,
   output        io_vme_rd_0_cmd_valid,
   output [31:0] io_vme_rd_0_cmd_bits_addr,
-  output [3:0]  io_vme_rd_0_cmd_bits_len,
+  output [7:0]  io_vme_rd_0_cmd_bits_len,
   output        io_vme_rd_0_data_ready,
   input         io_vme_rd_0_data_valid,
   input  [63:0] io_vme_rd_0_data_bits_data,
@@ -24256,7 +24260,7 @@ module VTAShellInternal(
   input         io_vme_rd_1_cmd_ready,
   output        io_vme_rd_1_cmd_valid,
   output [31:0] io_vme_rd_1_cmd_bits_addr,
-  output [3:0]  io_vme_rd_1_cmd_bits_len,
+  output [7:0]  io_vme_rd_1_cmd_bits_len,
   output [20:0] io_vme_rd_1_cmd_bits_tag,
   input         io_vme_rd_1_data_valid,
   input  [63:0] io_vme_rd_1_data_bits_data,
@@ -24265,7 +24269,7 @@ module VTAShellInternal(
   input         io_vme_rd_2_cmd_ready,
   output        io_vme_rd_2_cmd_valid,
   output [31:0] io_vme_rd_2_cmd_bits_addr,
-  output [3:0]  io_vme_rd_2_cmd_bits_len,
+  output [7:0]  io_vme_rd_2_cmd_bits_len,
   output [20:0] io_vme_rd_2_cmd_bits_tag,
   input         io_vme_rd_2_data_valid,
   input  [63:0] io_vme_rd_2_data_bits_data,
@@ -24273,7 +24277,7 @@ module VTAShellInternal(
   input         io_vme_rd_3_cmd_ready,
   output        io_vme_rd_3_cmd_valid,
   output [31:0] io_vme_rd_3_cmd_bits_addr,
-  output [3:0]  io_vme_rd_3_cmd_bits_len,
+  output [7:0]  io_vme_rd_3_cmd_bits_len,
   output [20:0] io_vme_rd_3_cmd_bits_tag,
   input         io_vme_rd_3_data_valid,
   input  [63:0] io_vme_rd_3_data_bits_data,
@@ -24281,7 +24285,7 @@ module VTAShellInternal(
   input         io_vme_rd_4_cmd_ready,
   output        io_vme_rd_4_cmd_valid,
   output [31:0] io_vme_rd_4_cmd_bits_addr,
-  output [3:0]  io_vme_rd_4_cmd_bits_len,
+  output [7:0]  io_vme_rd_4_cmd_bits_len,
   output [20:0] io_vme_rd_4_cmd_bits_tag,
   input         io_vme_rd_4_data_valid,
   input  [63:0] io_vme_rd_4_data_bits_data,
@@ -24289,7 +24293,7 @@ module VTAShellInternal(
   input         io_vme_wr_0_cmd_ready,
   output        io_vme_wr_0_cmd_valid,
   output [31:0] io_vme_wr_0_cmd_bits_addr,
-  output [3:0]  io_vme_wr_0_cmd_bits_len,
+  output [7:0]  io_vme_wr_0_cmd_bits_len,
   input         io_vme_wr_0_data_ready,
   output        io_vme_wr_0_data_valid,
   output [63:0] io_vme_wr_0_data_bits_data,
@@ -24313,7 +24317,7 @@ module VTAShellInternal(
   wire  core_io_vme_rd_0_cmd_ready; // @[VTAShell.scala 51:20]
   wire  core_io_vme_rd_0_cmd_valid; // @[VTAShell.scala 51:20]
   wire [31:0] core_io_vme_rd_0_cmd_bits_addr; // @[VTAShell.scala 51:20]
-  wire [3:0] core_io_vme_rd_0_cmd_bits_len; // @[VTAShell.scala 51:20]
+  wire [7:0] core_io_vme_rd_0_cmd_bits_len; // @[VTAShell.scala 51:20]
   wire  core_io_vme_rd_0_data_ready; // @[VTAShell.scala 51:20]
   wire  core_io_vme_rd_0_data_valid; // @[VTAShell.scala 51:20]
   wire [63:0] core_io_vme_rd_0_data_bits_data; // @[VTAShell.scala 51:20]
@@ -24321,7 +24325,7 @@ module VTAShellInternal(
   wire  core_io_vme_rd_1_cmd_ready; // @[VTAShell.scala 51:20]
   wire  core_io_vme_rd_1_cmd_valid; // @[VTAShell.scala 51:20]
   wire [31:0] core_io_vme_rd_1_cmd_bits_addr; // @[VTAShell.scala 51:20]
-  wire [3:0] core_io_vme_rd_1_cmd_bits_len; // @[VTAShell.scala 51:20]
+  wire [7:0] core_io_vme_rd_1_cmd_bits_len; // @[VTAShell.scala 51:20]
   wire [20:0] core_io_vme_rd_1_cmd_bits_tag; // @[VTAShell.scala 51:20]
   wire  core_io_vme_rd_1_data_valid; // @[VTAShell.scala 51:20]
   wire [63:0] core_io_vme_rd_1_data_bits_data; // @[VTAShell.scala 51:20]
@@ -24330,7 +24334,7 @@ module VTAShellInternal(
   wire  core_io_vme_rd_2_cmd_ready; // @[VTAShell.scala 51:20]
   wire  core_io_vme_rd_2_cmd_valid; // @[VTAShell.scala 51:20]
   wire [31:0] core_io_vme_rd_2_cmd_bits_addr; // @[VTAShell.scala 51:20]
-  wire [3:0] core_io_vme_rd_2_cmd_bits_len; // @[VTAShell.scala 51:20]
+  wire [7:0] core_io_vme_rd_2_cmd_bits_len; // @[VTAShell.scala 51:20]
   wire [20:0] core_io_vme_rd_2_cmd_bits_tag; // @[VTAShell.scala 51:20]
   wire  core_io_vme_rd_2_data_valid; // @[VTAShell.scala 51:20]
   wire [63:0] core_io_vme_rd_2_data_bits_data; // @[VTAShell.scala 51:20]
@@ -24338,7 +24342,7 @@ module VTAShellInternal(
   wire  core_io_vme_rd_3_cmd_ready; // @[VTAShell.scala 51:20]
   wire  core_io_vme_rd_3_cmd_valid; // @[VTAShell.scala 51:20]
   wire [31:0] core_io_vme_rd_3_cmd_bits_addr; // @[VTAShell.scala 51:20]
-  wire [3:0] core_io_vme_rd_3_cmd_bits_len; // @[VTAShell.scala 51:20]
+  wire [7:0] core_io_vme_rd_3_cmd_bits_len; // @[VTAShell.scala 51:20]
   wire [20:0] core_io_vme_rd_3_cmd_bits_tag; // @[VTAShell.scala 51:20]
   wire  core_io_vme_rd_3_data_valid; // @[VTAShell.scala 51:20]
   wire [63:0] core_io_vme_rd_3_data_bits_data; // @[VTAShell.scala 51:20]
@@ -24346,7 +24350,7 @@ module VTAShellInternal(
   wire  core_io_vme_rd_4_cmd_ready; // @[VTAShell.scala 51:20]
   wire  core_io_vme_rd_4_cmd_valid; // @[VTAShell.scala 51:20]
   wire [31:0] core_io_vme_rd_4_cmd_bits_addr; // @[VTAShell.scala 51:20]
-  wire [3:0] core_io_vme_rd_4_cmd_bits_len; // @[VTAShell.scala 51:20]
+  wire [7:0] core_io_vme_rd_4_cmd_bits_len; // @[VTAShell.scala 51:20]
   wire [20:0] core_io_vme_rd_4_cmd_bits_tag; // @[VTAShell.scala 51:20]
   wire  core_io_vme_rd_4_data_valid; // @[VTAShell.scala 51:20]
   wire [63:0] core_io_vme_rd_4_data_bits_data; // @[VTAShell.scala 51:20]
@@ -24354,7 +24358,7 @@ module VTAShellInternal(
   wire  core_io_vme_wr_0_cmd_ready; // @[VTAShell.scala 51:20]
   wire  core_io_vme_wr_0_cmd_valid; // @[VTAShell.scala 51:20]
   wire [31:0] core_io_vme_wr_0_cmd_bits_addr; // @[VTAShell.scala 51:20]
-  wire [3:0] core_io_vme_wr_0_cmd_bits_len; // @[VTAShell.scala 51:20]
+  wire [7:0] core_io_vme_wr_0_cmd_bits_len; // @[VTAShell.scala 51:20]
   wire  core_io_vme_wr_0_data_ready; // @[VTAShell.scala 51:20]
   wire  core_io_vme_wr_0_data_valid; // @[VTAShell.scala 51:20]
   wire [63:0] core_io_vme_wr_0_data_bits_data; // @[VTAShell.scala 51:20]
@@ -24508,7 +24512,7 @@ module VTAShellAPB(
   output [31:0] io_mem_aw_bits_addr,
   output [7:0]  io_mem_aw_bits_id,
   output [4:0]  io_mem_aw_bits_user,
-  output [3:0]  io_mem_aw_bits_len,
+  output [7:0]  io_mem_aw_bits_len,
   output [2:0]  io_mem_aw_bits_size,
   output [1:0]  io_mem_aw_bits_burst,
   output [1:0]  io_mem_aw_bits_lock,
@@ -24533,7 +24537,7 @@ module VTAShellAPB(
   output [31:0] io_mem_ar_bits_addr,
   output [7:0]  io_mem_ar_bits_id,
   output [4:0]  io_mem_ar_bits_user,
-  output [3:0]  io_mem_ar_bits_len,
+  output [7:0]  io_mem_ar_bits_len,
   output [2:0]  io_mem_ar_bits_size,
   output [1:0]  io_mem_ar_bits_burst,
   output [1:0]  io_mem_ar_bits_lock,
@@ -24577,7 +24581,7 @@ module VTAShellAPB(
   wire  vme_io_mem_aw_ready; // @[VTAShell.scala 93:19]
   wire  vme_io_mem_aw_valid; // @[VTAShell.scala 93:19]
   wire [31:0] vme_io_mem_aw_bits_addr; // @[VTAShell.scala 93:19]
-  wire [3:0] vme_io_mem_aw_bits_len; // @[VTAShell.scala 93:19]
+  wire [7:0] vme_io_mem_aw_bits_len; // @[VTAShell.scala 93:19]
   wire  vme_io_mem_w_ready; // @[VTAShell.scala 93:19]
   wire  vme_io_mem_w_valid; // @[VTAShell.scala 93:19]
   wire [63:0] vme_io_mem_w_bits_data; // @[VTAShell.scala 93:19]
@@ -24590,7 +24594,7 @@ module VTAShellAPB(
   wire  vme_io_mem_ar_valid; // @[VTAShell.scala 93:19]
   wire [31:0] vme_io_mem_ar_bits_addr; // @[VTAShell.scala 93:19]
   wire [7:0] vme_io_mem_ar_bits_id; // @[VTAShell.scala 93:19]
-  wire [3:0] vme_io_mem_ar_bits_len; // @[VTAShell.scala 93:19]
+  wire [7:0] vme_io_mem_ar_bits_len; // @[VTAShell.scala 93:19]
   wire  vme_io_mem_r_ready; // @[VTAShell.scala 93:19]
   wire  vme_io_mem_r_valid; // @[VTAShell.scala 93:19]
   wire [63:0] vme_io_mem_r_bits_data; // @[VTAShell.scala 93:19]
@@ -24600,7 +24604,7 @@ module VTAShellAPB(
   wire  vme_io_vme_rd_0_cmd_ready; // @[VTAShell.scala 93:19]
   wire  vme_io_vme_rd_0_cmd_valid; // @[VTAShell.scala 93:19]
   wire [31:0] vme_io_vme_rd_0_cmd_bits_addr; // @[VTAShell.scala 93:19]
-  wire [3:0] vme_io_vme_rd_0_cmd_bits_len; // @[VTAShell.scala 93:19]
+  wire [7:0] vme_io_vme_rd_0_cmd_bits_len; // @[VTAShell.scala 93:19]
   wire  vme_io_vme_rd_0_data_ready; // @[VTAShell.scala 93:19]
   wire  vme_io_vme_rd_0_data_valid; // @[VTAShell.scala 93:19]
   wire [63:0] vme_io_vme_rd_0_data_bits_data; // @[VTAShell.scala 93:19]
@@ -24608,7 +24612,7 @@ module VTAShellAPB(
   wire  vme_io_vme_rd_1_cmd_ready; // @[VTAShell.scala 93:19]
   wire  vme_io_vme_rd_1_cmd_valid; // @[VTAShell.scala 93:19]
   wire [31:0] vme_io_vme_rd_1_cmd_bits_addr; // @[VTAShell.scala 93:19]
-  wire [3:0] vme_io_vme_rd_1_cmd_bits_len; // @[VTAShell.scala 93:19]
+  wire [7:0] vme_io_vme_rd_1_cmd_bits_len; // @[VTAShell.scala 93:19]
   wire [20:0] vme_io_vme_rd_1_cmd_bits_tag; // @[VTAShell.scala 93:19]
   wire  vme_io_vme_rd_1_data_valid; // @[VTAShell.scala 93:19]
   wire [63:0] vme_io_vme_rd_1_data_bits_data; // @[VTAShell.scala 93:19]
@@ -24617,7 +24621,7 @@ module VTAShellAPB(
   wire  vme_io_vme_rd_2_cmd_ready; // @[VTAShell.scala 93:19]
   wire  vme_io_vme_rd_2_cmd_valid; // @[VTAShell.scala 93:19]
   wire [31:0] vme_io_vme_rd_2_cmd_bits_addr; // @[VTAShell.scala 93:19]
-  wire [3:0] vme_io_vme_rd_2_cmd_bits_len; // @[VTAShell.scala 93:19]
+  wire [7:0] vme_io_vme_rd_2_cmd_bits_len; // @[VTAShell.scala 93:19]
   wire [20:0] vme_io_vme_rd_2_cmd_bits_tag; // @[VTAShell.scala 93:19]
   wire  vme_io_vme_rd_2_data_valid; // @[VTAShell.scala 93:19]
   wire [63:0] vme_io_vme_rd_2_data_bits_data; // @[VTAShell.scala 93:19]
@@ -24625,7 +24629,7 @@ module VTAShellAPB(
   wire  vme_io_vme_rd_3_cmd_ready; // @[VTAShell.scala 93:19]
   wire  vme_io_vme_rd_3_cmd_valid; // @[VTAShell.scala 93:19]
   wire [31:0] vme_io_vme_rd_3_cmd_bits_addr; // @[VTAShell.scala 93:19]
-  wire [3:0] vme_io_vme_rd_3_cmd_bits_len; // @[VTAShell.scala 93:19]
+  wire [7:0] vme_io_vme_rd_3_cmd_bits_len; // @[VTAShell.scala 93:19]
   wire [20:0] vme_io_vme_rd_3_cmd_bits_tag; // @[VTAShell.scala 93:19]
   wire  vme_io_vme_rd_3_data_valid; // @[VTAShell.scala 93:19]
   wire [63:0] vme_io_vme_rd_3_data_bits_data; // @[VTAShell.scala 93:19]
@@ -24633,7 +24637,7 @@ module VTAShellAPB(
   wire  vme_io_vme_rd_4_cmd_ready; // @[VTAShell.scala 93:19]
   wire  vme_io_vme_rd_4_cmd_valid; // @[VTAShell.scala 93:19]
   wire [31:0] vme_io_vme_rd_4_cmd_bits_addr; // @[VTAShell.scala 93:19]
-  wire [3:0] vme_io_vme_rd_4_cmd_bits_len; // @[VTAShell.scala 93:19]
+  wire [7:0] vme_io_vme_rd_4_cmd_bits_len; // @[VTAShell.scala 93:19]
   wire [20:0] vme_io_vme_rd_4_cmd_bits_tag; // @[VTAShell.scala 93:19]
   wire  vme_io_vme_rd_4_data_valid; // @[VTAShell.scala 93:19]
   wire [63:0] vme_io_vme_rd_4_data_bits_data; // @[VTAShell.scala 93:19]
@@ -24641,7 +24645,7 @@ module VTAShellAPB(
   wire  vme_io_vme_wr_0_cmd_ready; // @[VTAShell.scala 93:19]
   wire  vme_io_vme_wr_0_cmd_valid; // @[VTAShell.scala 93:19]
   wire [31:0] vme_io_vme_wr_0_cmd_bits_addr; // @[VTAShell.scala 93:19]
-  wire [3:0] vme_io_vme_wr_0_cmd_bits_len; // @[VTAShell.scala 93:19]
+  wire [7:0] vme_io_vme_wr_0_cmd_bits_len; // @[VTAShell.scala 93:19]
   wire  vme_io_vme_wr_0_data_ready; // @[VTAShell.scala 93:19]
   wire  vme_io_vme_wr_0_data_valid; // @[VTAShell.scala 93:19]
   wire [63:0] vme_io_vme_wr_0_data_bits_data; // @[VTAShell.scala 93:19]
@@ -24664,7 +24668,7 @@ module VTAShellAPB(
   wire  shell_io_vme_rd_0_cmd_ready; // @[VTAShell.scala 94:21]
   wire  shell_io_vme_rd_0_cmd_valid; // @[VTAShell.scala 94:21]
   wire [31:0] shell_io_vme_rd_0_cmd_bits_addr; // @[VTAShell.scala 94:21]
-  wire [3:0] shell_io_vme_rd_0_cmd_bits_len; // @[VTAShell.scala 94:21]
+  wire [7:0] shell_io_vme_rd_0_cmd_bits_len; // @[VTAShell.scala 94:21]
   wire  shell_io_vme_rd_0_data_ready; // @[VTAShell.scala 94:21]
   wire  shell_io_vme_rd_0_data_valid; // @[VTAShell.scala 94:21]
   wire [63:0] shell_io_vme_rd_0_data_bits_data; // @[VTAShell.scala 94:21]
@@ -24672,7 +24676,7 @@ module VTAShellAPB(
   wire  shell_io_vme_rd_1_cmd_ready; // @[VTAShell.scala 94:21]
   wire  shell_io_vme_rd_1_cmd_valid; // @[VTAShell.scala 94:21]
   wire [31:0] shell_io_vme_rd_1_cmd_bits_addr; // @[VTAShell.scala 94:21]
-  wire [3:0] shell_io_vme_rd_1_cmd_bits_len; // @[VTAShell.scala 94:21]
+  wire [7:0] shell_io_vme_rd_1_cmd_bits_len; // @[VTAShell.scala 94:21]
   wire [20:0] shell_io_vme_rd_1_cmd_bits_tag; // @[VTAShell.scala 94:21]
   wire  shell_io_vme_rd_1_data_valid; // @[VTAShell.scala 94:21]
   wire [63:0] shell_io_vme_rd_1_data_bits_data; // @[VTAShell.scala 94:21]
@@ -24681,7 +24685,7 @@ module VTAShellAPB(
   wire  shell_io_vme_rd_2_cmd_ready; // @[VTAShell.scala 94:21]
   wire  shell_io_vme_rd_2_cmd_valid; // @[VTAShell.scala 94:21]
   wire [31:0] shell_io_vme_rd_2_cmd_bits_addr; // @[VTAShell.scala 94:21]
-  wire [3:0] shell_io_vme_rd_2_cmd_bits_len; // @[VTAShell.scala 94:21]
+  wire [7:0] shell_io_vme_rd_2_cmd_bits_len; // @[VTAShell.scala 94:21]
   wire [20:0] shell_io_vme_rd_2_cmd_bits_tag; // @[VTAShell.scala 94:21]
   wire  shell_io_vme_rd_2_data_valid; // @[VTAShell.scala 94:21]
   wire [63:0] shell_io_vme_rd_2_data_bits_data; // @[VTAShell.scala 94:21]
@@ -24689,7 +24693,7 @@ module VTAShellAPB(
   wire  shell_io_vme_rd_3_cmd_ready; // @[VTAShell.scala 94:21]
   wire  shell_io_vme_rd_3_cmd_valid; // @[VTAShell.scala 94:21]
   wire [31:0] shell_io_vme_rd_3_cmd_bits_addr; // @[VTAShell.scala 94:21]
-  wire [3:0] shell_io_vme_rd_3_cmd_bits_len; // @[VTAShell.scala 94:21]
+  wire [7:0] shell_io_vme_rd_3_cmd_bits_len; // @[VTAShell.scala 94:21]
   wire [20:0] shell_io_vme_rd_3_cmd_bits_tag; // @[VTAShell.scala 94:21]
   wire  shell_io_vme_rd_3_data_valid; // @[VTAShell.scala 94:21]
   wire [63:0] shell_io_vme_rd_3_data_bits_data; // @[VTAShell.scala 94:21]
@@ -24697,7 +24701,7 @@ module VTAShellAPB(
   wire  shell_io_vme_rd_4_cmd_ready; // @[VTAShell.scala 94:21]
   wire  shell_io_vme_rd_4_cmd_valid; // @[VTAShell.scala 94:21]
   wire [31:0] shell_io_vme_rd_4_cmd_bits_addr; // @[VTAShell.scala 94:21]
-  wire [3:0] shell_io_vme_rd_4_cmd_bits_len; // @[VTAShell.scala 94:21]
+  wire [7:0] shell_io_vme_rd_4_cmd_bits_len; // @[VTAShell.scala 94:21]
   wire [20:0] shell_io_vme_rd_4_cmd_bits_tag; // @[VTAShell.scala 94:21]
   wire  shell_io_vme_rd_4_data_valid; // @[VTAShell.scala 94:21]
   wire [63:0] shell_io_vme_rd_4_data_bits_data; // @[VTAShell.scala 94:21]
@@ -24705,7 +24709,7 @@ module VTAShellAPB(
   wire  shell_io_vme_wr_0_cmd_ready; // @[VTAShell.scala 94:21]
   wire  shell_io_vme_wr_0_cmd_valid; // @[VTAShell.scala 94:21]
   wire [31:0] shell_io_vme_wr_0_cmd_bits_addr; // @[VTAShell.scala 94:21]
-  wire [3:0] shell_io_vme_wr_0_cmd_bits_len; // @[VTAShell.scala 94:21]
+  wire [7:0] shell_io_vme_wr_0_cmd_bits_len; // @[VTAShell.scala 94:21]
   wire  shell_io_vme_wr_0_data_ready; // @[VTAShell.scala 94:21]
   wire  shell_io_vme_wr_0_data_valid; // @[VTAShell.scala 94:21]
   wire [63:0] shell_io_vme_wr_0_data_bits_data; // @[VTAShell.scala 94:21]

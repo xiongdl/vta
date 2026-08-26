@@ -7,9 +7,9 @@
   "memory_protocol": "axi4",
   "memory_data_width": 64,
   "memory_address_width": 32,
-  "rtl_sha256": "4e51713ca5af4179183e1c4a06f8f48288f0feb7f9c5717ecb77f4970ef71d75",
+  "rtl_sha256": "7a0bcd43818a8c1edb5edb315403e67b1e0cb71e1ab06539b08820df2d7483b2",
   "vta_config_sha256": "6876e92fabe0141a7fdbbe6762889d81f9512fcfbc7d45d6dc1919f639905180",
-  "source_commit": "d5ade6795f14934fd6d8120fa88bcb3ceeaa9871",
-  "generator": "vta.APBHostDefaultDe10Config",
+  "source_commit": "31fc5363bdeb4c153fa4e284891ab9577341bcb9",
+  "generator": "vta.socgen.SoCVariant",
   "source_policy": "pre-generated RTL; SoC builds must not invoke Chisel"
 }

@@ -7,9 +7,9 @@
   "memory_protocol": "ahb-lite",
   "memory_data_width": 32,
   "memory_address_width": 32,
-  "rtl_sha256": "db7ec18ab5f0805e96e11831ca0cda886cc572a0998c1c0a16915d1f547886d8",
+  "rtl_sha256": "f8c813d3f084930b1037e853a84f5674ac9653eb94c842c0db4051a945125d24",
   "vta_config_sha256": "1719baccd9c9073140260c163463f082d539a5fdad86b9b18ae5dcc25bfdbf4d",
-  "source_commit": "2d96a9cfab52e200fd7d13dd0f3d6fd7d53cc659",
+  "source_commit": "31fc5363bdeb4c153fa4e284891ab9577341bcb9",
   "generator": "vta.socgen.SoCVariant",
   "source_policy": "pre-generated RTL; SoC builds must not invoke Chisel"
 }

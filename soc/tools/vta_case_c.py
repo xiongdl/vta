@@ -8,18 +8,21 @@ import json
 from pathlib import Path
 
 ORDER = ("insn", "uop", "inp", "wgt", "acc", "out")
-
-
-def next_power_of_two(value: int) -> int:
-    return 1 if value <= 1 else 1 << (value - 1).bit_length()
+INST_BITS = 128
+MEMORY_BURST_BEATS = 16
 
 
 def alignment_for(name: str, manifest: dict) -> int:
-    if name == "insn":
-        return 1024
-    end = max((item["offset"] + item["size"] for item in manifest["accesses"]
-               if item["memory"] == name), default=1)
-    return max(64, next_power_of_two(end))
+    data_bits = 1 << manifest["config"]["LOG_BUS_WIDTH"]
+    if data_bits < 32 or data_bits & (data_bits - 1):
+        raise ValueError(f"unsupported VTA memory data width: {data_bits}")
+    return MEMORY_BURST_BEATS * (data_bits // 8) if name == "insn" else 8
+
+
+def section_for(name: str) -> str:
+    if name in ("insn", "uop", "wgt", "acc"):
+        return ".rodata_ai"
+    return ".data_ai.out" if name == "out" else ".data_ai.init"
 
 
 def words(data: bytes, width: int) -> str:
@@ -34,21 +37,26 @@ def words(data: bytes, width: int) -> str:
 
 def emit_header(case: Path, output: Path, symbol: str) -> None:
     manifest = json.loads((case / "manifest.json").read_text())
+    if manifest.get("baddr_mode", "add") != "add":
+        raise ValueError("C firmware generation requires additive VTA baddr RTL")
     definitions = []
     for name in ORDER:
         section = manifest["sections"].get(name)
         if section is None:
             continue
         data = (case / section["file"]).read_bytes()
-        ctype, width = ("uint32_t", 4) if name == "uop" else ("uint64_t", 8)
+        bus_bytes = (1 << manifest["config"]["LOG_BUS_WIDTH"]) // 8
+        ctype, width = (("uint32_t", 4) if name == "uop" or bus_bytes == 4
+                        else ("uint64_t", 8))
+        qualifier = "const " if section_for(name) == ".rodata_ai" else ""
         definitions.append(
-            f"{ctype} {symbol}_{name}[]\n"
-            f"    VTA_CASE_SECTION(\".{name}_data\", {alignment_for(name, manifest)}) = {{\n"
+            f"{qualifier}{ctype} {symbol}_{name}[]\n"
+            f"    VTA_CASE_SECTION(\"{section_for(name)}\", {alignment_for(name, manifest)}) = {{\n"
             f"{words(data, width)}\n}};\n")
     expected = (case / manifest["sections"]["expected_out"]["file"]).read_bytes()
     definitions.append(
-        f"const uint64_t {symbol}_expected[]\n"
-        f"    VTA_CASE_SECTION(\".ref_data\", 8) = {{\n"
+        f"uint64_t {symbol}_expected[]\n"
+        f"    VTA_CASE_SECTION(\".data_ai.expected\", 8) = {{\n"
         f"{words(expected, 8)}\n}};\n")
     config = manifest["config"]
     output.write_text(f"""#include <stddef.h>
@@ -85,6 +93,7 @@ def emit_test(output: Path, symbol: str, header: str) -> None:
     output.write_text(f"""#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <sim_debug.h>
 
 #include "{header}"
 
@@ -127,20 +136,50 @@ int main(void) {{
     MMIO32(VTA_CONTROL_REG) = VTA_CONTROL_START;
 
     while (MMIO32(VTA_CONTROL_REG) != VTA_STATUS_DONE) {{}}
-
+    uint32_t cycles = MMIO32(VTA_CYCLE_COUNT_REG);
+    printf("VTA case counters: cycles=%u insns=%u\\r\\n",
+           (unsigned int)cycles, (unsigned int){upper}_INSN_COUNT);
     for (size_t offset = 0; offset < {upper}_EXPECTED_SIZE; offset += 4U) {{
-        uint32_t actual = *(volatile uint32_t *)((uintptr_t){symbol}_out + offset);
+        uint32_t actual = *(volatile uint32_t *)((uintptr_t)out + offset);
         uint32_t expected = *(const uint32_t *)((uintptr_t){symbol}_expected + offset);
         if (actual != expected) {{
             printf("VTA case FAIL: offset=0x%zx expected=%08x actual=%08x\\r\\n",
                    offset, (unsigned int)expected, (unsigned int)actual);
+            sim_finish();
             return 1;
         }}
     }}
     printf("VTA case PASS\\r\\n");
+    sim_finish();
     return 0;
 }}
 """)
+
+
+def emit_makefile(output: Path, symbol: str) -> None:
+    output.joinpath("Makefile").write_text(f'''# Generated single-operator VTA SoC case.
+# LiteX invokes this file as the replacement BIOS package Makefile.
+CASE_SOURCE_DIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
+SOC_DIR := $(abspath $(CASE_SOURCE_DIR)/../..)
+ifeq ($(abspath $(CURDIR)),$(CASE_SOURCE_DIR))
+.PHONY: rtl sim run
+rtl:
+\t$(MAKE) -C $(SOC_DIR) rtl CONFIG=config/sim_default.json
+sim:
+\t$(MAKE) -C $(SOC_DIR) sim CASE=$(CASE_SOURCE_DIR) CONFIG=config/sim_default.json
+run:
+\t$(MAKE) -C $(SOC_DIR) run CASE=$(CASE_SOURCE_DIR) CONFIG=config/sim_default.json
+else
+SOC_DIRECTORY := $(SOC_DIR)
+BIOS_DIRECTORY := $(SOC_DIRECTORY)/.venv/lib/python3.10/site-packages/litex/soc/software/bios
+include $(BIOS_DIRECTORY)/Makefile
+LSCRIPT = ../../../../../../../../linker/vta_case.ld
+CFLAGS += -I$(BIOS_DIRECTORY)
+override VPATH := $(CASE_SOURCE_DIR):$(BIOS_DIRECTORY):$(BIOS_DIRECTORY)/cmds:$(CPU_DIRECTORY)
+main.o: $(CASE_SOURCE_DIR)/{symbol}_test.c
+	$(compile)
+endif
+''')
 
 
 def main() -> None:
@@ -154,6 +193,7 @@ def main() -> None:
     args.output.mkdir(parents=True, exist_ok=True)
     emit_header(args.case.resolve(), args.output / f"{stem}.h", symbol)
     emit_test(args.output / f"{stem}.c", symbol, f"{stem}.h")
+    emit_makefile(args.output, symbol)
 
 
 if __name__ == "__main__":

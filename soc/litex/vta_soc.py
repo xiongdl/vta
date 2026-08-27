@@ -12,9 +12,6 @@ from litex.soc.integration.soc import SoCRegion
 from litex.build.sim.config import SimConfig
 from litex.tools.litex_sim import SimSoC
 from litex_boards.targets.xilinx_zcu104 import BaseSoC
-from litedram.frontend.axi import LiteDRAMAXI2Native
-
-from ahb import LiteDRAMAHB2Native
 from vta_ip import FrozenVTA
 
 
@@ -52,7 +49,11 @@ class ZCU104VTASoC(BaseSoC):
 
 
 class SimVTASoC(SimSoC):
-    def __init__(self, config):
+    def __init__(self, config, case_dir=None):
+        # Generated C/H cases embed their immutable workload directly in ROM.
+        rom_size = SOC_CONFIG.number(config["rom"]["size"])
+        if case_dir is not None:
+            rom_size = max(rom_size, 0x00100000)
         super().__init__(
             with_sdram=True,
             sdram_data_width=config["ddr"]["data_width"],
@@ -61,15 +62,23 @@ class SimVTASoC(SimSoC):
             # Keep the RV32 CPU/CSR path at 32 bits.  A 64-bit AXI system bus
             # turns 32-bit CSR accesses at address +4 into misaligned 64-bit
             # transactions with the current LiteX AXI-to-CSR bridge.
-            # LiteX inserts a width converter for the native VTA AXI master.
+            # LiteX inserts a width converter for the 64-bit VTA master.
             bus_data_width=32,
             bus_address_width=config["soc"]["address_width"],
-            integrated_rom_size=SOC_CONFIG.number(config["rom"]["size"]),
+            integrated_rom_size=rom_size,
             integrated_sram_size=SOC_CONFIG.number(config["sram"]["size"]),
             integrated_main_ram_size=0,
+            l2_size=8192,
+            sim_debug=case_dir is not None,
             uart_name="sim",
             with_timer=True,
         )
+        if case_dir is not None:
+            # Case arrays are shared directly with the VTA DMA. Keep their
+            # backing ROM/SRAM outside the CPU cacheability map so firmware
+            # needs no platform-specific cache maintenance.
+            self.bus.regions["rom"].cached = False
+            self.bus.regions["sram"].cached = False
         self.submodules.vta = vta = FrozenVTA(
             self.platform, config["_vta_ip_dir"],
             host_frontend=config["vta"]["vcr_frontend"], sim_debug=True)
@@ -77,22 +86,14 @@ class SimVTASoC(SimSoC):
             origin=SOC_CONFIG.number(config["vta"]["vcr_base"]),
             size=SOC_CONFIG.number(config["vta"]["vcr_size"]),
             cached=False))
-        # Give VTA a native-width, burst-preserving LiteDRAM path.
-        # The RV32 system bus remains 32-bit for CPU/CSR correctness.
-        vta_port = self.sdram.crossbar.get_port(
-            data_width=config["vta"]["memory_data_width"])
-        if config["vta"]["memory_protocol"] == "axi4":
-            self.submodules.vta_axi2native = LiteDRAMAXI2Native(
-                axi=vta.axi,
-                port=vta_port,
-                base_address=SOC_CONFIG.number(config["ddr"]["base"]))
-        else:
-            self.submodules.vta_ahb2native = LiteDRAMAHB2Native(
-                ahb=vta.ahb,
-                port=vta_port,
-                base_address=SOC_CONFIG.number(config["ddr"]["base"]))
+        # Decode each VTA address through the same system bus as the CPU, so
+        # ROM, SRAM and DDR are all reachable through the Memory interface.
+        if config["vta"]["memory_protocol"] != "axi4":
+            raise ValueError("LiteX system-memory integration requires VTA AXI4")
+        self.bus.add_master("vta_dma", vta.axi)
         self.add_constant("VTA_VCR_BASE", SOC_CONFIG.number(config["vta"]["vcr_base"]))
         self.add_constant("VTA_MEMORY_DATA_WIDTH", config["vta"]["memory_data_width"])
+        self.case_dir = case_dir
 
 
 def main():
@@ -102,9 +103,10 @@ def main():
     parser.add_argument("--target", choices=("zcu104",), default="zcu104")
     parser.add_argument("--build", action="store_true", help="run Vivado after generation")
     parser.add_argument("--sim", action="store_true", help="reserved for the dedicated Verilator target")
+    parser.add_argument("--case-dir", type=Path, help="compile this generated single-operator case as BIOS")
     args = parser.parse_args()
     config = SOC_CONFIG.validate(SOC_CONFIG.load_config(args.config), require_ip=True)
-    soc = SimVTASoC(config) if args.sim else ZCU104VTASoC(config)
+    soc = SimVTASoC(config, args.case_dir.resolve() if args.case_dir else None) if args.sim else ZCU104VTASoC(config)
     builder = Builder(
         soc,
         output_dir=str(args.build_dir),
@@ -112,6 +114,12 @@ def main():
         compile_software=args.build,
         compile_gateware=args.build,
     )
+    if args.case_dir:
+        # Replace the normal BIOS source with the generated case package.
+        builder.software_packages = [
+            (name, src) for name, src in builder.software_packages if name != "bios"
+        ]
+        builder.add_software_package("bios", str(args.case_dir))
     if args.sim:
         sim_config = SimConfig()
         sim_config.add_clocker("sys_clk", freq_hz=int(1e6))

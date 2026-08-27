@@ -30,6 +30,43 @@ python3 tools/import_vta_ip.py \
 The importer rejects a mismatched top module or memory width. Normal builds
 validate the imported manifest and never access `../hardware/chisel`.
 
+## Three independent commands
+
+Use the SoC configuration as the single selector. These commands are
+independent: the latter two never regenerate Chisel RTL.
+Activate `tvm_py310` in each new terminal. The Makefile then uses `soc/.venv`
+for LiteX Python packages and the Conda environment for Java, sbt, Verilator,
+build tools, and native libraries. Run `make env-check` before the three steps.
+On macOS, Apple Clang and the matching SDK are the only system prerequisites;
+the flow does not depend on Homebrew.
+
+```bash
+# 1. Explicitly generate and freeze the RTL selected by CONFIG.
+make rtl CONFIG=config/sim_default.json
+
+# 2. Compile the frozen RTL and LiteX SoC into build/sim/gateware/obj_dir/Vsim.
+make sim CONFIG=config/sim_default.json BUILD_DIR=build
+
+# 3. Run a packed case using the executable built above.
+make run CASE=/path/to/packed-case BUILD_DIR=build
+```
+
+The command selects the matching bundled VTA configuration for the 32/64/128
+bit memory width. Pass `RTL_ARGS="--vta-config /path/to/vta_config.json"` when
+freezing a nonstandard VTA hardware configuration.
+
+For a generated single-operator firmware case, change into that case directory
+and use the same three short commands:
+
+```bash
+make rtl       # optional when a matching frozen package already exists
+make sim       # compile this case's BIOS/SoC executable
+make run       # run the already compiled executable
+```
+
+`make run` does not build anything. It reports a missing executable instead of
+silently regenerating RTL or recompiling the SoC.
+
 ## Configuration and local checks
 
 ```bash

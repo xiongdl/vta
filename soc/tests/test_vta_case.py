@@ -12,6 +12,13 @@ SPEC.loader.exec_module(VTA_CASE)
 
 
 class VTACaseTest(unittest.TestCase):
+    def test_interface_alignment_tracks_memory_width(self):
+        for log_bus_width, beat_bytes in ((5, 4), (6, 8), (7, 16)):
+            config = {"LOG_BUS_WIDTH": log_bus_width}
+            self.assertEqual(VTA_CASE.interface_alignment("insn", config), 16 * beat_bytes)
+            for name in ("uop", "inp", "wgt", "acc", "out"):
+                self.assertEqual(VTA_CASE.interface_alignment(name, config), 8)
+
     def make_case(self, directory: Path):
         (directory / "insn.bin").write_bytes(bytes(16))
         (directory / "out.bin").write_bytes(bytes(64))

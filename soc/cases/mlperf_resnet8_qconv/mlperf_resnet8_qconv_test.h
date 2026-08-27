@@ -14,8 +14,8 @@
  * Include this data header from this case's C file only.
  */
 
-uint64_t mlperf_resnet8_qconv_insn[]
-    VTA_CASE_SECTION(".insn_data", 1024) = {
+const uint64_t mlperf_resnet8_qconv_insn[]
+    VTA_CASE_SECTION(".rodata_ai", 128) = {
     0x0000000000000000ULL, 0x0000000800080001ULL, 0x00100020010000a2ULL, 0x0000000000004040ULL,
     0x0000000000000110ULL, 0x00000010000f000fULL, 0x00000000000000c0ULL, 0x0000000200010004ULL,
     0x0000000020002008ULL, 0x0000000800080001ULL, 0x0010002002000822ULL, 0x0000103c00004040ULL,
@@ -41,8 +41,8 @@ uint64_t mlperf_resnet8_qconv_insn[]
     0x0000000000000003ULL, 0x0000000000000000ULL,
 };
 
-uint32_t mlperf_resnet8_qconv_uop[]
-    VTA_CASE_SECTION(".uop_data", 128) = {
+const uint32_t mlperf_resnet8_qconv_uop[]
+    VTA_CASE_SECTION(".rodata_ai", 8) = {
     0x00000000U, 0x00000001U, 0x00000002U, 0x00000003U,
     0x00000004U, 0x00000005U, 0x00000006U, 0x00000007U,
     0x00000000U, 0x00001001U, 0x00002002U, 0x00003003U,
@@ -54,7 +54,7 @@ uint32_t mlperf_resnet8_qconv_uop[]
 };
 
 uint64_t mlperf_resnet8_qconv_inp[]
-    VTA_CASE_SECTION(".inp_data", 8192) = {
+    VTA_CASE_SECTION(".data_ai.init", 8) = {
     0x80299a80808a80c5ULL, 0xc284808080808080ULL, 0x8001808092808080ULL, 0xbf80808080808080ULL,
     0x802fb0808d809680ULL, 0x94808a8080808080ULL, 0x84fe818097808085ULL, 0x8080808080bb8080ULL,
     0x80c58080c3808080ULL, 0x80808d80a2b18080ULL, 0x803992809a809399ULL, 0x9f809c8080ba8080ULL,
@@ -305,8 +305,8 @@ uint64_t mlperf_resnet8_qconv_inp[]
     0x9280800380dd9680ULL, 0x8080808080be98bdULL, 0x0000000000000000ULL, 0x0000000000000000ULL,
 };
 
-uint64_t mlperf_resnet8_qconv_wgt[]
-    VTA_CASE_SECTION(".wgt_data", 2048) = {
+const uint64_t mlperf_resnet8_qconv_wgt[]
+    VTA_CASE_SECTION(".rodata_ai", 8) = {
     0xfcb735fb2cf50403ULL, 0xd839d6cb0d1415c4ULL, 0xacaff79e083007e6ULL, 0x5936eec2ee0de68cULL,
     0x194fd6a881da2a49ULL, 0x280741f3f003ebb4ULL, 0x3900fd7ff5f6f627ULL, 0xcbeffa5af8069b48ULL,
     0xba811272370a023fULL, 0x8b01f919dd3e1d2cULL, 0xd883ebf520a5fbabULL, 0x81fef3ee112afcfdULL,
@@ -373,8 +373,8 @@ uint64_t mlperf_resnet8_qconv_wgt[]
     0xef08c3f73bccf907ULL, 0x0a4301bb1f0781e7ULL, 0x025f160fe318ca28ULL, 0xcf24f497e13fd559ULL,
 };
 
-uint64_t mlperf_resnet8_qconv_acc[]
-    VTA_CASE_SECTION(".acc_data", 131072) = {
+const uint64_t mlperf_resnet8_qconv_acc[]
+    VTA_CASE_SECTION(".rodata_ai", 8) = {
     0xffffd493ffff8826ULL, 0xfffff487ffff0e86ULL, 0xfffe8502ffffbf72ULL, 0xffff3195fffed3a6ULL,
     0xffff3799ffffa1cdULL, 0xffffa3c5000000b2ULL, 0xfffec913ffff6d0fULL, 0xffff70b7000074d9ULL,
     0xffffd493ffff8826ULL, 0xfffff487ffff0e86ULL, 0xfffe8502ffffbf72ULL, 0xffff3195fffed3a6ULL,
@@ -2938,7 +2938,7 @@ uint64_t mlperf_resnet8_qconv_acc[]
 };
 
 uint64_t mlperf_resnet8_qconv_out[]
-    VTA_CASE_SECTION(".out_data", 4096) = {
+    VTA_CASE_SECTION(".data_ai.out", 8) = {
     0x0000003000000032ULL, 0x0000003600000032ULL, 0x000000300000002dULL, 0x0000002d00000038ULL,
     0x0000003600000032ULL, 0x0000003100000020ULL, 0x0000003a00000030ULL, 0x0000003700000035ULL,
     0x000000350000003aULL, 0x0000000000000034ULL, 0x0092ffffffff009cULL, 0x0088ffff009f0020ULL,
@@ -3069,8 +3069,8 @@ uint64_t mlperf_resnet8_qconv_out[]
     0x000000015de10dd0ULL, 0x000000015de3fc90ULL, 0x0000000137755d80ULL, 0x000000015de10b50ULL,
 };
 
-const uint64_t mlperf_resnet8_qconv_expected[]
-    VTA_CASE_SECTION(".ref_data", 8) = {
+uint64_t mlperf_resnet8_qconv_expected[]
+    VTA_CASE_SECTION(".data_ai.expected", 8) = {
     0xe5afb4defd4a3be7ULL, 0x00c515eccb3129ecULL, 0xf5dad3e7fe3e29f2ULL, 0x09e61411f8211efdULL,
     0x06fafe060b21300aULL, 0x1b091d111f291e0aULL, 0x09fdf3090c2c2c03ULL, 0x1e011f18121f200aULL,
     0x0f010114162f290fULL, 0x23081e1b1d251f0aULL, 0xffe6e302093c2901ULL, 0x0fff120f16331affULL,

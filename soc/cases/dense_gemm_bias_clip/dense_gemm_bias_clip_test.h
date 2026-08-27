@@ -14,8 +14,8 @@
  * Include this data header from this case's C file only.
  */
 
-uint64_t dense_gemm_bias_clip_insn[]
-    VTA_CASE_SECTION(".insn_data", 1024) = {
+const uint64_t dense_gemm_bias_clip_insn[]
+    VTA_CASE_SECTION(".rodata_ai", 128) = {
     0x0000000000000000ULL, 0x0000000100010001ULL, 0x00020008002000a2ULL, 0x0000000000000000ULL,
     0x0000000000000110ULL, 0x0000000100010001ULL, 0x00000000000000c0ULL, 0x0000000100010001ULL,
     0x0000000004000408ULL, 0x0000000100010001ULL, 0x0002000800400122ULL, 0x0000000000000000ULL,
@@ -29,8 +29,8 @@ uint64_t dense_gemm_bias_clip_insn[]
     0x0000000000000003ULL, 0x0000000000000000ULL,
 };
 
-uint32_t dense_gemm_bias_clip_uop[]
-    VTA_CASE_SECTION(".uop_data", 64) = {
+const uint32_t dense_gemm_bias_clip_uop[]
+    VTA_CASE_SECTION(".rodata_ai", 8) = {
     0x00000000U, 0x00000000U, 0x00000800U, 0x00000000U,
     0x00000000U, 0x00000000U, 0x00000000U, 0x00000000U,
     0x00000000U, 0x00000000U, 0x00000000U, 0x00000000U,
@@ -38,13 +38,13 @@ uint32_t dense_gemm_bias_clip_uop[]
 };
 
 uint64_t dense_gemm_bias_clip_inp[]
-    VTA_CASE_SECTION(".inp_data", 64) = {
+    VTA_CASE_SECTION(".data_ai.init", 8) = {
     0x0300fc0201fefd04ULL, 0x01fdfcfffefffdfcULL, 0xfdfe010401040400ULL, 0xfefdfc02fcfcff02ULL,
     0x0000000000000000ULL, 0x0000000000000000ULL, 0x0000000000000000ULL, 0x0000000000000000ULL,
 };
 
-uint64_t dense_gemm_bias_clip_wgt[]
-    VTA_CASE_SECTION(".wgt_data", 512) = {
+const uint64_t dense_gemm_bias_clip_wgt[]
+    VTA_CASE_SECTION(".rodata_ai", 8) = {
     0x020002fdfd040000ULL, 0x0202fcff040201feULL, 0x01fd020302fdfe03ULL, 0x04feff04fcfcfd03ULL,
     0x040404030304feffULL, 0xfd030001fcff00fdULL, 0xfc0004fd03fd00ffULL, 0x01010200fcffff01ULL,
     0x00ff02fefe0004fcULL, 0x02fefffdfeff02ffULL, 0x01000004fe020401ULL, 0xfdffff0204ffff02ULL,
@@ -63,20 +63,20 @@ uint64_t dense_gemm_bias_clip_wgt[]
     0x02fcff01fcfefe03ULL, 0x040103fdfdfc0302ULL, 0xfe0404fffffffdfdULL, 0xfcfeff03010101fdULL,
 };
 
-uint64_t dense_gemm_bias_clip_acc[]
-    VTA_CASE_SECTION(".acc_data", 64) = {
+const uint64_t dense_gemm_bias_clip_acc[]
+    VTA_CASE_SECTION(".rodata_ai", 8) = {
     0xfffffffdffffffefULL, 0xfffffff0fffffff2ULL, 0xfffffff3fffffff8ULL, 0xfffffff6fffffffaULL,
     0xfffffff6fffffff5ULL, 0xffffffeefffffff2ULL, 0xffffffeefffffffeULL, 0xffffffeffffffff9ULL,
 };
 
 uint64_t dense_gemm_bias_clip_out[]
-    VTA_CASE_SECTION(".out_data", 64) = {
+    VTA_CASE_SECTION(".data_ai.out", 8) = {
     0x0000000000000000ULL, 0x0000000000000092ULL, 0x0000000000000000ULL, 0x0000000000000000ULL,
     0x0000000000000000ULL, 0x0000000000000000ULL, 0x0000000000000000ULL, 0x0000000000000000ULL,
 };
 
-const uint64_t dense_gemm_bias_clip_expected[]
-    VTA_CASE_SECTION(".ref_data", 8) = {
+uint64_t dense_gemm_bias_clip_expected[]
+    VTA_CASE_SECTION(".data_ai.expected", 8) = {
     0xe8fbfde0e0e21ee0ULL, 0xeff6e0041f14e0e0ULL,
 };
 

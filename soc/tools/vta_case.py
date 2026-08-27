@@ -21,6 +21,15 @@ DEFAULT_BASES = {
     "acc": 0x40080000,
     "out": 0x400D0000,
 }
+INST_BITS = 128
+MEMORY_BURST_BEATS = 16
+
+
+def interface_alignment(name: str, config: dict) -> int:
+    data_bits = 1 << config["LOG_BUS_WIDTH"]
+    if data_bits < 32 or data_bits & (data_bits - 1):
+        raise ValueError(f"unsupported VTA memory data width: {data_bits}")
+    return MEMORY_BURST_BEATS * (data_bits // 8) if name == "insn" else 8
 
 
 def align(value: int, alignment: int = 64) -> int:
@@ -125,7 +134,7 @@ def pack(raw: Path, output: Path, repo: Path, address_offset: int = 0) -> None:
             if key in placements:
                 continue
             arena = arenas.setdefault(name, bytearray())
-            start = align(len(arena), max(64, elem_bytes))
+            start = align(len(arena), interface_alignment(name, config))
             arena.extend(bytes(start - len(arena)))
             placements[key] = start
             region_data = (raw / region["file"]).read_bytes()
@@ -154,7 +163,7 @@ def pack(raw: Path, output: Path, repo: Path, address_offset: int = 0) -> None:
                         str(patch_file)], check=True)
 
     for name, data in arenas.items():
-        data.extend(bytes(align(len(data)) - len(data)))
+        data.extend(bytes(align(len(data), interface_alignment(name, config)) - len(data)))
         (output / f"{name}.bin").write_bytes(data)
     (output / "expected_out.bin").write_bytes(expected_out)
     original_insn.unlink()
@@ -162,12 +171,14 @@ def pack(raw: Path, output: Path, repo: Path, address_offset: int = 0) -> None:
     for name in arenas:
         sections[name] = {"file": f"{name}.bin", "address": DEFAULT_BASES[name] + address_offset}
     sections["expected_out"] = {"file": "expected_out.bin"}
-    for section in sections.values():
+    for name, section in sections.items():
         path = output / section["file"]
-        section.update(size=path.stat().st_size, sha256=sha256(path), alignment=64)
+        alignment = 8 if name == "expected_out" else interface_alignment(name, config)
+        section.update(size=path.stat().st_size, sha256=sha256(path), alignment=alignment)
     manifest = {
         "format": "vta-soc-case-v1", "source_format": before["format"],
         "insn_count": before["insn_count"], "vcr_base_mode": "per-memory-type",
+        "baddr_mode": "add",
         "config": config, "sections": sections, "accesses": accesses,
         "expected_outputs": expected_outputs,
     }

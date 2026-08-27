@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <sim_debug.h>
 
 #include "dense_gemm_bias_clip_test.h"
 
@@ -43,6 +44,9 @@ int main(void) {
     MMIO32(VTA_CONTROL_REG) = VTA_CONTROL_START;
 
     while (MMIO32(VTA_CONTROL_REG) != VTA_STATUS_DONE) {}
+    uint32_t cycles = MMIO32(VTA_CYCLE_COUNT_REG);
+    printf("VTA case counters: cycles=%u insns=%u\r\n",
+           (unsigned int)cycles, (unsigned int)DENSE_GEMM_BIAS_CLIP_INSN_COUNT);
 
     for (size_t offset = 0; offset < DENSE_GEMM_BIAS_CLIP_EXPECTED_SIZE; offset += 4U) {
         uint32_t actual = *(volatile uint32_t *)((uintptr_t)dense_gemm_bias_clip_out + offset);
@@ -50,9 +54,11 @@ int main(void) {
         if (actual != expected) {
             printf("VTA case FAIL: offset=0x%zx expected=%08x actual=%08x\r\n",
                    offset, (unsigned int)expected, (unsigned int)actual);
+            sim_finish();
             return 1;
         }
     }
     printf("VTA case PASS\r\n");
+    sim_finish();
     return 0;
 }

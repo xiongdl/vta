@@ -25,7 +25,7 @@
 #include <dmlc/thread_local.h>
 #include <tvm/runtime/registry.h>
 
-#include "../../src/runtime/workspace_pool.h"
+#include "../src/runtime/workspace_pool.h"
 #include "runtime.h"
 
 namespace tvm {

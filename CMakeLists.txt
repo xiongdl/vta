@@ -30,8 +30,8 @@ foreach(required_path
 endforeach()
 
 find_library(
-  TVM_RUNTIME_LIBRARY
-  NAMES tvm_runtime
+  TVM_LIBRARY
+  NAMES tvm
   PATHS "${TVM_BUILD_DIR}"
   NO_DEFAULT_PATH
   REQUIRED)
@@ -83,7 +83,7 @@ target_include_directories(
     "${TVM_INCLUDE_DIR}"
     "${TVM_PATH}/3rdparty/dlpack/include"
     "${TVM_PATH}/3rdparty/dmlc-core/include")
-target_link_libraries(vta_fsim PRIVATE "${TVM_RUNTIME_LIBRARY}")
+target_link_libraries(vta_fsim PRIVATE "${TVM_LIBRARY}")
 
 set_target_properties(
   vta_fsim

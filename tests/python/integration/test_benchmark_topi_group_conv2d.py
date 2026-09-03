@@ -86,6 +86,12 @@ def run_group_conv2d(env, remote, wl, target, check_correctness=True, print_ir=F
 
     # Workload assertions
     assert wl.hpad == wl.wpad
+    func_name = "group_conv2d_%d_%d_%d_%d" % (
+        wl.height,
+        wl.width,
+        wl.out_filter,
+        wl.hstride,
+    )
 
     # Perform packing only if we are targeting the accelerator
     if "arm_cpu" in target.keys:
@@ -216,19 +222,20 @@ def run_group_conv2d(env, remote, wl, target, check_correctness=True, print_ir=F
                 s,
                 [data, kernel, bias, res],
                 target=tvm.target.Target(target, host=env.target_host),
-                name="conv2d",
+                name=func_name,
             )
     else:
         mod = tvm.build(
             s,
             [data, kernel, bias, res],
             target=tvm.target.Target(target, host=env.target_host),
-            name="conv2d",
+            name=func_name,
         )
     temp = utils.tempdir()
-    mod.save(temp.relpath("conv2d.o"))
-    remote.upload(temp.relpath("conv2d.o"))
-    f = remote.load_module("conv2d.o")
+    module_name = func_name + ".o"
+    mod.save(temp.relpath(module_name))
+    remote.upload(temp.relpath(module_name))
+    f = remote.load_module(module_name)
     dev = remote.device(str(target))
 
     res_np = np.zeros(topi.utils.get_const_tuple(res.shape)).astype(res.dtype)
@@ -236,7 +243,7 @@ def run_group_conv2d(env, remote, wl, target, check_correctness=True, print_ir=F
     kernel_arr = tvm.nd.array(kernel_np, dev)
     bias_arr = tvm.nd.array(bias_np, dev)
     res_arr = tvm.nd.array(res_np, dev)
-    time_f = f.time_evaluator("conv2d", dev, number=samples)
+    time_f = f.time_evaluator(func_name, dev, number=samples)
 
     # In vta sim mode, collect simulator runtime statistics
     stats = {}

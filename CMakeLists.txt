@@ -4,6 +4,8 @@ project(vta LANGUAGES CXX)
 
 set(TVM_PATH "" CACHE PATH "Path to the TVM source tree")
 set(VTA_PATH "${CMAKE_CURRENT_SOURCE_DIR}" CACHE PATH "Path to the VTA source tree")
+set(VTA_CONFIG_FILE "${VTA_PATH}/config/vta_config.json" CACHE FILEPATH
+    "Path to the VTA configuration JSON file")
 
 if(NOT TVM_PATH)
   message(FATAL_ERROR "TVM_PATH is required and must point to the TVM source tree")
@@ -13,6 +15,9 @@ file(REAL_PATH "${TVM_PATH}" TVM_PATH)
 file(REAL_PATH "${VTA_PATH}" VTA_PATH)
 if(NOT EXISTS "${VTA_PATH}/config/vta_config.py")
   message(FATAL_ERROR "VTA_PATH must point to the VTA source tree: ${VTA_PATH}")
+endif()
+if(NOT EXISTS "${VTA_CONFIG_FILE}")
+  message(FATAL_ERROR "VTA_CONFIG_FILE does not exist: ${VTA_CONFIG_FILE}")
 endif()
 
 set(TVM_INCLUDE_DIR "${TVM_PATH}/include")
@@ -38,20 +43,8 @@ find_library(
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 execute_process(
-  COMMAND "${Python3_EXECUTABLE}" "${VTA_PATH}/config/vta_config.py" --target
-  RESULT_VARIABLE VTA_CONFIG_TARGET_RESULT
-  OUTPUT_VARIABLE VTA_TARGET
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-if(NOT VTA_CONFIG_TARGET_RESULT EQUAL 0)
-  message(FATAL_ERROR "Failed to read the VTA target configuration")
-endif()
-if(NOT VTA_TARGET STREQUAL "sim")
-  message(FATAL_ERROR
-          "Only the FSIM target is currently supported; configured target is '${VTA_TARGET}'")
-endif()
-
-execute_process(
-  COMMAND "${Python3_EXECUTABLE}" "${VTA_PATH}/config/vta_config.py" --defs
+  COMMAND "${Python3_EXECUTABLE}" "${VTA_PATH}/config/vta_config.py"
+          "--use-cfg=${VTA_CONFIG_FILE}" --defs
   RESULT_VARIABLE VTA_CONFIG_DEFS_RESULT
   OUTPUT_VARIABLE VTA_DEFINITIONS_RAW
   OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -61,32 +54,88 @@ endif()
 separate_arguments(VTA_DEFINITIONS NATIVE_COMMAND "${VTA_DEFINITIONS_RAW}")
 list(TRANSFORM VTA_DEFINITIONS REPLACE "^-D" "")
 
-add_library(
-  vta_fsim SHARED
+set(
+  VTA_RUNTIME_SOURCES
   "${VTA_PATH}/src/runtime/device_api.cc"
   "${VTA_PATH}/src/runtime/runtime.cc"
-  "${VTA_PATH}/src/sim/sim_driver.cc"
-  "${VTA_PATH}/src/sim/sim_tlpp.cc"
   "${VTA_PATH}/src/vmem/virtual_memory.cc")
 
-target_compile_features(vta_fsim PRIVATE cxx_std_17)
-target_compile_definitions(
-  vta_fsim
-  PRIVATE
-    DMLC_USE_LOGGING_LIBRARY=<tvm/runtime/logging.h>
-    USE_FSIM_TLPP
-    ${VTA_DEFINITIONS})
-target_include_directories(
-  vta_fsim
-  PRIVATE
-    "${VTA_PATH}/include"
-    "${TVM_INCLUDE_DIR}"
-    "${TVM_PATH}/3rdparty/dlpack/include"
-    "${TVM_PATH}/3rdparty/dmlc-core/include")
-target_link_libraries(vta_fsim PRIVATE "${TVM_LIBRARY}")
+function(configure_vta_runtime target)
+  target_compile_features(${target} PRIVATE cxx_std_17)
+  target_compile_definitions(
+    ${target}
+    PRIVATE
+      DMLC_USE_LOGGING_LIBRARY=<tvm/runtime/logging.h>
+      ${VTA_DEFINITIONS})
+  target_include_directories(
+    ${target}
+    PRIVATE
+      "${VTA_PATH}/include"
+      "${TVM_INCLUDE_DIR}"
+      "${TVM_PATH}/3rdparty/dlpack/include"
+      "${TVM_PATH}/3rdparty/dmlc-core/include")
+  target_link_libraries(${target} PRIVATE "${TVM_LIBRARY}")
+  set_target_properties(
+    ${target}
+    PROPERTIES
+      CXX_EXTENSIONS OFF
+      BUILD_RPATH "${TVM_PATH}/build")
+endfunction()
 
-set_target_properties(
-  vta_fsim
-  PROPERTIES
-    CXX_EXTENSIONS OFF
-    BUILD_RPATH "${TVM_PATH}/build")
+add_library(
+  vta_fsim SHARED
+  ${VTA_RUNTIME_SOURCES}
+  "${VTA_PATH}/src/sim/sim_driver.cc"
+  "${VTA_PATH}/src/sim/sim_tlpp.cc")
+configure_vta_runtime(vta_fsim)
+target_compile_definitions(vta_fsim PRIVATE USE_FSIM_TLPP)
+
+set(VERILATOR_ROOT "" CACHE PATH "Path to the Verilator installation")
+if(NOT VERILATOR_ROOT)
+  find_program(VERILATOR_EXECUTABLE NAMES verilator)
+  if(NOT VERILATOR_EXECUTABLE)
+    message(FATAL_ERROR
+            "TSIM requires VERILATOR_ROOT or verilator available in PATH")
+  endif()
+  execute_process(
+    COMMAND "${VERILATOR_EXECUTABLE}" -getenv VERILATOR_ROOT
+    RESULT_VARIABLE VERILATOR_ROOT_RESULT
+    OUTPUT_VARIABLE VERILATOR_ROOT
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(NOT VERILATOR_ROOT_RESULT EQUAL 0)
+    message(FATAL_ERROR "Failed to query VERILATOR_ROOT from ${VERILATOR_EXECUTABLE}")
+  endif()
+endif()
+file(REAL_PATH "${VERILATOR_ROOT}" VERILATOR_ROOT)
+set(VERILATOR_INCLUDE_DIR "${VERILATOR_ROOT}/include")
+foreach(required_path
+        "${VERILATOR_INCLUDE_DIR}/verilated.cpp"
+        "${VERILATOR_INCLUDE_DIR}/verilated_dpi.cpp"
+        "${VERILATOR_INCLUDE_DIR}/verilated_threads.cpp"
+        "${VERILATOR_INCLUDE_DIR}/vltstd/svdpi.h")
+  if(NOT EXISTS "${required_path}")
+    message(FATAL_ERROR "Required Verilator dependency was not found: ${required_path}")
+  endif()
+endforeach()
+
+find_package(Threads REQUIRED)
+add_library(
+  vta_tsim SHARED
+  ${VTA_RUNTIME_SOURCES}
+  "${VTA_PATH}/src/tsim/tsim_driver.cc"
+  "${VTA_PATH}/src/dpi/module.cc"
+  "${VERILATOR_INCLUDE_DIR}/verilated_threads.cpp")
+configure_vta_runtime(vta_tsim)
+target_include_directories(
+  vta_tsim
+  PRIVATE
+    "${VERILATOR_INCLUDE_DIR}"
+    "${VERILATOR_INCLUDE_DIR}/vltstd")
+target_link_libraries(vta_tsim PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
+if(APPLE)
+  target_link_options(
+    vta_tsim
+    PRIVATE
+      "-Wl,-U,__Z15vl_time_stamp64v"
+      "-Wl,-U,__Z13sc_time_stampv")
+endif()

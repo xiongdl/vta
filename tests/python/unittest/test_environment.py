@@ -14,7 +14,11 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+import os
+
+import pytest
 import vta
+from vta.environment import get_vta_config_path, get_vta_hw_path
 
 
 def test_env():
@@ -30,6 +34,28 @@ def test_env_scope():
     with vta.Environment(cfg):
         assert vta.get_env().TARGET == "xyz"
     assert vta.get_env().TARGET == env.TARGET
+
+
+def test_default_config_path(monkeypatch):
+    monkeypatch.delenv("VTA_CONFIG_FILE", raising=False)
+
+    assert get_vta_config_path() == os.path.join(
+        get_vta_hw_path(), "config", "vta_config.json"
+    )
+
+
+def test_explicit_config_path(monkeypatch, tmp_path):
+    config_path = tmp_path / "custom.json"
+    monkeypatch.setenv("VTA_CONFIG_FILE", str(config_path))
+
+    assert get_vta_config_path() == str(config_path)
+
+
+def test_explicit_config_path_rejects_relative_path(monkeypatch):
+    monkeypatch.setenv("VTA_CONFIG_FILE", "config/tsim_sample.json")
+
+    with pytest.raises(ValueError, match="VTA_CONFIG_FILE must be an absolute path"):
+        get_vta_config_path()
 
 
 if __name__ == "__main__":

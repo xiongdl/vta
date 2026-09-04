@@ -34,6 +34,17 @@ def get_vta_hw_path():
     return os.path.abspath(vta_path)
 
 
+def get_vta_config_path():
+    """Get the active VTA configuration file path."""
+    config_path_default = os.path.join(get_vta_hw_path(), "config", "vta_config.json")
+    config_path = os.getenv("VTA_CONFIG_FILE")
+    if config_path is None:
+        return config_path_default
+    if not os.path.isabs(config_path):
+        raise ValueError("VTA_CONFIG_FILE must be an absolute path")
+    return os.path.abspath(config_path)
+
+
 def pkg_config(cfg):
     """Returns PkgConfig pkg config object."""
     pkg_config_py = os.path.join(get_vta_hw_path(), "config/pkg_config.py")
@@ -256,10 +267,11 @@ def get_env():
 
 def _init_env():
     """Initialize the default global env"""
-    config_path = os.path.join(get_vta_hw_path(), "config/vta_config.json")
+    config_path = get_vta_config_path()
     if not os.path.exists(config_path):
         raise RuntimeError("Cannot find config in %s" % str(config_path))
-    cfg = json.load(open(config_path))
+    with open(config_path, encoding="utf-8") as config_file:
+        cfg = json.load(config_file)
     return Environment(cfg)
 
 

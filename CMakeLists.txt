@@ -4,7 +4,7 @@ project(vta LANGUAGES CXX)
 
 set(TVM_PATH "" CACHE PATH "Path to the TVM source tree")
 set(VTA_PATH "${CMAKE_CURRENT_SOURCE_DIR}" CACHE PATH "Path to the VTA source tree")
-set(VTA_CONFIG_FILE "${VTA_PATH}/config/vta_config.json" CACHE FILEPATH
+set(VTA_CONFIG_FILE "${VTA_PATH}/config/vta_config.json" CACHE STRING
     "Path to the VTA configuration JSON file")
 
 if(NOT TVM_PATH)
@@ -15,6 +15,9 @@ file(REAL_PATH "${TVM_PATH}" TVM_PATH)
 file(REAL_PATH "${VTA_PATH}" VTA_PATH)
 if(NOT EXISTS "${VTA_PATH}/config/vta_config.py")
   message(FATAL_ERROR "VTA_PATH must point to the VTA source tree: ${VTA_PATH}")
+endif()
+if(NOT IS_ABSOLUTE "${VTA_CONFIG_FILE}")
+  message(FATAL_ERROR "VTA_CONFIG_FILE must be an absolute path")
 endif()
 if(NOT EXISTS "${VTA_CONFIG_FILE}")
   message(FATAL_ERROR "VTA_CONFIG_FILE does not exist: ${VTA_CONFIG_FILE}")

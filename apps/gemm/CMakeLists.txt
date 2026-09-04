@@ -22,14 +22,14 @@ if(NOT DEFINED ENV{TVM_PATH})
     message(ERROR "Make sure to set TVM_PATH in your environment")
 endif()
 
-if(NOT DEFINED ENV{VTA_HW_PATH})
-    message(ERROR "Make sure to set VTA_HW_PATH in your environment")
+if(NOT DEFINED ENV{VTA_PATH})
+    message(ERROR "Make sure to set VTA_PATH in your environment")
 endif()
 
 include_directories("$ENV{TVM_PATH}/include")
 include_directories("$ENV{TVM_PATH}/3rdparty/dlpack/include")
 include_directories("$ENV{TVM_PATH}/3rdparty/dmlc-core/include")
-include_directories("$ENV{VTA_HW_PATH}/src/dpi")
+include_directories("$ENV{VTA_PATH}/src/dpi")
 
 set(CMAKE_C_FLAGS "-O2 -Wall -fPIC -fvisibility=hidden")
 set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -fvisibility=hidden -std=c++11")
@@ -40,11 +40,11 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND
 endif()
 
 file(GLOB TSIM_SW_SRC src/driver.cc)
-list(APPEND TSIM_SW_SRC $ENV{VTA_HW_PATH}/src/vmem/virtual_memory.cc)
-list(APPEND TSIM_SW_SRC $ENV{VTA_HW_PATH}/src/dpi/module.cc)
+list(APPEND TSIM_SW_SRC $ENV{VTA_PATH}/src/vmem/virtual_memory.cc)
+list(APPEND TSIM_SW_SRC $ENV{VTA_PATH}/src/dpi/module.cc)
 
 add_library(sw SHARED ${TSIM_SW_SRC})
-target_include_directories(sw PRIVATE $ENV{VTA_HW_PATH}/include $ENV{VTA_HW_PATH}/src)
+target_include_directories(sw PRIVATE $ENV{VTA_PATH}/include $ENV{VTA_PATH}/src)
 
 if(APPLE)
   set_target_properties(sw PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")

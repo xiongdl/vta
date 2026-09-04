@@ -26,11 +26,10 @@ import os
 
 
 def get_vta_hw_path():
-    """Get the VTA HW path."""
+    """Get the VTA source path."""
     curr_path = os.path.dirname(os.path.abspath(os.path.expanduser(__file__)))
-    vta_hw_default = os.path.abspath(os.path.join(curr_path, ".."))
-    VTA_HW_PATH = os.getenv('VTA_HW_PATH', vta_hw_default)
-    return VTA_HW_PATH
+    vta_path_default = os.path.abspath(os.path.join(curr_path, ".."))
+    return os.getenv('VTA_PATH', vta_path_default)
 
 def get_tvm_path():
     """Get the TVM path."""
@@ -76,7 +75,7 @@ class PkgConfig(object):
         # Update cfg now that we've extended it
         self.__dict__.update(cfg)
 
-        # VTA_HW path and TVM_PATH
+        # VTA_PATH and TVM_PATH
         vta_hw_path = get_vta_hw_path()
         tvm_path = get_tvm_path()
 

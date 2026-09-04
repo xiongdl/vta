@@ -27,11 +27,11 @@ from . import intrin
 
 
 def get_vta_hw_path():
-    """Get the VTA HW path."""
+    """Get the VTA source path."""
     curr_path = os.path.dirname(os.path.abspath(os.path.expanduser(__file__)))
-    vta_hw_default = os.path.abspath(os.path.join(curr_path, "../.."))
-    VTA_HW_PATH = os.getenv("VTA_HW_PATH", vta_hw_default)
-    return os.path.abspath(VTA_HW_PATH)
+    vta_path_default = os.path.abspath(os.path.join(curr_path, "../.."))
+    vta_path = os.getenv("VTA_PATH", vta_path_default)
+    return os.path.abspath(vta_path)
 
 
 def pkg_config(cfg):

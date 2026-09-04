@@ -20,8 +20,8 @@ set -e
 set -u
 
 export TVM_PATH=`pwd`/tvm
-export PYTHONPATH=${TVM_PATH}/python:${TVM_PATH}/vta/python:${TVM_PATH}/topi/python
-export VTA_HW_PATH=`pwd`
+export PYTHONPATH=${TVM_PATH}/python:${VTA_PATH}/python
+export VTA_PATH=`pwd`
 
 
 # cleanup pycache
@@ -35,31 +35,31 @@ rm -rf ~/.tvm
 make cython3
 
 # Set default VTA config to use TSIM cycle accurate sim
-cp ${VTA_HW_PATH}/config/tsim_sample.json ${VTA_HW_PATH}/config/vta_config.json
+cp ${VTA_PATH}/config/tsim_sample.json ${VTA_PATH}/config/vta_config.json
 
 # Build and run the TSIM apps (disable until refactor is complete)
 # echo "Test the TSIM apps..."
-# make -C ${VTA_HW_PATH}/apps/tsim_example/ run_verilog
-# make -C ${VTA_HW_PATH}/apps/tsim_example/ run_chisel
-# make -C ${VTA_HW_PATH}/apps/gemm/ default
+# make -C ${VTA_PATH}/apps/tsim_example/ run_verilog
+# make -C ${VTA_PATH}/apps/tsim_example/ run_chisel
+# make -C ${VTA_PATH}/apps/gemm/ default
 
 # Check style of scala code
 echo "Check style of scala code..."
-make -C ${VTA_HW_PATH}/hardware/chisel lint
+make -C ${VTA_PATH}/hardware/chisel lint
 
 # Build VTA chisel design and verilator simulator
 echo "Building VTA chisel design..."
-make -C ${VTA_HW_PATH}/hardware/chisel unittest
-make -C ${VTA_HW_PATH}/hardware/chisel cleanall
-make -C ${VTA_HW_PATH}/hardware/chisel USE_THREADS=0 lib
+make -C ${VTA_PATH}/hardware/chisel unittest
+make -C ${VTA_PATH}/hardware/chisel cleanall
+make -C ${VTA_PATH}/hardware/chisel USE_THREADS=0 lib
 
 # Run unit tests in cycle accurate simulator
 echo "Running unittest in tsim..."
-python3 -m pytest -v ${TVM_PATH}/vta/tests/python/unittest
+python3 -m pytest -v ${VTA_PATH}/tests/python/unittest
 
 # Run unit tests in cycle accurate simulator
 echo "Running integration test in tsim..."
-python3 -m pytest -v ${TVM_PATH}/vta/tests/python/integration
+python3 -m pytest -v ${VTA_PATH}/tests/python/integration
 
 # Reset default fsim simulation
-cp ${VTA_HW_PATH}/config/fsim_sample.json ${VTA_HW_PATH}/config/vta_config.json
+cp ${VTA_PATH}/config/fsim_sample.json ${VTA_PATH}/config/vta_config.json

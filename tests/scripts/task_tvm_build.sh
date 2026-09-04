@@ -17,5 +17,5 @@
 # under the License.
 
 
-export VTA_HW_PATH=`pwd`
+export VTA_PATH=`pwd`
 cd $1 && cmake .. && make $2 && cd -

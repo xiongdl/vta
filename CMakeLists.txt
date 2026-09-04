@@ -3,17 +3,17 @@ cmake_minimum_required(VERSION 3.18)
 project(vta LANGUAGES CXX)
 
 set(TVM_PATH "" CACHE PATH "Path to the TVM source tree")
-set(TVM_BUILD_DIR "" CACHE PATH "Path containing libtvm and libtvm_runtime")
+set(VTA_PATH "${CMAKE_CURRENT_SOURCE_DIR}" CACHE PATH "Path to the VTA source tree")
 
 if(NOT TVM_PATH)
   message(FATAL_ERROR "TVM_PATH is required and must point to the TVM source tree")
 endif()
 
 file(REAL_PATH "${TVM_PATH}" TVM_PATH)
-if(NOT TVM_BUILD_DIR)
-  set(TVM_BUILD_DIR "${TVM_PATH}/build")
+file(REAL_PATH "${VTA_PATH}" VTA_PATH)
+if(NOT EXISTS "${VTA_PATH}/config/vta_config.py")
+  message(FATAL_ERROR "VTA_PATH must point to the VTA source tree: ${VTA_PATH}")
 endif()
-file(REAL_PATH "${TVM_BUILD_DIR}" TVM_BUILD_DIR)
 
 set(TVM_INCLUDE_DIR "${TVM_PATH}/include")
 set(TVM_WORKSPACE_POOL_HEADER
@@ -32,13 +32,13 @@ endforeach()
 find_library(
   TVM_LIBRARY
   NAMES tvm
-  PATHS "${TVM_BUILD_DIR}"
+  PATHS "${TVM_PATH}/build"
   NO_DEFAULT_PATH
   REQUIRED)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 execute_process(
-  COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/config/vta_config.py" --target
+  COMMAND "${Python3_EXECUTABLE}" "${VTA_PATH}/config/vta_config.py" --target
   RESULT_VARIABLE VTA_CONFIG_TARGET_RESULT
   OUTPUT_VARIABLE VTA_TARGET
   OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -51,7 +51,7 @@ if(NOT VTA_TARGET STREQUAL "sim")
 endif()
 
 execute_process(
-  COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/config/vta_config.py" --defs
+  COMMAND "${Python3_EXECUTABLE}" "${VTA_PATH}/config/vta_config.py" --defs
   RESULT_VARIABLE VTA_CONFIG_DEFS_RESULT
   OUTPUT_VARIABLE VTA_DEFINITIONS_RAW
   OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -63,11 +63,11 @@ list(TRANSFORM VTA_DEFINITIONS REPLACE "^-D" "")
 
 add_library(
   vta_fsim SHARED
-  src/runtime/device_api.cc
-  src/runtime/runtime.cc
-  src/sim/sim_driver.cc
-  src/sim/sim_tlpp.cc
-  src/vmem/virtual_memory.cc)
+  "${VTA_PATH}/src/runtime/device_api.cc"
+  "${VTA_PATH}/src/runtime/runtime.cc"
+  "${VTA_PATH}/src/sim/sim_driver.cc"
+  "${VTA_PATH}/src/sim/sim_tlpp.cc"
+  "${VTA_PATH}/src/vmem/virtual_memory.cc")
 
 target_compile_features(vta_fsim PRIVATE cxx_std_17)
 target_compile_definitions(
@@ -79,7 +79,7 @@ target_compile_definitions(
 target_include_directories(
   vta_fsim
   PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${VTA_PATH}/include"
     "${TVM_INCLUDE_DIR}"
     "${TVM_PATH}/3rdparty/dlpack/include"
     "${TVM_PATH}/3rdparty/dmlc-core/include")
@@ -89,4 +89,4 @@ set_target_properties(
   vta_fsim
   PROPERTIES
     CXX_EXTENSIONS OFF
-    BUILD_RPATH "${TVM_BUILD_DIR}")
+    BUILD_RPATH "${TVM_PATH}/build")

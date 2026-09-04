@@ -69,12 +69,12 @@ ifndef TVM_PATH
    TVM_PATH := $(abspath ../../../../)
 endif
 
-ifndef VTA_HW_PATH
-   VTA_HW_PATH := $(abspath ../../)
+ifndef VTA_PATH
+   VTA_PATH := $(abspath ../../)
 endif
 
-verilator_build_dir = $(VTA_HW_PATH)/$(BUILD_NAME)/verilator
-chisel_build_dir = $(VTA_HW_PATH)/$(BUILD_NAME)/chisel
+verilator_build_dir = $(VTA_PATH)/$(BUILD_NAME)/verilator
+chisel_build_dir = $(VTA_PATH)/$(BUILD_NAME)/chisel
 
 verilator_opt = --cc
 verilator_opt += +define+RANDOMIZE_GARBAGE_ASSIGN
@@ -107,7 +107,7 @@ cxx_flags += -include V$(TOP_TEST).h
 cxx_flags += -I$(verilator_build_dir)
 cxx_flags += -I$(VERILATOR_INC_DIR)
 cxx_flags += -I$(VERILATOR_INC_DIR)/vltstd
-cxx_flags += -I$(VTA_HW_PATH)/include
+cxx_flags += -I$(VTA_PATH)/include
 cxx_flags += -I$(TVM_PATH)/include
 cxx_flags += -I$(TVM_PATH)/3rdparty/dlpack/include
 
@@ -150,14 +150,14 @@ ifneq ($(USE_THREADS), 0)
 	cxx_objs += $(verilator_build_dir)/verilated_threads.o
 endif
 
-VPATH = $(VERILATOR_INC_DIR):$(verilator_build_dir):$(VTA_HW_PATH)/hardware/dpi
+VPATH = $(VERILATOR_INC_DIR):$(verilator_build_dir):$(VTA_PATH)/hardware/dpi
 
 # The following is to be consistent with cmake
 ifeq ($(shell uname), Darwin)
-	lib_path = $(VTA_HW_PATH)/$(BUILD_NAME)/$(VTA_LIBNAME).dylib
+	lib_path = $(VTA_PATH)/$(BUILD_NAME)/$(VTA_LIBNAME).dylib
 	cxx_flags += -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
 else
-	lib_path = $(VTA_HW_PATH)/$(BUILD_NAME)/$(VTA_LIBNAME).so
+	lib_path = $(VTA_PATH)/$(BUILD_NAME)/$(VTA_LIBNAME).so
 endif
 
 default: lint lib
@@ -199,7 +199,7 @@ clean:
 	-rm -rf target project/target project/project test_run_dir
 
 cleanall:
-	-rm -rf $(VTA_HW_PATH)/$(BUILD_NAME)/chisel
-	-rm -rf $(VTA_HW_PATH)/$(BUILD_NAME)/libvta_hw.so
-	-rm -rf $(VTA_HW_PATH)/$(BUILD_NAME)/libvta_hw.dylib
-	-rm -rf $(VTA_HW_PATH)/$(BUILD_NAME)/verilator
+	-rm -rf $(VTA_PATH)/$(BUILD_NAME)/chisel
+	-rm -rf $(VTA_PATH)/$(BUILD_NAME)/libvta_hw.so
+	-rm -rf $(VTA_PATH)/$(BUILD_NAME)/libvta_hw.dylib
+	-rm -rf $(VTA_PATH)/$(BUILD_NAME)/verilator

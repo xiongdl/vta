@@ -19,7 +19,7 @@
 set -e
 set -u
 
-export VTA_HW_PATH=`pwd`
+export VTA_PATH=`pwd`
 
 cd tvm
 

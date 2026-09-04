@@ -54,7 +54,7 @@ def _load_sw():
 
     if env.TARGET == "tsim":
         lib_hw = find_libvta("libvta_hw", optional=True)
-        assert lib_hw  # make sure to make in ${VTA_HW_PATH}/hardware/chisel
+        assert lib_hw  # make sure to make in ${VTA_PATH}/hardware/chisel
         f = tvm.get_global_func("vta.tsim.init")
         m = tvm.runtime.load_module(lib_hw[0], "vta-tsim")
         f(m)

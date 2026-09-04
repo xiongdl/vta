@@ -1,0 +1,6 @@
+-Dsbt.boot.directory=dep/boot
+-Dsbt.coursier.home=dep/coursier
+-Dsbt.global.base=dep/global
+-Dsbt.ivy.home=dep/ivy
+-Dsbt.ci=true
+-Dsbt.log.noformat=true

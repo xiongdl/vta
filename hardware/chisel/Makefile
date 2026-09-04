@@ -64,7 +64,6 @@ CXX_HAS_ALIGN_NEW := $(shell [ $(CXX_MAJOR) -ge 7 ] && echo true)
 
 CONFIG_TEST = $(TOP_TEST)$(CONFIG)
 
-
 ifndef TVM_PATH
    TVM_PATH := $(abspath ../../../../)
 endif
@@ -72,6 +71,12 @@ endif
 ifndef VTA_PATH
    VTA_PATH := $(abspath ../../)
 endif
+
+SBT ?= sbt
+SBT_ENV = HOME=$(VTA_PATH)/hardware/chisel/dep/home \
+	XDG_CACHE_HOME=$(VTA_PATH)/hardware/chisel/dep/xdg-cache \
+	COURSIER_CACHE=$(VTA_PATH)/hardware/chisel/dep/coursier \
+	SBT_OPTS=-Duser.home=$(VTA_PATH)/hardware/chisel/dep/home
 
 verilator_build_dir = $(VTA_PATH)/$(BUILD_NAME)/verilator
 chisel_build_dir = $(VTA_PATH)/$(BUILD_NAME)/chisel
@@ -163,8 +168,8 @@ endif
 default: lint lib
 
 lint:
-	sbt scalastyle
-	sbt test:scalastyle
+	$(SBT_ENV) $(SBT) scalastyle
+	$(SBT_ENV) $(SBT) test:scalastyle
 
 lib: $(lib_path)
 
@@ -186,14 +191,14 @@ $(verilator_build_dir)/V$(TOP_TEST).cpp: $(chisel_build_dir)/$(TOP_TEST).$(CONFI
 
 verilog: $(chisel_build_dir)/$(TOP).$(CONFIG).sv
 $(chisel_build_dir)/$(TOP).$(CONFIG).sv:
-	sbt 'runMain vta.$(CONFIG) --target-dir $(chisel_build_dir) -o $(TOP).$(CONFIG)'
+	$(SBT_ENV) $(SBT) 'runMain vta.$(CONFIG) --target-dir $(chisel_build_dir) -o $(TOP).$(CONFIG)'
 
 verilog_test: $(chisel_build_dir)/$(TOP_TEST).$(CONFIG).sv
 $(chisel_build_dir)/$(TOP_TEST).$(CONFIG).sv:
-	sbt 'runMain vta.$(CONFIG_TEST) --target-dir $(chisel_build_dir) -o $(TOP_TEST).$(CONFIG)'
+	$(SBT_ENV) $(SBT) 'runMain vta.$(CONFIG_TEST) --target-dir $(chisel_build_dir) -o $(TOP_TEST).$(CONFIG)'
 
 unittest:
-	sbt test
+	$(SBT_ENV) $(SBT) test
 
 clean:
 	-rm -rf target project/target project/project test_run_dir

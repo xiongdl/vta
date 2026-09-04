@@ -35,8 +35,8 @@ def test_save_load_out():
         n = 6
         x = te.placeholder((n, n, env.BATCH, env.BLOCK_OUT), name="x", dtype=env.acc_dtype)
         x_buf = te.compute((n, n, env.BATCH, env.BLOCK_OUT), lambda *i: x(*i), "x_buf")
-        # insert no-op that won't be optimized away
-        y_buf = te.compute((n, n, env.BATCH, env.BLOCK_OUT), lambda *i: x_buf(*i) >> 0, "y_buf")
+        # Insert an ALU operation so the accumulator load is preserved.
+        y_buf = te.compute((n, n, env.BATCH, env.BLOCK_OUT), lambda *i: x_buf(*i) >> 1, "y_buf")
         y = te.compute(
             (n, n, env.BATCH, env.BLOCK_OUT), lambda *i: y_buf(*i).astype(env.inp_dtype), "y"
         )
@@ -61,7 +61,7 @@ def test_save_load_out():
         # verify
         dev = remote.ext_dev(0)
         x_np = np.random.randint(1, 10, size=(n, n, env.BATCH, env.BLOCK_OUT)).astype(x.dtype)
-        y_np = x_np.astype(y.dtype)
+        y_np = np.right_shift(x_np, 1).astype(y.dtype)
         x_nd = tvm.nd.array(x_np, dev)
         y_nd = tvm.nd.empty(y_np.shape, device=dev, dtype=y_np.dtype)
 
@@ -91,7 +91,7 @@ def test_padded_load():
             m = 5
             x = te.placeholder((n, m, env.BATCH, env.BLOCK_OUT), name="x", dtype=env.acc_dtype)
             x_buf = topi.nn.pad(x, pad_before, pad_after, name="y")
-            # insert no-op that won't be optimized away
+            # Insert an ALU operation so the padded accumulator load is preserved.
             y_buf = te.compute(
                 (
                     n + pad_before[0] + pad_after[0],
@@ -99,7 +99,7 @@ def test_padded_load():
                     env.BATCH,
                     env.BLOCK_OUT,
                 ),
-                lambda *i: x_buf(*i) >> 0,
+                lambda *i: x_buf(*i) >> 1,
                 "y_buf",
             )
             y = te.compute(
@@ -141,6 +141,7 @@ def test_padded_load():
                 )
             ).astype(y.dtype)
             y_np[pad_before[0] : pad_before[0] + n, pad_before[1] : pad_before[1] + m, :] = x_np
+            y_np = np.right_shift(y_np, 1).astype(y.dtype)
             x_nd = tvm.nd.array(x_np, dev)
             y_nd = tvm.nd.empty(y_np.shape, device=dev, dtype=y_np.dtype)
 

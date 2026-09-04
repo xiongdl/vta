@@ -15,22 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 
-ifeq (, $(shell which verilator))
- $(error "No Verilator in $(PATH), consider doing apt-get install verilator")
-endif
-
-# Change VERILATOR_INC_DIR if Verilator is installed on a different location
-ifeq (, $(VERILATOR_INC_DIR))
-	ifeq (, $(wildcard /usr/local/share/verilator/include/*))
-		ifeq (, $(wildcard /usr/share/verilator/include/*))
-			$(error "Verilator include directory is not set properly")
-		else
-			VERILATOR_INC_DIR := /usr/share/verilator/include
-		endif
-	else
-			VERILATOR_INC_DIR := /usr/local/share/verilator/include
-	endif
-endif
+VERILATOR ?= verilator
+VERILATOR_ROOT ?= $(shell $(VERILATOR) --getenv VERILATOR_ROOT 2>/dev/null)
+VERILATOR_INC_DIR ?= $(VERILATOR_ROOT)/include
 
 CONFIG = DefaultDe10Config
 TOP = VTA
@@ -167,6 +154,20 @@ endif
 
 default: lint lib
 
+.PHONY: check_verilator deps
+check_verilator:
+	@command -v "$(VERILATOR)" >/dev/null 2>&1 || { \
+		echo "Error: Verilator was not found in PATH." >&2; \
+		exit 1; \
+	}
+	@test -f "$(VERILATOR_INC_DIR)/verilated.cpp" || { \
+		echo "Error: Verilator include directory is invalid: $(VERILATOR_INC_DIR)" >&2; \
+		exit 1; \
+	}
+
+deps:
+	$(SBT_ENV) $(SBT) update test:compile
+
 lint:
 	$(SBT_ENV) $(SBT) scalastyle
 	$(SBT_ENV) $(SBT) test:scalastyle
@@ -179,15 +180,15 @@ $(verilator_build_dir)/%.o: %.cpp
 $(verilator_build_dir)/tsim_device.o: tsim_device.cc
 	$(CXX) -fPIC $(cxx_flags) -c $^ -o $@
 
-$(lib_path): $(verilator_build_dir)/V$(TOP_TEST).cpp $(cxx_objs)
+$(lib_path): $(verilator_build_dir)/V$(TOP_TEST).cpp $(cxx_objs) | check_verilator
 	for f in $(shell find $(verilator_build_dir)/*.cpp); do \
 		$(CXX) -fPIC $(cxx_flags) -c $${f} -o $${f}.o ; \
 	done
 	$(CXX) $(ld_flags) $(cxx_flags) $(cxx_objs) $(patsubst %.cpp,%.cpp.o,$(shell find $(verilator_build_dir)/*.cpp)) -o $@
 
 verilator: $(verilator_build_dir)/V$(TOP_TEST).cpp
-$(verilator_build_dir)/V$(TOP_TEST).cpp: $(chisel_build_dir)/$(TOP_TEST).$(CONFIG).sv
-	verilator $(verilator_opt) $<
+$(verilator_build_dir)/V$(TOP_TEST).cpp: $(chisel_build_dir)/$(TOP_TEST).$(CONFIG).sv | check_verilator
+	$(VERILATOR) $(verilator_opt) $<
 
 verilog: $(chisel_build_dir)/$(TOP).$(CONFIG).sv
 $(chisel_build_dir)/$(TOP).$(CONFIG).sv:
@@ -197,7 +198,7 @@ verilog_test: $(chisel_build_dir)/$(TOP_TEST).$(CONFIG).sv
 $(chisel_build_dir)/$(TOP_TEST).$(CONFIG).sv:
 	$(SBT_ENV) $(SBT) 'runMain vta.$(CONFIG_TEST) --target-dir $(chisel_build_dir) -o $(TOP_TEST).$(CONFIG)'
 
-unittest:
+unittest: check_verilator
 	$(SBT_ENV) $(SBT) test
 
 clean:

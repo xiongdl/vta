@@ -41,13 +41,13 @@ static VTASimDPIFunc _sim_dpi = nullptr;
 static VTAHostDPIFunc _host_dpi = nullptr;
 static VTAMemDPIFunc _mem_dpi = nullptr;
 
-void VTASimDPI(dpi8_t* wait,
-               dpi8_t* exit) {
+extern "C" void VTASimDPI(dpi8_t* wait,
+                            dpi8_t* exit) {
   assert(_sim_dpi != nullptr);
   (*_sim_dpi)(_ctx, wait, exit);
 }
 
-void VTAHostDPI(dpi8_t* req_valid,
+extern "C" void VTAHostDPI(dpi8_t* req_valid,
                 dpi8_t* req_opcode,
                 dpi8_t* req_addr,
                 dpi32_t* req_value,
@@ -60,7 +60,7 @@ void VTAHostDPI(dpi8_t* req_valid,
                resp_valid, resp_value);
 }
 
-void VTAMemDPI(dpi8_t rd_req_valid,
+extern "C" void VTAMemDPI(dpi8_t rd_req_valid,
                dpi8_t rd_req_len,
                dpi8_t rd_req_id,
                dpi64_t rd_req_addr,
@@ -159,7 +159,7 @@ int VTADPISim() {
     trace_count++;
     if ((trace_count % 1000000) == 1)
       fprintf(stderr, "[traced %luM cycles]\n", trace_count / 1000000);
-    while (top->sim_wait) {
+    while (top->sim_wait && !Verilated::gotFinish()) {
       top->clock = 0;
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
       top->sim_clock = 0;

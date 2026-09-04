@@ -81,20 +81,15 @@ class Profiler {
 
 class DPILoader {
  public:
-  ~DPILoader() {
-    dpi_->SimResume();
-    dpi_->SimFinish();
-  }
-
   void Init(Module module) {
-    mod_ = module;
-    dpi_ = this->Get();
+    dpi_ = static_cast<DPIModuleNode*>(module.operator->());
     dpi_->SimLaunch();
     dpi_->SimWait();
   }
 
   DPIModuleNode* Get() {
-    return static_cast<DPIModuleNode*>(mod_.operator->());
+    CHECK(dpi_ != nullptr) << "TSIM is not initialized";
+    return dpi_;
   }
 
   static DPILoader* Global() {
@@ -102,9 +97,8 @@ class DPILoader {
     return &inst;
   }
 
-  // TVM module
-  Module mod_;
-  // DPI Module
+  // Non-owning pointer. The vta.tsim.init caller must retain the Module
+  // until all TSIM device operations have completed.
   DPIModuleNode* dpi_{nullptr};
 };
 

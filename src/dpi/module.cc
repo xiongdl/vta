@@ -274,6 +274,7 @@ void MemDevice::WriteData(svOpenArrayHandle value, uint64_t wr_strb) {
 class DPIModule final : public DPIModuleNode {
  public:
   ~DPIModule() {
+    SimFinish();
     if (lib_handle_) Unload();
   }
 
@@ -306,6 +307,8 @@ class DPIModule final : public DPIModuleNode {
   }
 
   void SimLaunch() {
+    CHECK(!tsim_thread_.joinable())
+        << "TSIM simulation thread is already running";
     auto frun = [this]() {
       (*ftsim_)();
     };
@@ -321,7 +324,9 @@ class DPIModule final : public DPIModuleNode {
   }
 
   void SimFinish() {
+    if (!tsim_thread_.joinable()) return;
     sim_device_.Exit();
+    sim_device_.Resume();
     tsim_thread_.join();
   }
 

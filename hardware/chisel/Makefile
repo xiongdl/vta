@@ -38,7 +38,10 @@ USE_TRACE_FST = 0
 USE_TRACE_DETAILED = 0
 USE_THREADS = 0
 VTA_LIBNAME = libvta_hw
-CXX = g++
+ifeq ($(origin CXX), default)
+  CXX := c++
+endif
+CXX_STANDARD ?= c++17
 # A debug build with DEBUG = 1 is useful to trace the simulation with a
 # debugger.
 DEBUG = 0
@@ -48,6 +51,7 @@ SANITIZE = 0
 
 CXX_MAJOR := $(shell $(CXX) -dumpversion | sed 's/\..*//')
 CXX_HAS_ALIGN_NEW := $(shell [ $(CXX_MAJOR) -ge 7 ] && echo true)
+CXX_IS_CLANG := $(shell $(CXX) --version 2>/dev/null | head -1 | grep -i clang)
 
 CONFIG_TEST = $(TOP_TEST)$(CONFIG)
 
@@ -85,7 +89,12 @@ else
 	cxx_flags = -O0 -g -Wall
 endif
 
-cxx_flags += -std=c++11 -Wno-maybe-uninitialized
+cxx_flags += -std=$(CXX_STANDARD)
+ifneq ($(CXX_IS_CLANG),)
+	cxx_flags += -Wno-uninitialized
+else
+	cxx_flags += -Wno-maybe-uninitialized
+endif
 ifeq ($(CXX_HAS_ALIGN_NEW),true)
 	cxx_flags += -faligned-new
 endif
@@ -112,7 +121,10 @@ ifeq ($(SANITIZE), 1)
 	endif
 endif
 
-cxx_objs = $(verilator_build_dir)/verilated.o $(verilator_build_dir)/verilated_dpi.o $(verilator_build_dir)/tsim_device.o
+cxx_objs = $(verilator_build_dir)/tsim_device.o
+verilated_model_lib = $(verilator_build_dir)/libV$(TOP_TEST).a
+verilated_runtime_lib = $(verilator_build_dir)/libverilated.a
+verilated_lib_stamp = $(verilator_build_dir)/.vta-verilated-libs
 
 ifneq ($(USE_TRACE), 0)
 	cxx_flags += -DVM_TRACE=1
@@ -139,7 +151,6 @@ endif
 ifneq ($(USE_THREADS), 0)
 	verilator_opt += --threads $(USE_THREADS)
 	cxx_flags += -DVL_THREADED
-	cxx_objs += $(verilator_build_dir)/verilated_threads.o
 endif
 
 VPATH = $(VERILATOR_INC_DIR):$(verilator_build_dir):$(VTA_PATH)/hardware/dpi
@@ -147,7 +158,9 @@ VPATH = $(VERILATOR_INC_DIR):$(verilator_build_dir):$(VTA_PATH)/hardware/dpi
 # The following is to be consistent with cmake
 ifeq ($(shell uname), Darwin)
 	lib_path = $(VTA_PATH)/$(BUILD_NAME)/$(VTA_LIBNAME).dylib
-	cxx_flags += -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+	MACOS_SDK_PATH ?= $(shell xcrun --show-sdk-path 2>/dev/null)
+	cxx_flags += -isysroot $(MACOS_SDK_PATH)
+	ld_flags += -undefined dynamic_lookup
 else
 	lib_path = $(VTA_PATH)/$(BUILD_NAME)/$(VTA_LIBNAME).so
 endif
@@ -180,13 +193,19 @@ $(verilator_build_dir)/%.o: %.cpp
 $(verilator_build_dir)/tsim_device.o: tsim_device.cc
 	$(CXX) -fPIC $(cxx_flags) -c $^ -o $@
 
-$(lib_path): $(verilator_build_dir)/V$(TOP_TEST).cpp $(cxx_objs) | check_verilator
-	for f in $(shell find $(verilator_build_dir)/*.cpp); do \
-		$(CXX) -fPIC $(cxx_flags) -c $${f} -o $${f}.o ; \
-	done
-	$(CXX) $(ld_flags) $(cxx_flags) $(cxx_objs) $(patsubst %.cpp,%.cpp.o,$(shell find $(verilator_build_dir)/*.cpp)) -o $@
+$(lib_path): $(verilated_lib_stamp) $(cxx_objs) | check_verilator
+	$(CXX) $(ld_flags) $(cxx_flags) $(cxx_objs) $(verilated_model_lib) $(verilated_runtime_lib) -o $@
+
+$(verilated_lib_stamp): $(verilator_build_dir)/V$(TOP_TEST).cpp
+	$(MAKE) -C $(verilator_build_dir) -f V$(TOP_TEST).mk \
+		CXX="$(CXX)" CXXFLAGS="-fPIC $(cxx_flags)" \
+		libV$(TOP_TEST).a libverilated.a
+	@test -f "$(verilated_model_lib)"
+	@test -f "$(verilated_runtime_lib)"
+	@touch $@
 
 verilator: $(verilator_build_dir)/V$(TOP_TEST).cpp
+$(cxx_objs): | $(verilator_build_dir)/V$(TOP_TEST).cpp
 $(verilator_build_dir)/V$(TOP_TEST).cpp: $(chisel_build_dir)/$(TOP_TEST).$(CONFIG).sv | check_verilator
 	$(VERILATOR) $(verilator_opt) $<
 

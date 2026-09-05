@@ -159,7 +159,7 @@ int VTADPISim() {
     trace_count++;
     if ((trace_count % 1000000) == 1)
       fprintf(stderr, "[traced %luM cycles]\n", trace_count / 1000000);
-    while (top->sim_wait && !Verilated::gotFinish()) {
+    while (top->sim_wait) {
       top->clock = 0;
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
       top->sim_clock = 0;

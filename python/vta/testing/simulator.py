@@ -58,7 +58,7 @@ def _load_sw():
         f = tvm.get_global_func("vta.tsim.init")
         m = tvm.runtime.load_module(lib_hw[0], "vta-tsim")
         f(m)
-        libs.append(m)
+        return lib_hw
 
     return libs
 

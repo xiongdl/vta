@@ -18,5 +18,6 @@
 """Relay integration for the VTA external compiler."""
 
 from .contract import COMPILER_NAME, EXTERNAL_COMPILER, VTACompilerConfig
+from .partition import partition_for_vta
 
-__all__ = ["COMPILER_NAME", "EXTERNAL_COMPILER", "VTACompilerConfig"]
+__all__ = ["COMPILER_NAME", "EXTERNAL_COMPILER", "VTACompilerConfig", "partition_for_vta"]

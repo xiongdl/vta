@@ -65,7 +65,30 @@ def _has_vta_partition(mod):
 
 
 def partition_for_vta(mod, params=None, mod_name="default"):
-    """Partition supported Relay regions for the VTA external compiler."""
+    """Partition VTA-supported regions in a Relay module.
+
+    Parameters
+    ----------
+    mod : tvm.IRModule
+        The Relay module to partition.
+    params : Optional[Mapping[str, tvm.runtime.NDArray]]
+        Parameters to bind to the module's ``main`` function before matching.
+    mod_name : str
+        Module name used to derive deterministic external function symbols.
+
+    Returns
+    -------
+    tvm.IRModule
+        A typed module with supported regions outlined for the VTA compiler.
+
+    Raises
+    ------
+    TypeError
+        If ``mod`` is not an IRModule or ``params`` is not a mapping.
+    ValueError
+        If ``mod_name`` is invalid, or parameter binding requires a missing
+        ``main`` function.
+    """
     _validate_inputs(mod, params, mod_name)
     if params:
         try:

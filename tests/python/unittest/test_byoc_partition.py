@@ -16,6 +16,7 @@
 # under the License.
 
 import pytest
+import numpy as np
 import tvm
 import vta
 from tvm import relay
@@ -24,6 +25,7 @@ from tvm.relay.op.contrib import get_pattern_table
 from byoc_utils import make_qnn_conv2d_module, make_qnn_conv2d_near_miss_module
 from vta.relay.contract import VTACompilerConfig
 from vta.relay.patterns import QNN_CONV2D_COMPOSITE, check_qnn_conv2d, pattern_table
+from vta.relay.partition import _partition_pipeline, partition_for_vta
 
 
 def _merge_composites(mod):
@@ -124,3 +126,68 @@ def test_qnn_conv2d_predicate_rejects_unsupported_hardware_boundary(overrides):
     mod = make_qnn_conv2d_module(vta.get_env(), **overrides)
 
     assert not check_qnn_conv2d(_root_call(mod))
+
+
+def _vta_functions(mod):
+    return [
+        function
+        for function in mod.functions.values()
+        if isinstance(function, relay.Function)
+        and function.attrs is not None
+        and "Compiler" in function.attrs
+        and function.attrs.get_str("Compiler") == "vta"
+    ]
+
+
+def test_partition_for_vta_returns_typed_module_with_vta_region():
+    mod = make_qnn_conv2d_module(vta.get_env())
+
+    partitioned = partition_for_vta(mod)
+
+    assert isinstance(partitioned, tvm.IRModule)
+    assert partitioned["main"].checked_type is not None
+    assert len(_vta_functions(partitioned)) == 1
+
+
+def test_partition_for_vta_uses_approved_pass_order():
+    pipeline = _partition_pipeline(VTACompilerConfig.from_env(vta.get_env()), "default")
+
+    assert [compiler_pass.info.name for compiler_pass in pipeline.passes] == [
+        "InferType",
+        "MergeComposite",
+        "AnnotateTarget",
+        "sequential",
+        "sequential",
+        "InferType",
+    ]
+
+
+def test_partition_for_vta_binds_weight_parameter_before_matching():
+    env = vta.get_env()
+    mod, _ = make_qnn_conv2d_near_miss_module(env)
+    weight_shape = (env.BLOCK_OUT, env.BLOCK_IN, 3, 3)
+
+    partitioned = partition_for_vta(
+        mod,
+        params={"weight": tvm.nd.array(np.ones(weight_shape, dtype=env.wgt_dtype))},
+    )
+
+    assert len(_vta_functions(partitioned)) == 1
+
+
+@pytest.mark.parametrize("invalid_mod", [None, relay.var("data")])
+def test_partition_for_vta_rejects_non_module_input(invalid_mod):
+    with pytest.raises(TypeError, match="mod must be a tvm.IRModule"):
+        partition_for_vta(invalid_mod)
+
+
+@pytest.mark.parametrize("invalid_params", [[], "weight", 1])
+def test_partition_for_vta_rejects_non_mapping_params(invalid_params):
+    with pytest.raises(TypeError, match="params must be a mapping or None"):
+        partition_for_vta(tvm.IRModule(), params=invalid_params)
+
+
+@pytest.mark.parametrize("invalid_name", [None, "", "bad\nname", "bad\x00name"])
+def test_partition_for_vta_rejects_invalid_module_name(invalid_name):
+    with pytest.raises(ValueError, match="mod_name must be a non-empty string without control"):
+        partition_for_vta(tvm.IRModule(), mod_name=invalid_name)

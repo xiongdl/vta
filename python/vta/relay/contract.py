@@ -75,7 +75,7 @@ class VTACompilerConfig:
         host_target = getattr(env, "target_host", None)
         try:
             tvm.target.Target(host_target)
-        except (TypeError, ValueError) as err:
+        except (TypeError, ValueError, tvm.error.TVMError) as err:
             raise ValueError("target_host must define a valid TVM target") from err
 
         model = getattr(env, "MODEL", None)

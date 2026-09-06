@@ -54,6 +54,16 @@ def _partition_pipeline(config, mod_name):
     )
 
 
+def _has_vta_partition(mod):
+    return any(
+        isinstance(function, relay.Function)
+        and function.attrs is not None
+        and "Compiler" in function.attrs
+        and function.attrs.get_str("Compiler") == COMPILER_NAME
+        for function in mod.functions.values()
+    )
+
+
 def partition_for_vta(mod, params=None, mod_name="default"):
     """Partition supported Relay regions for the VTA external compiler."""
     _validate_inputs(mod, params, mod_name)
@@ -63,6 +73,9 @@ def partition_for_vta(mod, params=None, mod_name="default"):
         except tvm.error.TVMError as err:
             raise ValueError("mod must contain a main function when params are provided") from err
         mod["main"] = bind_params_by_name(main, dict(params))
+
+    if _has_vta_partition(mod):
+        return relay.transform.InferType()(mod)
 
     config = VTACompilerConfig.from_env(get_env())
     return _partition_pipeline(config, mod_name)(mod)

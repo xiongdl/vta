@@ -48,6 +48,33 @@ def _root_call(mod):
     return mod["main"].body.args[0]
 
 
+def _operator_names(expr):
+    names = []
+
+    def visit(node):
+        if isinstance(node, relay.Call) and isinstance(node.op, tvm.ir.Op):
+            names.append(node.op.name)
+
+    relay.analysis.post_order_visit(expr, visit)
+    return names
+
+
+def _find_call(expr, operator_name):
+    matches = []
+
+    def visit(node):
+        if (
+            isinstance(node, relay.Call)
+            and isinstance(node.op, tvm.ir.Op)
+            and node.op.name == operator_name
+        ):
+            matches.append(node)
+
+    relay.analysis.post_order_visit(expr, visit)
+    assert len(matches) == 1
+    return matches[0]
+
+
 @pytest.mark.parametrize("bias_kind", [None, "bias_add", "add"])
 def test_qnn_conv2d_pattern_matches_approved_forms(bias_kind):
     mod = make_qnn_conv2d_module(vta.get_env(), bias_kind=bias_kind)
@@ -191,3 +218,54 @@ def test_partition_for_vta_rejects_non_mapping_params(invalid_params):
 def test_partition_for_vta_rejects_invalid_module_name(invalid_name):
     with pytest.raises(ValueError, match="mod_name must be a non-empty string without control"):
         partition_for_vta(tvm.IRModule(), mod_name=invalid_name)
+
+
+def test_partitioned_vta_function_has_required_attributes_and_types():
+    partitioned = partition_for_vta(
+        make_qnn_conv2d_module(vta.get_env()), mod_name="fixture"
+    )
+    external = _vta_functions(partitioned)[0]
+
+    assert int(external.attrs.Primitive) == 1
+    assert int(external.attrs.Inline) == 1
+    assert external.attrs.get_str("global_symbol") == "tvmgen_fixture_vta_main_0"
+    assert external.params[0].checked_type.dtype == vta.get_env().inp_dtype
+    assert external.ret_type.dtype == vta.get_env().out_dtype
+
+
+def test_partition_keeps_host_operations_outside_vta_function():
+    partitioned = partition_for_vta(make_qnn_conv2d_module(vta.get_env()))
+    external = _vta_functions(partitioned)[0]
+
+    assert _operator_names(partitioned["main"].body) == ["abs", "transpose"]
+    assert "abs" not in external.astext(show_meta_data=False)
+    assert "transpose" not in external.astext(show_meta_data=False)
+
+
+def test_partition_owns_convolution_weight_constant():
+    partitioned = partition_for_vta(make_qnn_conv2d_module(vta.get_env()))
+    external = _vta_functions(partitioned)[0]
+    conv = _find_call(external.body, "nn.conv2d")
+
+    assert isinstance(conv.args[1], relay.Constant)
+
+
+def test_partition_symbol_is_deterministic():
+    first = partition_for_vta(make_qnn_conv2d_module(vta.get_env()), mod_name="fixture")
+    second = partition_for_vta(make_qnn_conv2d_module(vta.get_env()), mod_name="fixture")
+
+    assert tvm.ir.structural_equal(first, second)
+
+
+def test_near_miss_remains_on_host():
+    near_miss, _ = make_qnn_conv2d_near_miss_module(vta.get_env())
+
+    assert _vta_functions(partition_for_vta(near_miss)) == []
+
+
+def test_partition_for_vta_is_idempotent():
+    once = partition_for_vta(make_qnn_conv2d_module(vta.get_env()))
+
+    twice = partition_for_vta(once)
+
+    assert tvm.ir.structural_equal(once, twice)

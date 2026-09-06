@@ -53,6 +53,76 @@ def _tensor_dtype(expr):
     return checked_type.dtype
 
 
+def _static_shape(expr):
+    checked_type = getattr(expr, "checked_type", None)
+    if not isinstance(checked_type, relay.TensorType):
+        return None
+    if not all(isinstance(dim, tvm.tir.IntImm) for dim in checked_type.shape):
+        return None
+    return tuple(int(dim) for dim in checked_type.shape)
+
+
+def _scalar_integer(constant):
+    if not isinstance(constant, relay.Constant):
+        return None
+    values = constant.data.numpy()
+    if values.size != 1 or values.dtype.kind not in "iu":
+        return None
+    return int(values.item())
+
+
+def _hardware_domain_is_supported(conv2d, shifted, clipped, config):
+    data, weight = conv2d.args
+    data_shape = _static_shape(data)
+    weight_shape = _static_shape(weight)
+    output_shape = _static_shape(conv2d)
+    if data_shape is None or weight_shape is None or output_shape is None:
+        return False
+    if len(data_shape) != 4 or len(weight_shape) != 4 or len(output_shape) != 4:
+        return False
+
+    attrs = conv2d.attrs
+    if str(attrs.data_layout) != "NCHW" or str(attrs.kernel_layout) != "OIHW":
+        return False
+    if str(attrs.out_layout) not in ("", "NCHW"):
+        return False
+    if tuple(int(value) for value in attrs.kernel_size) != (3, 3):
+        return False
+    if tuple(int(value) for value in attrs.strides) != (1, 1):
+        return False
+    if tuple(int(value) for value in attrs.dilation) != (1, 1) or int(attrs.groups) != 1:
+        return False
+    if tuple(int(value) for value in attrs.padding) != (1, 1, 1, 1):
+        return False
+
+    batch, input_channels, _, _ = data_shape
+    output_channels = output_shape[1]
+    if batch <= 0 or batch % config.batch != 0:
+        return False
+    if input_channels <= 0 or input_channels % config.block_in != 0:
+        return False
+    if output_channels <= 0 or output_channels % config.block_out != 0:
+        return False
+    if int(attrs.channels) != output_channels:
+        return False
+    if weight_shape != (output_channels, input_channels, 3, 3):
+        return False
+
+    shift = _scalar_integer(shifted.args[1])
+    accumulator_bits = tvm.DataType(config.accumulator_dtype).bits
+    if shift is None or shift < 0 or shift >= accumulator_bits:
+        return False
+
+    output_type = tvm.DataType(config.output_dtype)
+    if output_type.type_code == tvm.DataType("int8").type_code:
+        minimum = -(1 << (output_type.bits - 1))
+        maximum = (1 << (output_type.bits - 1)) - 1
+    else:
+        minimum = 0
+        maximum = (1 << output_type.bits) - 1
+    return float(clipped.attrs.a_min) >= minimum and float(clipped.attrs.a_max) <= maximum
+
+
 def check_qnn_conv2d(call, config=None):
     """Return whether a matched convolution has the required constants and dtypes."""
     config = config or VTACompilerConfig.from_env(get_env())
@@ -90,6 +160,7 @@ def check_qnn_conv2d(call, config=None):
         and _tensor_dtype(conv2d) == config.accumulator_dtype
         and str(conv2d.attrs.out_dtype) == config.accumulator_dtype
         and (bias is None or _tensor_dtype(bias) == config.accumulator_dtype)
+        and _hardware_domain_is_supported(conv2d, shifted, clipped, config)
     )
 
 

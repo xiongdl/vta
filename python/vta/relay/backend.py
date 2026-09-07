@@ -20,8 +20,11 @@
 import tvm
 from tvm import relay
 
-from .contract import COMPILER_NAME
+from .contract import COMPILER_NAME, EXTERNAL_COMPILER
 from .transform import lower_vta_function
+
+
+_REGISTERED_COMPILER = None
 
 
 def _compile_vta_function(func):
@@ -46,3 +49,26 @@ def _compile_vta_function(func):
     if not module.implements_function(symbol, True):
         raise RuntimeError(f"VTA runtime module does not implement {symbol}")
     return module
+
+
+def register_byoc():
+    """Register the VTA Relay external compiler in the current TVM process."""
+    global _REGISTERED_COMPILER
+
+    existing = tvm.get_global_func(EXTERNAL_COMPILER, allow_missing=True)
+    if _REGISTERED_COMPILER is not None:
+        if existing is not None and existing.handle.value == _REGISTERED_COMPILER.handle.value:
+            return
+        raise RuntimeError(f"{EXTERNAL_COMPILER} is already registered by another callback")
+    if existing is not None:
+        raise RuntimeError(f"{EXTERNAL_COMPILER} is already registered by another callback")
+
+    try:
+        _REGISTERED_COMPILER = tvm.register_func(
+            EXTERNAL_COMPILER,
+            _compile_vta_function,
+        )
+    except tvm.error.TVMError as err:
+        raise RuntimeError(
+            f"{EXTERNAL_COMPILER} is already registered by another callback"
+        ) from err

@@ -15,6 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import subprocess
+import sys
+import textwrap
+
 import pytest
 import tvm
 import vta
@@ -37,6 +41,15 @@ def _partitioned_function(bias_kind=None):
         if isinstance(function, relay.Function)
         and function.attrs is not None
         and "Compiler" in function.attrs
+    )
+
+
+def _run_isolated_python(source):
+    return subprocess.run(
+        [sys.executable, "-c", textwrap.dedent(source)],
+        check=False,
+        capture_output=True,
+        text=True,
     )
 
 
@@ -107,3 +120,42 @@ def test_compile_vta_function_rejects_malformed_function_before_build(monkeypatc
         _compile_vta_function(external)
 
     assert not build_called
+
+
+def test_register_byoc_is_explicit_and_idempotent_in_isolated_process():
+    result = _run_isolated_python(
+        """
+        import tvm
+        import vta
+
+        assert tvm.get_global_func("relay.ext.vta", True) is None
+        vta.register_byoc()
+        first = tvm.get_global_func("relay.ext.vta")
+        vta.register_byoc()
+        second = tvm.get_global_func("relay.ext.vta")
+        assert first.handle.value == second.handle.value
+        """
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_register_byoc_rejects_foreign_callback_in_isolated_process():
+    result = _run_isolated_python(
+        """
+        import tvm
+        import vta
+
+        foreign = tvm.register_func("relay.ext.vta", lambda func: None)
+        try:
+            vta.register_byoc()
+        except RuntimeError as err:
+            assert "relay.ext.vta is already registered" in str(err)
+        else:
+            raise AssertionError("foreign callback was silently replaced")
+        current = tvm.get_global_func("relay.ext.vta")
+        assert current.handle.value == foreign.handle.value
+        """
+    )
+
+    assert result.returncode == 0, result.stderr

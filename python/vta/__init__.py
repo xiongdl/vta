@@ -36,3 +36,4 @@ __version__ = "0.1.0"
 if not tvm._ffi.base._RUNTIME_ONLY:
     from . import top
     from .build_module import build_config, lower, build
+    from .relay.backend import register_byoc

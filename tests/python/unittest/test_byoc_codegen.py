@@ -22,6 +22,7 @@ from tvm import relay
 
 from byoc_utils import make_qnn_conv2d_module
 from vta.relay import partition_for_vta
+from vta.relay.backend import _compile_vta_function
 from vta.relay.transform import lower_vta_function
 
 
@@ -53,3 +54,56 @@ def test_lowered_vta_function_builds_with_internal_constants(bias_kind):
     assert isinstance(module, tvm.runtime.Module)
     assert module.handle.value is not None
     assert len(primfunc.params) == 2
+
+
+@pytest.mark.parametrize("bias_kind", [None, "bias_add", "add"])
+def test_compile_vta_function_returns_exact_symbol(bias_kind):
+    external = _partitioned_function(bias_kind)
+    symbol = external.attrs.get_str("global_symbol")
+
+    module = _compile_vta_function(external)
+
+    assert isinstance(module, tvm.runtime.Module)
+    assert module.implements_function(symbol, True)
+
+
+def test_compile_vta_function_accepts_tvms_compiler_stripped_input():
+    external = _partitioned_function().without_attr("Compiler")
+    symbol = external.attrs.get_str("global_symbol")
+
+    module = _compile_vta_function(external)
+
+    assert module.implements_function(symbol, True)
+
+
+def test_compile_vta_function_rejects_invalid_input_before_build(monkeypatch):
+    build_called = False
+
+    def unexpected_build(*args, **kwargs):
+        nonlocal build_called
+        build_called = True
+        raise AssertionError("tvm.build must not run for invalid input")
+
+    monkeypatch.setattr(tvm, "build", unexpected_build)
+
+    with pytest.raises(TypeError, match="func must be a tvm.relay.Function"):
+        _compile_vta_function(None)
+
+    assert not build_called
+
+
+def test_compile_vta_function_rejects_malformed_function_before_build(monkeypatch):
+    external = _partitioned_function().without_attr("Primitive")
+    build_called = False
+
+    def unexpected_build(*args, **kwargs):
+        nonlocal build_called
+        build_called = True
+        raise AssertionError("tvm.build must not run for malformed input")
+
+    monkeypatch.setattr(tvm, "build", unexpected_build)
+
+    with pytest.raises(ValueError, match="Primitive=1"):
+        _compile_vta_function(external)
+
+    assert not build_called

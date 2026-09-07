@@ -292,12 +292,59 @@ def _internalize_constants(primfunc, runtime_param_count, values):
     for index in reversed(range(len(values))):
         param = constant_params[index]
         buffer = primfunc.buffer_map[param]
-        data = tvm.tir.Var(
+        device_data = tvm.tir.Var(
             f"vta_const_{index}",
             tvm.ir.PointerType(tvm.ir.PrimType(buffer.dtype), "global"),
         )
-        body = tvm.tir.stmt_functor.substitute(body, {buffer.data: data})
-        body = tvm.tir.AllocateConst(data, buffer.dtype, buffer.shape, values[index], body)
+        host_data = tvm.tir.Var(
+            f"vta_const_{index}_host",
+            tvm.ir.PointerType(tvm.ir.PrimType(buffer.dtype), "global"),
+        )
+        device_cpu_data = tvm.tir.Var(
+            f"vta_const_{index}_ptr",
+            tvm.ir.PointerType(tvm.ir.PrimType(buffer.dtype), "global"),
+        )
+        element_count = int(np.prod(values[index].shape))
+        host_buffer = tvm.tir.decl_buffer(
+            (element_count,), buffer.dtype, data=host_data, name=f"vta_const_{index}_host"
+        )
+        device_cpu_buffer = tvm.tir.decl_buffer(
+            (element_count,), buffer.dtype, data=device_cpu_data, name=f"vta_const_{index}"
+        )
+        builder = tvm.tir.ir_builder.create()
+        with builder.for_range(0, element_count, name=f"vta_const_{index}_index") as offset:
+            builder.emit(
+                tvm.tir.BufferStore(
+                    device_cpu_buffer,
+                    tvm.tir.BufferLoad(host_buffer, [offset]),
+                    [offset],
+                )
+            )
+
+        body = tvm.tir.stmt_functor.substitute(body, {buffer.data: device_data})
+        body = tvm.tir.SeqStmt([builder.get(), body])
+        body = tvm.tir.LetStmt(
+            device_cpu_data,
+            tvm.tir.call_extern(
+                "handle", "VTABufferCPUPtr", get_env().dev.command_handle, device_data
+            ),
+            body,
+        )
+        body = tvm.tir.Allocate(
+            device_data,
+            buffer.dtype,
+            (element_count,),
+            tvm.tir.const(True, "bool"),
+            body,
+        )
+        flattened = tvm.nd.array(values[index].numpy().reshape(-1))
+        body = tvm.tir.AllocateConst(
+            host_data,
+            buffer.dtype,
+            (element_count,),
+            flattened,
+            body,
+        )
     kept_params = params[:runtime_param_count] + params[-1:]
     buffer_map = {param: primfunc.buffer_map[param] for param in kept_params}
     return tvm.tir.PrimFunc(

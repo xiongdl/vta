@@ -18,6 +18,7 @@
 import json
 
 import numpy as np
+import pytest
 import tvm
 import vta
 from tvm import relay, rpc
@@ -40,14 +41,15 @@ def _remote_simulator_stats(remote):
     return json.loads(status())
 
 
-def test_exported_no_bias_graph_executes_on_fsim():
+@pytest.mark.parametrize("bias_kind", [None, "bias_add", "add"])
+def test_exported_approved_graph_executes_on_fsim(bias_kind):
     env = vta.get_env()
     if not simulator.enabled():
         raise RuntimeError(
             "VTA FSIM is unavailable; run "
             "./scripts/build_vta_lib.sh --target libvta_fsim"
         )
-    mod = make_qnn_conv2d_module(env)
+    mod = make_qnn_conv2d_module(env, bias_kind=bias_kind)
     input_shape = tuple(int(dim) for dim in mod["main"].params[0].checked_type.shape)
     input_data = ((np.arange(np.prod(input_shape)) % 17) - 8).reshape(input_shape)
     input_data = input_data.astype(env.inp_dtype)
@@ -84,7 +86,7 @@ def test_exported_no_bias_graph_executes_on_fsim():
     assert graph_inputs == ["data"]
 
     artifact_dir = utils.tempdir()
-    artifact_name = "vta_byoc_runtime.tar"
+    artifact_name = f"vta_byoc_runtime_{bias_kind or 'no_bias'}.tar"
     artifact_path = artifact_dir.relpath(artifact_name)
     factory.export_library(artifact_path)
 

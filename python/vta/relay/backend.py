@@ -35,7 +35,12 @@ def _compile_vta_function(func):
     # TECompiler removes Compiler immediately before invoking relay.ext.vta.
     # Restore the hook identity locally so the lowering boundary can perform
     # its complete validation without weakening direct callers.
-    if func.attrs is None or "Compiler" not in func.attrs:
+    compiler = (
+        func.attrs.get_str("Compiler")
+        if func.attrs is not None and "Compiler" in func.attrs
+        else None
+    )
+    if compiler is None:
         func = func.with_attr("Compiler", COMPILER_NAME)
 
     primfunc = lower_vta_function(func)

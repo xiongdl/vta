@@ -18,6 +18,7 @@
 import subprocess
 import sys
 import textwrap
+from pathlib import Path
 
 import pytest
 import tvm
@@ -45,8 +46,13 @@ def _partitioned_function(bias_kind=None):
 
 
 def _run_isolated_python(source):
+    test_dir = str(Path(__file__).resolve().parent)
     return subprocess.run(
-        [sys.executable, "-c", textwrap.dedent(source)],
+        [
+            sys.executable,
+            "-c",
+            f"import sys; sys.path.insert(0, {test_dir!r})\n{textwrap.dedent(source)}",
+        ],
         check=False,
         capture_output=True,
         text=True,
@@ -155,6 +161,43 @@ def test_register_byoc_rejects_foreign_callback_in_isolated_process():
             raise AssertionError("foreign callback was silently replaced")
         current = tvm.get_global_func("relay.ext.vta")
         assert current.handle.value == foreign.handle.value
+        """
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_registered_vta_compiler_integrates_with_relay_build():
+    result = _run_isolated_python(
+        """
+        import tvm
+        import vta
+        from tvm import relay
+
+        from byoc_utils import make_qnn_conv2d_module
+        from vta.relay import partition_for_vta
+
+        env = vta.get_env()
+        partitioned = partition_for_vta(
+            make_qnn_conv2d_module(env),
+            mod_name="integration",
+        )
+        external = next(
+            function
+            for function in partitioned.functions.values()
+            if isinstance(function, relay.Function)
+            and function.attrs is not None
+            and "Compiler" in function.attrs
+        )
+        symbol = external.attrs.get_str("global_symbol")
+        host_ir = partitioned["main"].astext(show_meta_data=False)
+        assert "abs" in host_ir
+        assert "transpose" in host_ir
+
+        vta.register_byoc()
+        target = tvm.target.Target(env.target, host=env.target_host)
+        factory = relay.build(partitioned, target=target)
+        assert factory.get_lib().implements_function(symbol, True)
         """
     )
 

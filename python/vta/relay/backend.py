@@ -56,13 +56,28 @@ def _compile_vta_function(func):
     return module
 
 
-def register_byoc():
-    """Register the VTA Relay external compiler in the current TVM process."""
+def register_byoc() -> None:
+    """Register the VTA Relay external compiler in the current TVM process.
+
+    Returns
+    -------
+    None
+        Registration is process-global and repeated calls are no-ops.
+
+    Raises
+    ------
+    RuntimeError
+        If ``relay.ext.vta`` is already owned by another callback.
+    """
     global _REGISTERED_COMPILER
 
     existing = tvm.get_global_func(EXTERNAL_COMPILER, allow_missing=True)
     if _REGISTERED_COMPILER is not None:
-        if existing is not None and existing.handle.value == _REGISTERED_COMPILER.handle.value:
+        owns_registration = (
+            existing is not None
+            and existing.handle.value == _REGISTERED_COMPILER.handle.value
+        )
+        if owns_registration:
             return
         raise RuntimeError(f"{EXTERNAL_COMPILER} is already registered by another callback")
     if existing is not None:

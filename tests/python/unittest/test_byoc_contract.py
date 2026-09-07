@@ -16,6 +16,7 @@
 # under the License.
 
 import copy
+import inspect
 from dataclasses import FrozenInstanceError
 
 import numpy as np
@@ -50,6 +51,17 @@ def test_partition_for_vta_has_public_api_documentation():
     assert documentation is not None
     assert "Parameters" in documentation
     assert "Returns" in documentation
+
+
+def test_register_byoc_is_documented_only_at_top_level():
+    documentation = vta.register_byoc.__doc__
+
+    assert callable(vta.register_byoc)
+    assert inspect.signature(vta.register_byoc).return_annotation is None
+    assert documentation is not None
+    assert "Returns" in documentation
+    assert not hasattr(vta.relay, "register_byoc")
+    assert not hasattr(vta.relay, "lower_vta_function")
 
 
 def test_compiler_config_captures_active_environment():

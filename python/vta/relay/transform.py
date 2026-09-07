@@ -17,9 +17,12 @@
 
 """Function-local Relay legalization and lowering for VTA."""
 
+import numpy as np
 import tvm
 from tvm import relay
+from tvm.relay.backend import te_compiler
 
+from ..build_module import build_config as vta_build_config
 from ..environment import get_env
 from .contract import COMPILER_NAME, VTACompilerConfig
 from .patterns import QNN_CONV2D_COMPOSITE, check_qnn_conv2d
@@ -116,20 +119,18 @@ def _pack_weight(weight, shape, config):
 
 
 def _pack_output_constant(constant, config):
-    shape = _static_shape(constant)
-    if len(shape) == 1:
-        constant = relay.reshape(constant, (shape[0], 1, 1))
-        shape = (shape[0], 1, 1)
-    channels, height, width = shape
-    reshaped = relay.reshape(
-        constant,
-        (channels // config.block_out, config.block_out, height, width, 1),
-    )
-    transposed = relay.transpose(reshaped, axes=(0, 2, 3, 4, 1))
-    return relay.broadcast_to(
-        transposed,
+    values = constant.data.numpy()
+    if values.ndim == 1:
+        values = values.reshape(values.shape[0], 1, 1)
+    channels, height, width = values.shape
+    values = values.reshape(
+        channels // config.block_out, config.block_out, height, width, 1
+    ).transpose(0, 2, 3, 4, 1)
+    values = np.broadcast_to(
+        values,
         (channels // config.block_out, height, width, config.batch, config.block_out),
     )
+    return relay.const(values.copy(), dtype=constant.data.dtype)
 
 
 def _unpack_data(data, output_shape):
@@ -200,3 +201,190 @@ def legalize_vta_function(func, config=None):
         func.attrs,
     )
     return _infer_function(legalized)
+
+
+def _packed_output(legalized):
+    reshape = legalized.body
+    if not isinstance(reshape, relay.Call) or reshape.op.name != "reshape":
+        raise ValueError("legalized VTA function must end with output reshape")
+    transpose = reshape.args[0]
+    if (
+        not isinstance(transpose, relay.Call)
+        or transpose.op.name != "transpose"
+        or tuple(int(axis) for axis in transpose.attrs.axes) != (0, 4, 1, 5, 2, 3)
+    ):
+        raise ValueError("legalized VTA function must contain the approved output unpack")
+    return transpose.args[0]
+
+
+def _has_vta_gemm_tensorization(schedule):
+    """Return whether a TE schedule contains the VTA GEMM tensor intrinsic."""
+    if schedule is None:
+        return False
+    for stage in schedule.stages:
+        for iter_var_attr in stage.iter_var_attrs.values():
+            tensor_intrin = iter_var_attr.tensor_intrin
+            if tensor_intrin is not None and tensor_intrin.name == "GEMM":
+                return True
+    return False
+
+
+def _packed_core(func, config):
+    legalized = legalize_vta_function(func, config)
+    packed_output = _packed_output(legalized)
+    packed_core = relay.Function(
+        legalized.params,
+        packed_output,
+        packed_output.checked_type,
+    ).with_attr("Primitive", 1)
+    return _infer_function(packed_core)
+
+
+def _schedule_packed_core(packed_core, config):
+    target = tvm.target.Target(config.target, host=config.host_target)
+    with vta_build_config():
+        cached = te_compiler.get().lower(packed_core, target, mod_name="vta")
+    if cached.schedule is None or not _has_vta_gemm_tensorization(cached.schedule):
+        raise ValueError("VTA lowering did not produce a GEMM-tensorized TE schedule")
+    return cached
+
+
+def _lower_to_scheduled_te(func, config=None):
+    """Legalize and schedule the packed core of one outlined VTA function."""
+    config = config or VTACompilerConfig.from_env(get_env())
+    return _schedule_packed_core(_packed_core(func, config), config)
+
+
+class _ConstantLifter(relay.ExprMutator):
+    def __init__(self):
+        super().__init__()
+        self.params = []
+        self.values = []
+
+    def visit_constant(self, constant):
+        if len(constant.checked_type.shape) == 0:
+            return constant
+        param = relay.var(f"vta_const_{len(self.params)}", type_annotation=constant.checked_type)
+        self.params.append(param)
+        self.values.append(constant.data)
+        return param
+
+
+def _lift_constants(func):
+    lifter = _ConstantLifter()
+    body = lifter.visit(func.body)
+    lifted = relay.Function(
+        list(func.params) + lifter.params,
+        body,
+        func.ret_type,
+        func.type_params,
+        func.attrs,
+    )
+    return _infer_function(lifted), lifter.values
+
+
+def _internalize_constants(primfunc, runtime_param_count, values):
+    params = list(primfunc.params)
+    constant_params = params[runtime_param_count:-1]
+    if len(constant_params) != len(values):
+        raise ValueError("VTA TIR constant parameters do not match Relay constants")
+    body = primfunc.body
+    for index in reversed(range(len(values))):
+        param = constant_params[index]
+        buffer = primfunc.buffer_map[param]
+        data = tvm.tir.Var(
+            f"vta_const_{index}",
+            tvm.ir.PointerType(tvm.ir.PrimType(buffer.dtype), "global"),
+        )
+        body = tvm.tir.stmt_functor.substitute(body, {buffer.data: data})
+        body = tvm.tir.AllocateConst(data, buffer.dtype, buffer.shape, values[index], body)
+    kept_params = params[:runtime_param_count] + params[-1:]
+    buffer_map = {param: primfunc.buffer_map[param] for param in kept_params}
+    return tvm.tir.PrimFunc(
+        kept_params,
+        body,
+        primfunc.ret_type,
+        buffer_map,
+        primfunc.attrs,
+        primfunc.span,
+    )
+
+
+def _restore_unpacked_output(primfunc, output_type, config):
+    """Make the packed TE output internal and restore the Relay NCHW ABI."""
+    packed_param = primfunc.params[-1]
+    packed_buffer = primfunc.buffer_map[packed_param]
+    packed_data = tvm.tir.Var(
+        "packed_output",
+        tvm.ir.PointerType(tvm.ir.PrimType(packed_buffer.dtype), "global"),
+    )
+    internal_buffer = tvm.tir.decl_buffer(
+        packed_buffer.shape,
+        packed_buffer.dtype,
+        name="packed_output",
+        data=packed_data,
+    )
+    body = tvm.tir.stmt_functor.substitute(primfunc.body, {packed_buffer.data: packed_data})
+
+    output_param = tvm.tir.Var("output", "handle")
+    output_buffer = tvm.tir.decl_buffer(output_type.shape, output_type.dtype, name="output")
+    builder = tvm.tir.ir_builder.create()
+    with builder.for_range(0, output_type.shape[0], name="n") as n:
+        with builder.for_range(0, output_type.shape[1], name="c") as c:
+            with builder.for_range(0, output_type.shape[2], name="h") as h:
+                with builder.for_range(0, output_type.shape[3], name="w") as w:
+                    builder.emit(
+                        tvm.tir.BufferStore(
+                            output_buffer,
+                            tvm.tir.BufferLoad(
+                                internal_buffer,
+                                [
+                                    n // config.batch,
+                                    c // config.block_out,
+                                    h,
+                                    w,
+                                    n % config.batch,
+                                    c % config.block_out,
+                                ],
+                            ),
+                            [n, c, h, w],
+                        )
+                    )
+    body = tvm.tir.Allocate(
+        packed_data,
+        packed_buffer.dtype,
+        packed_buffer.shape,
+        tvm.tir.const(True, "bool"),
+        tvm.tir.SeqStmt([body, builder.get()]),
+    )
+    buffer_map = {param: primfunc.buffer_map[param] for param in primfunc.params[:-1]}
+    buffer_map[output_param] = output_buffer
+    return tvm.tir.PrimFunc(
+        list(primfunc.params[:-1]) + [output_param],
+        body,
+        primfunc.ret_type,
+        buffer_map,
+        primfunc.attrs,
+        primfunc.span,
+    )
+
+
+def lower_vta_function(func, config=None):
+    """Lower one outlined VTA Relay function to validated scheduled TIR."""
+    config = config or VTACompilerConfig.from_env(get_env())
+    packed_core, constants = _lift_constants(_packed_core(func, config))
+    cached = _schedule_packed_core(packed_core, config)
+    symbol = func.attrs.get_str("global_symbol")
+    scheduled_primfuncs = [
+        item for item in cached.funcs.functions.values() if isinstance(item, tvm.tir.PrimFunc)
+    ]
+    if len(scheduled_primfuncs) != 1:
+        raise ValueError("VTA TE lowering must produce exactly one scheduled TIR PrimFunc")
+    primfunc = _internalize_constants(scheduled_primfuncs[0], len(func.params), constants)
+    primfunc = _restore_unpacked_output(primfunc, func.ret_type, config)
+    return (
+        primfunc
+        .with_attr("global_symbol", symbol)
+        .with_attr("target", cached.target)
+        .with_attr("relay_attrs", func.attrs)
+    )

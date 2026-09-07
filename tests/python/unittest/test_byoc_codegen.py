@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import copy
 import subprocess
 import sys
 import textwrap
@@ -23,7 +24,8 @@ from pathlib import Path
 import pytest
 import tvm
 import vta
-from tvm import relay
+import vta.relay.transform as vta_transform
+from tvm import relay, te
 
 from byoc_utils import make_qnn_conv2d_module
 from vta.relay import partition_for_vta
@@ -198,6 +200,108 @@ def test_registered_vta_compiler_integrates_with_relay_build():
         target = tvm.target.Target(env.target, host=env.target_host)
         factory = relay.build(partitioned, target=target)
         assert factory.get_lib().implements_function(symbol, True)
+        """
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("bias_kind", [None, "bias_add", "add"])
+def test_registered_vta_compiler_builds_every_approved_variant(bias_kind):
+    result = _run_isolated_python(
+        f"""
+        import tvm
+        import vta
+        from tvm import relay
+
+        from byoc_utils import make_qnn_conv2d_module
+        from vta.relay import partition_for_vta
+
+        env = vta.get_env()
+        partitioned = partition_for_vta(
+            make_qnn_conv2d_module(env, bias_kind={bias_kind!r}),
+            mod_name="variant",
+        )
+        symbol = next(
+            function.attrs.get_str("global_symbol")
+            for function in partitioned.functions.values()
+            if isinstance(function, relay.Function)
+            and function.attrs is not None
+            and "Compiler" in function.attrs
+        )
+        vta.register_byoc()
+        factory = relay.build(
+            partitioned,
+            target=tvm.target.Target(env.target, host=env.target_host),
+        )
+        assert factory.get_lib().implements_function(symbol, True)
+        """
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_compile_vta_function_rejects_active_configuration_mismatch(monkeypatch):
+    external = _partitioned_function()
+    incompatible_env = copy.copy(vta.get_env())
+    incompatible_env.BLOCK_OUT = 32
+    build_called = False
+
+    def unexpected_build(*args, **kwargs):
+        nonlocal build_called
+        build_called = True
+        raise AssertionError("tvm.build must not run for an incompatible configuration")
+
+    monkeypatch.setattr(vta_transform, "get_env", lambda: incompatible_env)
+    monkeypatch.setattr(tvm, "build", unexpected_build)
+
+    with pytest.raises(ValueError, match="active VTA configuration"):
+        _compile_vta_function(external)
+
+    assert not build_called
+
+
+def test_compile_vta_function_rejects_undefined_runtime_module(monkeypatch):
+    external = _partitioned_function()
+    symbol = external.attrs.get_str("global_symbol")
+    monkeypatch.setattr(tvm, "build", lambda *args, **kwargs: None)
+
+    with pytest.raises(RuntimeError, match=f"no runtime module for {symbol}"):
+        _compile_vta_function(external)
+
+
+def test_compile_vta_function_rejects_runtime_module_without_symbol(monkeypatch):
+    data = te.placeholder((1,), name="data")
+    output = te.compute((1,), lambda i: data[i], name="output")
+    unrelated_module = tvm.build(
+        te.create_schedule(output.op),
+        [data, output],
+        target="llvm",
+        name="unrelated",
+    )
+    external = _partitioned_function()
+    symbol = external.attrs.get_str("global_symbol")
+    monkeypatch.setattr(tvm, "build", lambda *args, **kwargs: unrelated_module)
+
+    with pytest.raises(RuntimeError, match=f"does not implement {symbol}"):
+        _compile_vta_function(external)
+
+
+def test_near_miss_build_does_not_invoke_vta_codegen():
+    result = _run_isolated_python(
+        """
+        import tvm
+        import vta
+        from tvm import relay
+
+        from byoc_utils import make_qnn_conv2d_near_miss_module
+        from vta.relay import partition_for_vta
+
+        calls = []
+        tvm.register_func("relay.ext.vta", lambda func: calls.append(func))
+        partitioned = partition_for_vta(make_qnn_conv2d_near_miss_module(vta.get_env())[0])
+        relay.build(partitioned, target="llvm")
+        assert calls == []
         """
     )
 

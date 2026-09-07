@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import json
+
 import numpy as np
 import tvm
 import vta
@@ -31,6 +33,11 @@ def _run_graph(factory, device, input_data):
     runtime.set_input("data", input_data)
     runtime.run()
     return runtime.get_output(0).numpy()
+
+
+def _remote_simulator_stats(remote):
+    status = remote.get_function("vta.simulator.profiler_status")
+    return json.loads(status())
 
 
 def test_exported_no_bias_graph_executes_on_fsim():
@@ -57,15 +64,24 @@ def test_exported_no_bias_graph_executes_on_fsim():
         and "Compiler" in function.attrs
     ]
     assert len(external_functions) == 1
+    external = external_functions[0]
+    symbol = external.attrs.get_str("global_symbol")
+    assert len(external.params) == 1
     assert "abs" in partitioned["main"].astext(show_meta_data=False)
     assert "transpose" in partitioned["main"].astext(show_meta_data=False)
 
+    simulator.clear_stats()
     vta.register_byoc()
     with vta.build_config():
         factory = relay.build(
             partitioned,
             target=tvm.target.Target(env.target, host=env.target_host),
         )
+    assert all(counter == 0 for counter in simulator.stats().values())
+
+    graph = json.loads(factory.get_graph_json())
+    graph_inputs = [graph["nodes"][index]["name"] for index in graph["arg_nodes"]]
+    assert graph_inputs == ["data"]
 
     artifact_dir = utils.tempdir()
     artifact_name = "vta_byoc_runtime.tar"
@@ -75,11 +91,19 @@ def test_exported_no_bias_graph_executes_on_fsim():
     remote = rpc.LocalSession()
     remote.upload(artifact_path)
     loaded = remote.load_module(artifact_name)
+    assert loaded.implements_function(symbol, True)
+
+    remote.get_function("vta.simulator.profiler_clear")()
     runtime = graph_executor.create(factory.get_graph_json(), loaded, remote.ext_dev(0))
     runtime.set_input("data", input_data)
+    assert all(counter == 0 for counter in _remote_simulator_stats(remote).values())
     runtime.run()
     actual = runtime.get_output(0).numpy()
+    runtime_stats = _remote_simulator_stats(remote)
 
     assert actual.shape == expected.shape
     assert actual.dtype == expected.dtype
     np.testing.assert_array_equal(actual, expected)
+    assert runtime_stats["gemm_counter"] > 0
+    assert runtime_stats["wgt_load_nbytes"] > 0
+    assert runtime_stats["out_store_nbytes"] > 0

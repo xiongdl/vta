@@ -31,3 +31,33 @@ The key features of VTA include:
   - Direct optimization and deployment of models from deep learning frameworks via TVM.
   - Customized and extensible TVM compiler back-end.
   - Flexible RPC support to ease deployment, and program FPGAs with the convenience of Python.
+
+Capability-based Relay compilation
+----------------------------------
+
+VTA can partition supported Relay regions through its explicit BYOC interface.
+Unsupported operators remain on the host, and no graph operator names or
+start/stop indices are required:
+
+```python
+import tvm
+import vta
+from tvm import relay
+
+env = vta.get_env()
+partitioned = vta.relay.partition_for_vta(mod, params=params)
+vta.register_byoc()
+
+with vta.build_config():
+    factory = relay.build(
+        partitioned,
+        target=tvm.target.Target(env.target, host=env.target_host),
+    )
+```
+
+Registration is explicit and idempotent. The outer `vta.build_config()` is
+required so host functions can safely access VTA device buffers; the external
+compiler ensures that outlined VTA functions are lowered exactly once. The
+resulting Relay build artifact uses the existing graph executor and VTA
+`ext_dev` runtime lifecycle and can be exported and loaded through TVM's normal
+runtime module APIs.

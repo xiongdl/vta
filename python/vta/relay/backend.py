@@ -45,6 +45,8 @@ def _compile_vta_function(func):
 
     primfunc = lower_vta_function(func)
     symbol = func.attrs.get_str("global_symbol")
+    # An outer Relay build may use vta.build_config() for host wrappers.  This
+    # PrimFunc has already received those VTA passes during lowering.
     with tvm.transform.PassContext(config={"tir.add_lower_pass": []}):
         module = tvm.build(
             tvm.IRModule({symbol: primfunc}),

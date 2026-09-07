@@ -318,16 +318,30 @@ def _restore_unpacked_output(primfunc, output_type, config):
         "packed_output",
         tvm.ir.PointerType(tvm.ir.PrimType(packed_buffer.dtype), "global"),
     )
+    packed_cpu_data = tvm.tir.Var(
+        "packed_output_ptr",
+        tvm.ir.PointerType(tvm.ir.PrimType(packed_buffer.dtype), "global"),
+    )
     internal_buffer = tvm.tir.decl_buffer(
         packed_buffer.shape,
         packed_buffer.dtype,
         name="packed_output",
-        data=packed_data,
+        data=packed_cpu_data,
     )
     body = tvm.tir.stmt_functor.substitute(primfunc.body, {packed_buffer.data: packed_data})
 
     output_param = tvm.tir.Var("output", "handle")
     output_buffer = tvm.tir.decl_buffer(output_type.shape, output_type.dtype, name="output")
+    output_cpu_data = tvm.tir.Var(
+        "output_ptr",
+        tvm.ir.PointerType(tvm.ir.PrimType(output_buffer.dtype), "global"),
+    )
+    output_cpu_buffer = tvm.tir.decl_buffer(
+        output_buffer.shape,
+        output_buffer.dtype,
+        name="output",
+        data=output_cpu_data,
+    )
     builder = tvm.tir.ir_builder.create()
     with builder.for_range(0, output_type.shape[0], name="n") as n:
         with builder.for_range(0, output_type.shape[1], name="c") as c:
@@ -335,7 +349,7 @@ def _restore_unpacked_output(primfunc, output_type, config):
                 with builder.for_range(0, output_type.shape[3], name="w") as w:
                     builder.emit(
                         tvm.tir.BufferStore(
-                            output_buffer,
+                            output_cpu_buffer,
                             tvm.tir.BufferLoad(
                                 internal_buffer,
                                 [
@@ -350,12 +364,28 @@ def _restore_unpacked_output(primfunc, output_type, config):
                             [n, c, h, w],
                         )
                     )
+    unpack = tvm.tir.LetStmt(
+        packed_cpu_data,
+        tvm.tir.call_extern(
+            "handle", "VTABufferCPUPtr", get_env().dev.command_handle, packed_data
+        ),
+        tvm.tir.LetStmt(
+            output_cpu_data,
+            tvm.tir.call_extern(
+                "handle",
+                "VTABufferCPUPtr",
+                get_env().dev.command_handle,
+                output_buffer.data,
+            ),
+            builder.get(),
+        ),
+    )
     body = tvm.tir.Allocate(
         packed_data,
         packed_buffer.dtype,
         packed_buffer.shape,
         tvm.tir.const(True, "bool"),
-        tvm.tir.SeqStmt([body, builder.get()]),
+        tvm.tir.SeqStmt([body, unpack]),
     )
     buffer_map = {param: primfunc.buffer_map[param] for param in primfunc.params[:-1]}
     buffer_map[output_param] = output_buffer

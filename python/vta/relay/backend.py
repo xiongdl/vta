@@ -45,10 +45,11 @@ def _compile_vta_function(func):
 
     primfunc = lower_vta_function(func)
     symbol = func.attrs.get_str("global_symbol")
-    module = tvm.build(
-        tvm.IRModule({symbol: primfunc}),
-        target=primfunc.attrs["target"],
-    )
+    with tvm.transform.PassContext(config={"tir.add_lower_pass": []}):
+        module = tvm.build(
+            tvm.IRModule({symbol: primfunc}),
+            target=primfunc.attrs["target"],
+        )
     if not isinstance(module, tvm.runtime.Module) or module.handle.value is None:
         raise RuntimeError(f"VTA compilation returned no runtime module for {symbol}")
     if not module.implements_function(symbol, True):

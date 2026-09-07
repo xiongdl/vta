@@ -24,7 +24,7 @@ import vta
 from tvm import relay, rpc
 from tvm.contrib import graph_executor, utils
 
-from byoc_utils import make_qnn_conv2d_module
+from byoc_utils import make_qnn_conv2d_module, make_qnn_conv2d_near_miss_module
 from vta.relay import partition_for_vta
 from vta.testing import simulator
 
@@ -41,14 +41,23 @@ def _remote_simulator_stats(remote):
     return json.loads(status())
 
 
-@pytest.mark.parametrize("bias_kind", [None, "bias_add", "add"])
-def test_exported_approved_graph_executes_on_fsim(bias_kind):
-    env = vta.get_env()
+def _require_fsim():
     if not simulator.enabled():
         raise RuntimeError(
             "VTA FSIM is unavailable; run "
             "./scripts/build_vta_lib.sh --target libvta_fsim"
         )
+
+
+def _require_runtime_symbol(module, symbol):
+    if not module.implements_function(symbol, True):
+        raise RuntimeError(f"loaded VTA artifact does not implement {symbol}")
+
+
+@pytest.mark.parametrize("bias_kind", [None, "bias_add", "add"])
+def test_exported_approved_graph_executes_on_fsim(bias_kind):
+    env = vta.get_env()
+    _require_fsim()
     mod = make_qnn_conv2d_module(env, bias_kind=bias_kind)
     input_shape = tuple(int(dim) for dim in mod["main"].params[0].checked_type.shape)
     input_data = ((np.arange(np.prod(input_shape)) % 17) - 8).reshape(input_shape)
@@ -93,7 +102,7 @@ def test_exported_approved_graph_executes_on_fsim(bias_kind):
     remote = rpc.LocalSession()
     remote.upload(artifact_path)
     loaded = remote.load_module(artifact_name)
-    assert loaded.implements_function(symbol, True)
+    _require_runtime_symbol(loaded, symbol)
 
     remote.get_function("vta.simulator.profiler_clear")()
     runtime = graph_executor.create(factory.get_graph_json(), loaded, remote.ext_dev(0))
@@ -109,3 +118,54 @@ def test_exported_approved_graph_executes_on_fsim(bias_kind):
     assert runtime_stats["gemm_counter"] > 0
     assert runtime_stats["wgt_load_nbytes"] > 0
     assert runtime_stats["out_store_nbytes"] > 0
+
+
+def test_near_miss_executes_only_on_host():
+    env = vta.get_env()
+    mod, _ = make_qnn_conv2d_near_miss_module(env)
+    partitioned = partition_for_vta(mod)
+
+    assert not any(
+        isinstance(function, relay.Function)
+        and function.attrs is not None
+        and "Compiler" in function.attrs
+        for function in partitioned.functions.values()
+    )
+
+    factory = relay.build(partitioned, target="llvm")
+    graph = json.loads(factory.get_graph_json())
+    assert set(graph["attrs"]["device_index"][1]) == {tvm.cpu(0).device_type}
+
+    data_shape = tuple(int(dim) for dim in mod["main"].params[0].checked_type.shape)
+    weight_shape = tuple(int(dim) for dim in mod["main"].params[1].checked_type.shape)
+    data = ((np.arange(np.prod(data_shape)) % 17) - 8).reshape(data_shape)
+    weight = ((np.arange(np.prod(weight_shape)) % 5) - 2).reshape(weight_shape)
+    runtime = graph_executor.GraphModule(factory["default"](tvm.cpu(0)))
+    runtime.set_input("data", data.astype(env.inp_dtype))
+    runtime.set_input("weight", weight.astype(env.wgt_dtype))
+    runtime.run()
+    output = runtime.get_output(0).numpy()
+
+    assert output.shape == (env.BATCH, 8, 8, env.BLOCK_OUT)
+    assert output.dtype == np.dtype(env.out_dtype)
+
+
+def test_missing_fsim_reports_setup_command(monkeypatch):
+    monkeypatch.setattr(simulator, "enabled", lambda: False)
+
+    with pytest.raises(RuntimeError, match="build_vta_lib.sh --target libvta_fsim"):
+        _require_fsim()
+
+
+def test_loaded_artifact_must_implement_expected_symbol():
+    data = tvm.te.placeholder((1,), name="data")
+    output = tvm.te.compute((1,), lambda index: data[index], name="output")
+    unrelated = tvm.build(
+        tvm.te.create_schedule(output.op),
+        [data, output],
+        target="llvm",
+        name="unrelated",
+    )
+
+    with pytest.raises(RuntimeError, match="loaded VTA artifact.*tvmgen_missing_vta_main_0"):
+        _require_runtime_symbol(unrelated, "tvmgen_missing_vta_main_0")

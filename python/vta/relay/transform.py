@@ -370,7 +370,40 @@ def _restore_unpacked_output(primfunc, output_type, config):
 
 
 def lower_vta_function(func, config=None):
-    """Lower one outlined VTA Relay function to validated scheduled TIR."""
+    """Lower one outlined VTA Relay function for the external-codegen consumer.
+
+    Parameters
+    ----------
+    func : tvm.relay.Function
+        A typed, primitive function produced by :func:`partition_for_vta`.
+        The function is revalidated against the active VTA contract before
+        legalization and lowering.
+
+    config : VTACompilerConfig, optional
+        Explicit compilation configuration.  When omitted, the configuration
+        is derived from the active VTA environment.
+
+    Returns
+    -------
+    primfunc : tvm.tir.PrimFunc
+        A single scheduled VTA PrimFunc with the Relay ``global_symbol``, VTA
+        target, and original Relay attributes attached.  Constants and packed
+        tensors are internal; parameters retain the original unpacked NCHW ABI
+        in input-then-output order.
+
+    Raises
+    ------
+    TypeError
+        If ``func`` or ``config`` has the wrong Python type.
+    ValueError
+        If the outlined function violates the VTA contract or lowering does
+        not produce exactly one GEMM-tensorized VTA PrimFunc.
+
+    Notes
+    -----
+    This is an internal boundary for ``relay.ext.vta`` and is intentionally
+    not exported from :mod:`vta.relay`.
+    """
     config = config or VTACompilerConfig.from_env(get_env())
     packed_core, constants = _lift_constants(_packed_core(func, config))
     cached = _schedule_packed_core(packed_core, config)

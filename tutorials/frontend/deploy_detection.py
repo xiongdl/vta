@@ -22,8 +22,8 @@ Deploy Pretrained Vision Detection Model from Darknet on VTA
 This tutorial provides an end-to-end demo, on how to run Darknet YoloV3-tiny
 inference onto the VTA accelerator design to perform Image detection tasks.
 It showcases Relay as a front end compiler that can perform quantization (VTA
-only supports int8/32 inference) as well as graph packing (in order to enable
-tensorization in the core) to massage the compute graph for the hardware target.
+only supports int8/32 inference) and capability-based partitioning for the VTA
+external compiler.
 """
 
 ######################################################################
@@ -61,7 +61,6 @@ from tvm.relay.testing.darknet import __darknetffi__
 from tvm.contrib import graph_executor, utils
 from tvm.contrib.download import download_testdata
 from vta.testing import simulator
-from vta.top import graph_pack
 
 # Make sure that TVM was compiled with RPC=1
 assert tvm.runtime.enabled("rpc")
@@ -122,21 +121,7 @@ env = vta.get_env()
 device = "vta"
 target = env.target if device == "vta" else env.target_vta_cpu
 
-pack_dict = {
-    "yolov3-tiny": ["nn.max_pool2d", "cast", 4, 186],
-}
-
 # Name of Darknet model to compile
-# The ``start_pack`` and ``stop_pack`` labels indicate where
-# to start and end the graph packing relay pass: in other words
-# where to start and finish offloading to VTA.
-# the number 4 indicate the ``start_pack`` index is 4, the
-# number 186 indicate the ``stop_pack index`` is 186, by using
-# name and index number, here we can located to correct place
-# where to start/end when there are multiple ``nn.max_pool2d``
-# or ``cast``, print(mod.astext(show_meta_data=False)) can help
-# to find operator name and index information.
-assert MODEL_NAME in pack_dict
 
 #############################
 # Obtain an execution remote.
@@ -186,7 +171,7 @@ ctx = remote.ext_dev(0) if device == "vta" else remote.cpu(0)
 # 1. Front end translation from Darknet into Relay module.
 # 2. Apply 8-bit quantization: here we skip the first conv layer,
 #    and dense layer which will both be executed in fp32 on the CPU.
-# 3. Perform graph packing to alter the data layout for tensorization.
+# 3. Partition supported regions for the VTA external compiler.
 # 4. Perform constant folding to reduce number of operators (e.g. eliminate batch norm multiply).
 # 5. Perform relay build to object file.
 # 6. Load the object file onto remote (FPGA device).
@@ -217,24 +202,20 @@ with autotvm.tophub.context(target):
                 round_for_shift=True,
             ):
                 mod = relay.quantize.quantize(mod, params=params)
-            # Perform graph packing and constant folding for VTA target
-            mod = graph_pack(
-                mod["main"],
-                env.BATCH,
-                env.BLOCK_OUT,
-                env.WGT_WIDTH,
-                start_name=pack_dict[MODEL_NAME][0],
-                stop_name=pack_dict[MODEL_NAME][1],
-                start_name_idx=pack_dict[MODEL_NAME][2],
-                stop_name_idx=pack_dict[MODEL_NAME][3],
+            mod = vta.relay.partition_for_vta(
+                mod, params=params, mod_name="yolov3_tiny"
             )
     else:
         mod = mod["main"]
 
-    # Compile Relay program with AlterOpLayout disabled
+    if target.device_name == "vta":
+        vta.register_byoc()
+
     with vta.build_config(disabled_pass={"AlterOpLayout", "tir.CommonSubexprElimTIR"}):
         lib = relay.build(
-            mod, target=tvm.target.Target(target, host=env.target_host), params=params
+            mod,
+            target=tvm.target.Target(target, host=env.target_host),
+            params=None if target.device_name == "vta" else params,
         )
 
     # Measure Relay build time

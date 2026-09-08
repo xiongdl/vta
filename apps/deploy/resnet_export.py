@@ -27,18 +27,19 @@ from tvm import autotvm, relay
 from tvm.relay import op, transform
 
 import vta
-from vta.top import graph_pack
-from vta.top.graphpack import run_opt_pass
 
 # Load VTA parameters from the vta/config/vta_config.json file
 ENV = vta.get_env()
 assert ENV.target.device_name == "vta"
-# Dictionary lookup for when to start/end bit packing
-PACK_DICT = {"resnet18_v1": ["nn.max_pool2d", "nn.global_avg_pool2d", None, None],}
-
 # Name of Gluon model to compile
 MODEL = "resnet18_v1"
-assert MODEL in PACK_DICT
+
+
+def _run_opt_pass(expr, opt_pass):
+    """Run a Relay pass on an expression and return the matching expression kind."""
+    mod = tvm.IRModule.from_expr(expr)
+    entry = opt_pass(mod)["main"]
+    return entry if isinstance(expr, relay.Function) else entry.body
 
 def merge_transform_to_mxnet_model(mod):
     """ Add Image Transform Logic Into Model """
@@ -59,7 +60,7 @@ def merge_transform_to_mxnet_model(mod):
 
     #merge tranform into pretrained model network
     entry = mod["main"]
-    anf = run_opt_pass(entry.body, transform.ToANormalForm())
+    anf = _run_opt_pass(entry.body, transform.ToANormalForm())
     call = anf.value
     call_data, weights = call.args
     first_op = op.nn.conv2d(
@@ -89,7 +90,7 @@ def merge_transform_to_mxnet_model(mod):
                               entry.ret_type,
                               entry.type_params,
                               entry.attrs)
-    func = run_opt_pass(func, transform.ToGraphNormalForm())
+    func = _run_opt_pass(func, transform.ToGraphNormalForm())
 
     mod['main'] = func
     return mod
@@ -116,23 +117,16 @@ def compile_mxnet_gulon_resnet(_env, _model):
         with relay.build_config(opt_level=3):
             with relay.quantize.qconfig(global_scale=8.0, skip_conv_layers=[0]):
                 mod = relay.quantize.quantize(mod, params=params)
-            # Perform graph packing and constant folding for VTA target
-            relay_prog = graph_pack(
-                mod["main"],
-                _env.BATCH,
-                _env.BLOCK_IN,
-                _env.WGT_WIDTH,
-                start_name=PACK_DICT[_model][0],
-                stop_name=PACK_DICT[_model][1])
+            mod = vta.relay.partition_for_vta(mod, params=params, mod_name=_model)
 
-    # Compile Relay program with AlterOpLayout disabled
+    vta.register_byoc()
     with relay.build_config(opt_level=3, disabled_pass={"AlterOpLayout"}):
         with vta.build_config(debug_flag=0):
-            graph, lib, params = relay.build(
-                relay_prog, target=_env.target,
-                params=params, target_host=_env.target_host)
+            factory = relay.build(
+                mod, target=tvm.target.Target(_env.target, host=_env.target_host)
+            )
 
-    return graph, lib, params
+    return factory.get_graph_json(), factory.get_lib(), factory.get_params()
 
 def export_tvm_compile(graph, lib, params, path):
     """ Export Model"""

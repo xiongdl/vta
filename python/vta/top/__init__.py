@@ -18,7 +18,6 @@
 """TVM TOPI connector, eventually most of these should go to TVM repo"""
 
 from . import bitpack
-from .graphpack import graph_pack
 from . import op
 from .vta_conv2d import conv2d_packed, schedule_conv2d_packed
 from .vta_conv2d_transpose import conv2d_transpose_packed, schedule_conv2d_transpose_packed

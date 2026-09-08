@@ -18,6 +18,7 @@
 """Migration contracts for retiring the legacy VTA graph-pack entry point."""
 
 import ast
+import importlib.util
 from pathlib import Path
 
 import pytest
@@ -80,3 +81,9 @@ def test_consumer_fixture_creates_and_builds_a_vta_partition(mod_name):
             target=tvm.target.Target(env.target, host=env.target_host),
         )
     assert factory.get_lib() is not None
+
+
+def test_graphpack_public_api_and_implementation_are_removed():
+    assert not hasattr(vta.top, "graph_pack")
+    assert importlib.util.find_spec("vta.top.graphpack") is None
+    assert not (VTA_ROOT / "python" / "vta" / "top" / "graphpack.py").exists()

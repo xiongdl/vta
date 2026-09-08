@@ -36,17 +36,55 @@ def _run_graph(factory, device, input_data):
     return runtime.get_output(0).numpy()
 
 
-def _remote_simulator_stats(remote):
-    status = remote.get_function("vta.simulator.profiler_status")
+def _simulator_setup(env):
+    if env.TARGET == "sim":
+        return (
+            "libvta_fsim",
+            "vta.simulator.profiler_clear",
+            "vta.simulator.profiler_status",
+            "./scripts/build_vta_lib.sh --target libvta_fsim",
+        )
+    if env.TARGET == "tsim":
+        return (
+            "libvta_tsim + libvta_hw",
+            "vta.tsim.profiler_clear",
+            "vta.tsim.profiler_status",
+            "./scripts/build_vta_lib.sh --target libvta_hw",
+        )
+    raise RuntimeError(
+        "VTA BYOC runtime validation requires sim or tsim, got " f"{env.TARGET}"
+    )
+
+
+def _remote_simulator_stats(remote, status_name):
+    status = remote.get_function(status_name)
     return json.loads(status())
 
 
-def _require_fsim():
-    if not simulator.enabled():
+def _require_simulator(env):
+    library, clear_name, status_name, build_command = _simulator_setup(env)
+    if (
+        tvm.get_global_func(clear_name, allow_missing=True) is None
+        or tvm.get_global_func(status_name, allow_missing=True) is None
+    ):
         raise RuntimeError(
-            "VTA FSIM is unavailable; run "
-            "./scripts/build_vta_lib.sh --target libvta_fsim"
+            f"VTA {library} is unavailable; run {build_command}"
         )
+    return clear_name, status_name
+
+
+def _assert_accelerator_activity(env, runtime_stats):
+    if env.TARGET == "sim":
+        assert runtime_stats["gemm_counter"] > 0
+        assert runtime_stats["wgt_load_nbytes"] > 0
+        assert runtime_stats["out_store_nbytes"] > 0
+        return
+    if env.TARGET == "tsim":
+        assert runtime_stats["cycle_count"] > 0
+        return
+    raise RuntimeError(
+        "VTA BYOC runtime validation requires sim or tsim, got " f"{env.TARGET}"
+    )
 
 
 def _require_runtime_symbol(module, symbol):
@@ -54,10 +92,9 @@ def _require_runtime_symbol(module, symbol):
         raise RuntimeError(f"loaded VTA artifact does not implement {symbol}")
 
 
-@pytest.mark.parametrize("bias_kind", [None, "bias_add", "add"])
-def test_exported_approved_graph_executes_on_fsim(bias_kind):
+def _test_exported_approved_graph_executes(bias_kind):
     env = vta.get_env()
-    _require_fsim()
+    clear_name, status_name = _require_simulator(env)
     mod = make_qnn_conv2d_module(env, bias_kind=bias_kind)
     input_shape = tuple(int(dim) for dim in mod["main"].params[0].checked_type.shape)
     input_data = ((np.arange(np.prod(input_shape)) % 17) - 8).reshape(input_shape)
@@ -104,20 +141,30 @@ def test_exported_approved_graph_executes_on_fsim(bias_kind):
     loaded = remote.load_module(artifact_name)
     _require_runtime_symbol(loaded, symbol)
 
-    remote.get_function("vta.simulator.profiler_clear")()
+    remote.get_function(clear_name)()
     runtime = graph_executor.create(factory.get_graph_json(), loaded, remote.ext_dev(0))
     runtime.set_input("data", input_data)
-    assert all(counter == 0 for counter in _remote_simulator_stats(remote).values())
+    assert all(counter == 0 for counter in _remote_simulator_stats(remote, status_name).values())
     runtime.run()
     actual = runtime.get_output(0).numpy()
-    runtime_stats = _remote_simulator_stats(remote)
+    runtime_stats = _remote_simulator_stats(remote, status_name)
 
     assert actual.shape == expected.shape
     assert actual.dtype == expected.dtype
     np.testing.assert_array_equal(actual, expected)
-    assert runtime_stats["gemm_counter"] > 0
-    assert runtime_stats["wgt_load_nbytes"] > 0
-    assert runtime_stats["out_store_nbytes"] > 0
+    _assert_accelerator_activity(env, runtime_stats)
+
+
+def test_exported_no_bias_graph_executes_on_simulator():
+    _test_exported_approved_graph_executes(None)
+
+
+def test_exported_bias_add_graph_executes_on_simulator():
+    _test_exported_approved_graph_executes("bias_add")
+
+
+def test_exported_broadcast_add_graph_executes_on_simulator():
+    _test_exported_approved_graph_executes("add")
 
 
 def test_near_miss_executes_only_on_host():
@@ -150,11 +197,21 @@ def test_near_miss_executes_only_on_host():
     assert output.dtype == np.dtype(env.out_dtype)
 
 
-def test_missing_fsim_reports_setup_command(monkeypatch):
-    monkeypatch.setattr(simulator, "enabled", lambda: False)
+def test_missing_simulator_reports_setup_command(monkeypatch):
+    env = vta.get_env()
+    _, clear_name, _, build_command = _simulator_setup(env)
+    monkeypatch.setattr(tvm, "get_global_func", lambda *args, **kwargs: None)
 
-    with pytest.raises(RuntimeError, match="build_vta_lib.sh --target libvta_fsim"):
-        _require_fsim()
+    with pytest.raises(RuntimeError, match=build_command):
+        _require_simulator(env)
+
+
+def test_unsupported_simulator_target_reports_target_name(monkeypatch):
+    class UnsupportedEnvironment:
+        TARGET = "pynq"
+
+    with pytest.raises(RuntimeError, match="requires sim or tsim, got pynq"):
+        _simulator_setup(UnsupportedEnvironment())
 
 
 def test_loaded_artifact_must_implement_expected_symbol():

@@ -27,10 +27,13 @@
 #include "runtime.h"
 
 #include <dmlc/logging.h>
+#include <inttypes.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <tvm/runtime/c_runtime_api.h>
 #include <vta/driver.h>
 #include <vta/hw_spec.h>
+#include <vta/runtime.h>
 
 #include <algorithm>
 #include <cassert>
@@ -1303,6 +1306,21 @@ class CommandQueue {
 };
 
 }  // namespace vta
+
+int VTACheckConfig(uint64_t expected_fingerprint) {
+  const uint64_t actual_fingerprint = VTA_ABI_FINGERPRINT;
+  if (expected_fingerprint == actual_fingerprint) {
+    return 0;
+  }
+
+  char message[160];
+  snprintf(message, sizeof(message),
+           "VTA configuration fingerprint mismatch: expected=%016" PRIx64
+           " actual=%016" PRIx64,
+           expected_fingerprint, actual_fingerprint);
+  TVMAPISetLastError(message);
+  return -1;
+}
 
 void* VTABufferAlloc(size_t size) { return vta::DataBuffer::Alloc(size); }
 

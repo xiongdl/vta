@@ -24,6 +24,7 @@ import os
 import re
 import subprocess
 import sys
+import textwrap
 from pathlib import Path
 
 import pytest
@@ -43,6 +44,7 @@ ABI_CONFIG_KEYS = (
     "LOG_WGT_BUFF_SIZE",
     "LOG_ACC_BUFF_SIZE",
 )
+BUILD_FSIM_COMMAND = "./scripts/build_vta_lib.sh --target libvta_fsim"
 
 
 def _load_config_tool():
@@ -91,6 +93,21 @@ def _reference_fingerprint(definitions, schema_version):
         sort_keys=True,
     ).encode("ascii")
     return int.from_bytes(hashlib.sha256(canonical_json).digest()[:8], "big")
+
+
+def _run_isolated_fsim(source):
+    process_env = os.environ.copy()
+    python_paths = [str(VTA_ROOT.parent / "tvm" / "python"), str(VTA_ROOT / "python")]
+    if process_env.get("PYTHONPATH"):
+        python_paths.append(process_env["PYTHONPATH"])
+    process_env["PYTHONPATH"] = os.pathsep.join(python_paths)
+    return subprocess.run(
+        [sys.executable, "-c", textwrap.dedent(source)],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=process_env,
+    )
 
 
 @pytest.fixture
@@ -206,3 +223,106 @@ def test_generated_header_is_reproducible(tmp_path, default_config):
     _run_config_tool(config_path, "--abi-header={}".format(second_header))
 
     assert first_header.read_bytes() == second_header.read_bytes()
+
+
+def test_public_runtime_header_declares_stable_c_config_check(tmp_path):
+    source_path = tmp_path / "check_runtime_abi.c"
+    source_path.write_text(
+        "#include <stdint.h>\n"
+        "#include <vta/runtime.h>\n"
+        "\n"
+        "static int (*check_config)(uint64_t) = &VTACheckConfig;\n"
+        "\n"
+        "int main(void) { return check_config(UINT64_C(0)); }\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            os.environ.get("CC", "cc"),
+            "-std=c11",
+            "-Werror",
+            "-fsyntax-only",
+            "-I{}".format(VTA_ROOT / "include"),
+            str(source_path),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_matching_fsim_config_check_is_repeatable_without_side_effects():
+    fingerprint = _fingerprint_from_cli(DEFAULT_CONFIG_PATH)
+    result = _run_isolated_fsim(
+        f"""
+        import ctypes
+
+        from vta.testing import simulator
+
+        assert simulator.enabled(), {BUILD_FSIM_COMMAND!r}
+        assert len(simulator.LIBS) == 1
+        check_config = simulator.LIBS[0].VTACheckConfig
+        check_config.argtypes = [ctypes.c_uint64]
+        check_config.restype = ctypes.c_int
+
+        simulator.clear_stats()
+        before = simulator.stats()
+        assert all(value == 0 for value in before.values())
+        assert check_config(int({fingerprint!r}, 16)) == 0
+        assert check_config(int({fingerprint!r}, 16)) == 0
+        assert simulator.stats() == before
+        """
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_fsim_config_mismatch_fails_before_activity_and_reports_both_fingerprints():
+    actual_fingerprint = _fingerprint_from_cli(DEFAULT_CONFIG_PATH)
+    expected_fingerprint = "{:016x}".format(int(actual_fingerprint, 16) ^ 1)
+    result = _run_isolated_fsim(
+        f"""
+        import ctypes
+
+        import tvm._ffi.base
+        from vta.testing import simulator
+
+        assert simulator.enabled(), {BUILD_FSIM_COMMAND!r}
+        assert len(simulator.LIBS) == 1
+        check_config = simulator.LIBS[0].VTACheckConfig
+        check_config.argtypes = [ctypes.c_uint64]
+        check_config.restype = ctypes.c_int
+
+        simulator.clear_stats()
+        before = simulator.stats()
+        assert all(value == 0 for value in before.values())
+        assert check_config(int({expected_fingerprint!r}, 16)) != 0
+        tvm._ffi.base._LIB.TVMGetLastError.restype = ctypes.c_char_p
+        diagnostic = tvm._ffi.base._LIB.TVMGetLastError().decode("utf-8").lower()
+        assert {expected_fingerprint!r} in diagnostic
+        assert {actual_fingerprint!r} in diagnostic
+        assert simulator.stats() == before
+        """
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_existing_fsim_import_and_profiler_smoke_is_preserved():
+    result = _run_isolated_fsim(
+        f"""
+        from vta.testing import simulator
+
+        assert simulator.enabled(), {BUILD_FSIM_COMMAND!r}
+        assert len(simulator.LIBS) == 1
+        simulator.clear_stats()
+        stats = simulator.stats()
+        assert stats
+        assert all(value == 0 for value in stats.values())
+        """
+    )
+
+    assert result.returncode == 0, result.stderr

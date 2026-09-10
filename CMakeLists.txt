@@ -109,7 +109,8 @@ endfunction()
 add_library(
   tvm_vta_ext SHARED
   "${VTA_PATH}/src/compiler/target.cc"
-  "${VTA_PATH}/src/compiler/relay_to_tir.cc")
+  "${VTA_PATH}/src/compiler/relay_to_tir.cc"
+  "${VTA_PATH}/src/compiler/tir_to_runtime.cc")
 configure_vta_runtime(tvm_vta_ext)
 set_target_properties(
   tvm_vta_ext

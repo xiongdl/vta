@@ -16,6 +16,7 @@
 # under the License.
 
 import json
+import re
 
 import numpy as np
 import pytest
@@ -26,7 +27,7 @@ from tvm.contrib import graph_executor, utils
 
 from byoc_utils import make_qnn_conv2d_module, make_qnn_conv2d_near_miss_module
 from vta.relay import partition_for_vta
-from vta.testing import simulator
+from vta.relay.transform import lower_vta_function
 
 
 def _run_graph(factory, device, input_data):
@@ -62,6 +63,8 @@ def _remote_simulator_stats(remote, status_name):
 
 
 def _require_simulator(env):
+    from vta.testing import simulator
+
     library, clear_name, status_name, build_command = _simulator_setup(env)
     if (
         tvm.get_global_func(clear_name, allow_missing=True) is None
@@ -70,7 +73,7 @@ def _require_simulator(env):
         raise RuntimeError(
             f"VTA {library} is unavailable; run {build_command}"
         )
-    return clear_name, status_name
+    return simulator, clear_name, status_name
 
 
 def _assert_accelerator_activity(env, runtime_stats):
@@ -94,7 +97,6 @@ def _require_runtime_symbol(module, symbol):
 
 def _test_exported_approved_graph_executes(bias_kind):
     env = vta.get_env()
-    clear_name, status_name = _require_simulator(env)
     mod = make_qnn_conv2d_module(env, bias_kind=bias_kind)
     input_shape = tuple(int(dim) for dim in mod["main"].params[0].checked_type.shape)
     input_data = ((np.arange(np.prod(input_shape)) % 17) - 8).reshape(input_shape)
@@ -118,14 +120,12 @@ def _test_exported_approved_graph_executes(bias_kind):
     assert "abs" in partitioned["main"].astext(show_meta_data=False)
     assert "transpose" in partitioned["main"].astext(show_meta_data=False)
 
-    simulator.clear_stats()
-    vta.register_byoc()
+    assert tvm.get_global_func("relay.ext.vta", allow_missing=True) is None
     with vta.build_config():
         factory = relay.build(
             partitioned,
-            target=tvm.target.Target(env.target, host=env.target_host),
+            target=tvm.target.Target("vta", host=env.target_host),
         )
-    assert all(counter == 0 for counter in simulator.stats().values())
 
     graph = json.loads(factory.get_graph_json())
     graph_inputs = [graph["nodes"][index]["name"] for index in graph["arg_nodes"]]
@@ -136,6 +136,9 @@ def _test_exported_approved_graph_executes(bias_kind):
     artifact_path = artifact_dir.relpath(artifact_name)
     factory.export_library(artifact_path)
 
+    simulator, clear_name, status_name = _require_simulator(env)
+    simulator.clear_stats()
+    assert all(counter == 0 for counter in simulator.stats().values())
     remote = rpc.LocalSession()
     remote.upload(artifact_path)
     loaded = remote.load_module(artifact_name)
@@ -226,3 +229,60 @@ def test_loaded_artifact_must_implement_expected_symbol():
 
     with pytest.raises(RuntimeError, match="loaded VTA artifact.*tvmgen_missing_vta_main_0"):
         _require_runtime_symbol(unrelated, "tvmgen_missing_vta_main_0")
+
+
+def _direct_vta_runtime_module():
+    env = vta.get_env()
+    partitioned = partition_for_vta(
+        make_qnn_conv2d_module(env),
+        mod_name="fingerprint_mismatch",
+    )
+    external = next(
+        function
+        for function in partitioned.functions.values()
+        if isinstance(function, relay.Function)
+        and function.attrs is not None
+        and "Compiler" in function.attrs
+    )
+    symbol = external.attrs.get_str("global_symbol")
+    primfunc = lower_vta_function(external)
+    target = tvm.target.Target("vta", host=env.target_host)
+    hook = target.get_kind_attr("TIRToRuntime")
+    return hook(tvm.IRModule({symbol: primfunc}), target), external, symbol
+
+
+def test_mismatched_artifact_fails_before_fsim_profiler_activity(tmp_path):
+    runtime_module, external, symbol = _direct_vta_runtime_module()
+    llvm_source = runtime_module.get_source("ll")
+    check_call = re.search(r"(@VTACheckConfig\(i64 )(-?\d+)(\))", llvm_source)
+    assert check_call is not None
+    actual_value = int(check_call.group(2)) & ((1 << 64) - 1)
+    expected_value = actual_value ^ 1
+    expected_literal = (
+        expected_value if expected_value < (1 << 63) else expected_value - (1 << 64)
+    )
+    mismatched_source = (
+        llvm_source[: check_call.start(2)]
+        + str(expected_literal)
+        + llvm_source[check_call.end(2) :]
+    )
+    mismatch_path = tmp_path / "mismatched_vta.ll"
+    mismatch_path.write_text(mismatched_source, encoding="utf-8")
+
+    simulator, _, _ = _require_simulator(vta.get_env())
+    mismatched_module = tvm.runtime.load_module(str(mismatch_path))
+    input_shape = tuple(int(dim) for dim in external.params[0].checked_type.shape)
+    output_shape = tuple(int(dim) for dim in external.ret_type.shape)
+    input_data = np.arange(np.prod(input_shape), dtype="int8").reshape(input_shape)
+    device = tvm.ext_dev(0)
+    device_input = tvm.nd.array(input_data, device=device)
+    device_output = tvm.nd.empty(output_shape, external.ret_type.dtype, device=device)
+
+    simulator.clear_stats()
+    with pytest.raises(tvm.error.TVMError) as error:
+        mismatched_module[symbol](device_input, device_output)
+
+    diagnostic = str(error.value).lower()
+    assert "{:016x}".format(expected_value) in diagnostic
+    assert "{:016x}".format(actual_value) in diagnostic
+    assert all(counter == 0 for counter in simulator.stats().values())

@@ -16,6 +16,7 @@
 # under the License.
 
 import copy
+import re
 import subprocess
 import sys
 import textwrap
@@ -59,6 +60,243 @@ def _run_isolated_python(source):
         capture_output=True,
         text=True,
     )
+
+
+def _tir_to_runtime_hook():
+    hook = tvm.target.Target("vta").get_kind_attr("TIRToRuntime")
+    assert hook is not None
+    return hook
+
+
+def _vta_tir_module(function_count=1):
+    primfunc = lower_vta_function(_partitioned_function())
+    functions = {}
+    symbols = []
+    for index in range(function_count):
+        symbol = "tvmgen_native_vta_{}".format(index)
+        functions[symbol] = primfunc.with_attr("global_symbol", symbol)
+        symbols.append(symbol)
+    target = tvm.target.Target("vta", host=vta.get_env().target_host)
+    return tvm.IRModule(functions), target, symbols
+
+
+def _llvm_function_body(llvm_source, symbol):
+    definition = re.search(
+        r'^define\b[^\n]*@"?{}"?\('.format(re.escape(symbol)),
+        llvm_source,
+        flags=re.MULTILINE,
+    )
+    assert definition is not None, symbol
+    body_end = llvm_source.find("\n}", definition.end())
+    assert body_end != -1, symbol
+    return llvm_source[definition.start() : body_end]
+
+
+@pytest.mark.parametrize("function_count", [1, 3])
+def test_tir_to_runtime_returns_one_standard_llvm_module_with_every_symbol(function_count):
+    mod, target, symbols = _vta_tir_module(function_count)
+
+    runtime_module = _tir_to_runtime_hook()(mod, target)
+
+    assert isinstance(runtime_module, tvm.runtime.Module)
+    assert runtime_module.type_key == "llvm"
+    assert runtime_module.handle.value is not None
+    assert runtime_module.imported_modules == []
+    llvm_source = runtime_module.get_source("ll")
+    for symbol in symbols:
+        assert runtime_module.implements_function(symbol, False)
+        definitions = re.findall(
+            r'^define\b[^\n]*@"?{}"?\('.format(re.escape(symbol)),
+            llvm_source,
+            flags=re.MULTILINE,
+        )
+        assert len(definitions) == 1, symbol
+
+
+def test_tir_to_runtime_flattens_external_buffers_before_llvm_codegen():
+    mod, target, symbols = _vta_tir_module()
+    original_buffers = list(mod[symbols[0]].buffer_map.values())
+    assert any(len(buffer.shape) > 1 for buffer in original_buffers)
+
+    runtime_module = _tir_to_runtime_hook()(mod, target)
+
+    assert runtime_module.implements_function(symbols[0], False)
+
+
+def test_tir_to_runtime_injects_fingerprint_check_before_every_entry_activity():
+    mod, target, symbols = _vta_tir_module(3)
+
+    runtime_module = _tir_to_runtime_hook()(mod, target)
+    llvm_source = runtime_module.get_source("ll")
+
+    for symbol in symbols:
+        body = _llvm_function_body(llvm_source, symbol)
+        check_index = body.find("VTACheckConfig")
+        assert check_index >= 0, symbol
+        activity_indices = [
+            body.find(runtime_symbol)
+            for runtime_symbol in (
+                "VTABufferAlloc",
+                "VTATLSCommandHandle",
+                "VTABufferCPUPtr",
+                "VTALoadBuffer2D",
+                "VTAStoreBuffer2D",
+                "VTAUopPush",
+                "VTAPushGEMMOp",
+                "VTAPushALUOp",
+                "VTADepPush",
+                "VTADepPop",
+                "VTASetDebugMode",
+                "VTASynchronize",
+            )
+            if body.find(runtime_symbol) >= 0
+        ]
+        assert activity_indices, symbol
+        assert check_index < min(activity_indices), symbol
+
+
+def test_tir_to_runtime_does_not_recurse_through_public_tvm_build(monkeypatch):
+    mod, target, symbols = _vta_tir_module()
+
+    def unexpected_build(*args, **kwargs):
+        raise AssertionError("native TIRToRuntime must not call public tvm.build")
+
+    monkeypatch.setattr(tvm, "build", unexpected_build)
+
+    runtime_module = _tir_to_runtime_hook()(mod, target)
+
+    assert runtime_module.implements_function(symbols[0], False)
+
+
+def test_tir_to_runtime_validates_every_function_before_codegen():
+    mod, target, symbols = _vta_tir_module(2)
+    malformed_symbol = symbols[1]
+    malformed = mod[malformed_symbol].without_attr("global_symbol")
+    mod.update_func(mod.get_global_var(malformed_symbol), malformed)
+    before = tvm.ir.save_json(mod)
+    llvm_builder = tvm.get_global_func("target.build.llvm")
+    codegen_calls = []
+
+    def tracking_llvm_builder(*args):
+        codegen_calls.append(args)
+        return llvm_builder(*args)
+
+    tvm.register_func("target.build.llvm", tracking_llvm_builder, override=True)
+
+    try:
+        with pytest.raises(tvm.error.TVMError, match=malformed_symbol):
+            _tir_to_runtime_hook()(mod, target)
+    finally:
+        tvm.register_func("target.build.llvm", llvm_builder, override=True)
+
+    assert codegen_calls == []
+    assert tvm.ir.save_json(mod) == before
+
+
+def test_tir_to_runtime_rejects_duplicate_symbols():
+    mod, target, symbols = _vta_tir_module(2)
+    duplicate = mod[symbols[1]].with_attr("global_symbol", symbols[0])
+    mod.update_func(mod.get_global_var(symbols[1]), duplicate)
+
+    with pytest.raises(tvm.error.TVMError, match="duplicate.*{}".format(symbols[0])):
+        _tir_to_runtime_hook()(mod, target)
+
+
+def test_tir_to_runtime_requires_global_var_and_symbol_to_match():
+    mod, target, symbols = _vta_tir_module()
+    symbol = symbols[0]
+    mismatched = mod[symbol].with_attr("global_symbol", "tvmgen_wrong_vta_symbol")
+    mod.update_func(mod.get_global_var(symbol), mismatched)
+
+    with pytest.raises(tvm.error.TVMError, match="{}.*global_symbol".format(symbol)):
+        _tir_to_runtime_hook()(mod, target)
+
+
+def test_tir_to_runtime_rejects_non_primfunc_and_empty_modules():
+    _, target, _ = _vta_tir_module()
+    relay_mod = tvm.IRModule.from_expr(relay.Function([], relay.const(0)))
+
+    with pytest.raises(tvm.error.TVMError, match="PrimFunc"):
+        _tir_to_runtime_hook()(relay_mod, target)
+    with pytest.raises(tvm.error.TVMError, match="empty"):
+        _tir_to_runtime_hook()(tvm.IRModule(), target)
+
+
+def test_tir_to_runtime_rejects_wrong_target_and_missing_llvm_host():
+    mod, target, symbols = _vta_tir_module()
+
+    with pytest.raises(tvm.error.TVMError, match="vta target"):
+        _tir_to_runtime_hook()(mod, tvm.target.Target("llvm"))
+    with pytest.raises(tvm.error.TVMError, match="LLVM host"):
+        _tir_to_runtime_hook()(mod, tvm.target.Target("vta"))
+
+    symbol = symbols[0]
+    wrong_function_target = mod[symbol].with_attr("target", tvm.target.Target("llvm"))
+    mod.update_func(mod.get_global_var(symbol), wrong_function_target)
+    with pytest.raises(tvm.error.TVMError, match="{}.*target".format(symbol)):
+        _tir_to_runtime_hook()(mod, target)
+
+
+def test_tir_to_runtime_rejects_malformed_runtime_calls():
+    mod, target, symbols = _vta_tir_module()
+    symbol = symbols[0]
+    malformed = mod[symbol].with_body(
+        tvm.tir.Evaluate(tvm.tir.call_extern("int32", "VTAUnknownRuntimeCall"))
+    )
+    mod.update_func(mod.get_global_var(symbol), malformed)
+
+    with pytest.raises(tvm.error.TVMError, match="{}.*runtime call".format(symbol)):
+        _tir_to_runtime_hook()(mod, target)
+
+
+def test_compile_and_export_do_not_load_or_require_fsim():
+    result = _run_isolated_python(
+        """
+        import os
+        import sys
+        import tempfile
+
+        import tvm
+        import vta
+        from tvm import relay
+
+        from byoc_utils import make_qnn_conv2d_module
+        from vta.relay import partition_for_vta
+
+        assert "vta.testing.simulator" not in sys.modules
+        assert tvm.get_global_func("vta.simulator.profiler_status", True) is None
+        assert tvm.get_global_func("relay.ext.vta", True) is None
+
+        env = vta.get_env()
+        partitioned = partition_for_vta(
+            make_qnn_conv2d_module(env),
+            mod_name="compile_without_fsim",
+        )
+        symbol = next(
+            function.attrs.get_str("global_symbol")
+            for function in partitioned.functions.values()
+            if isinstance(function, relay.Function)
+            and function.attrs is not None
+            and "Compiler" in function.attrs
+        )
+        with vta.build_config():
+            factory = relay.build(
+                partitioned,
+                target=tvm.target.Target("vta", host=env.target_host),
+            )
+        assert factory.get_lib().get_function(symbol, True) is not None
+
+        with tempfile.TemporaryDirectory() as artifact_dir:
+            artifact_path = os.path.join(artifact_dir, "compile_without_fsim.tar")
+            factory.export_library(artifact_path)
+            assert os.path.isfile(artifact_path)
+        assert "vta.testing.simulator" not in sys.modules
+        assert tvm.get_global_func("vta.simulator.profiler_status", True) is None
+        assert tvm.get_global_func("relay.ext.vta", True) is None
+        """
+    )
+
+    assert result.returncode == 0, result.stderr
 
 
 @pytest.mark.parametrize("bias_kind", [None, "bias_add", "add"])
@@ -199,7 +437,7 @@ def test_registered_vta_compiler_integrates_with_relay_build():
         vta.register_byoc()
         target = tvm.target.Target(env.target, host=env.target_host)
         factory = relay.build(partitioned, target=target)
-        assert factory.get_lib().implements_function(symbol, True)
+        assert factory.get_lib().get_function(symbol, True) is not None
         """
     )
 
@@ -234,7 +472,7 @@ def test_registered_vta_compiler_builds_every_approved_variant(bias_kind):
             partitioned,
             target=tvm.target.Target(env.target, host=env.target_host),
         )
-        assert factory.get_lib().implements_function(symbol, True)
+        assert factory.get_lib().get_function(symbol, True) is not None
         """
     )
 

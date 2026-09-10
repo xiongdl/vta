@@ -18,8 +18,9 @@
  */
 
 #include <tvm/relay/transform.h>
-#include <tvm/runtime/logging.h>
 #include <tvm/target/target.h>
+#include <tvm/tir/function.h>
+#include <tvm/tir/transform.h>
 
 namespace tvm {
 
@@ -29,16 +30,51 @@ namespace vta {
 
 transform::Pass RelayToTIR();
 
-runtime::Module TIRToRuntime(IRModule, Target) {
-  LOG(FATAL) << "VTA TIRToRuntime is not implemented by the target-extension foundation";
-  return runtime::Module();
+runtime::Module TIRToRuntime(IRModule mod, Target target);
+
+transform::Pass ModernRelayToTIR() {
+  auto bind_vta_target = tir::transform::CreatePrimFuncPass(
+      [](tir::PrimFunc func, IRModule, transform::PassContext) {
+        Optional<Target> lowered_target = func->GetAttr<Target>(tvm::attr::kTarget);
+        if (!lowered_target.defined() || !lowered_target.value()->HasKey("vta")) {
+          return func;
+        }
+        Optional<Target> host = lowered_target.value()->GetHost();
+        ICHECK(host.defined() && host.value()->kind->name == "llvm")
+            << "VTA RelayToTIR produced a PrimFunc without an LLVM host target";
+        return WithAttrs(std::move(func),
+                         {{tvm::attr::kTarget, Target::WithHost(Target("vta"), host.value())},
+                          {"vta.route_to_runtime", Bool(true)}});
+      },
+      0, "vta.BindModernTarget", {});
+  auto route_to_runtime = tir::transform::CreatePrimFuncPass(
+      [](tir::PrimFunc func, IRModule, transform::PassContext) {
+        if (!func->HasNonzeroAttr("vta.route_to_runtime")) {
+          return func;
+        }
+        Target host = func->GetAttr<Target>(tvm::attr::kTarget).value();
+        return WithAttrs(
+            std::move(func),
+            {{tvm::attr::kTarget, Target::WithHost(Target("vta"), host)},
+             {tvm::attr::kCallingConv, Integer(CallingConv::kDeviceKernelLaunch)}});
+      },
+      0, "vta.RouteToRuntime", {});
+  transform::Sequential pipeline = transform::Sequential(
+      {RelayToTIR(), bind_vta_target, tir::transform::MakePackedAPI(), route_to_runtime},
+      "vta.ModernRelayToTIR");
+  runtime::TypedPackedFunc<IRModule(IRModule, transform::PassContext)> pass_func =
+      [pipeline](IRModule mod, transform::PassContext pass_context) {
+        return pipeline(std::move(mod), pass_context);
+      };
+  return transform::CreateModulePass(pass_func, 0, "vta.ModernRelayToTIR", {});
 }
 
 }  // namespace vta
 
 TVM_REGISTER_TARGET_KIND("vta", kDLExtDev)
+    .set_default_keys({"cpu"})
     .set_attr<Bool>("use_device_api", Bool(true))
-    .set_attr<relay::transform::FTVMRelayToTIR>(attr::kRelayToTIR, vta::RelayToTIR())
+    .set_attr<relay::transform::FTVMRelayToTIR>(attr::kRelayToTIR, vta::ModernRelayToTIR())
     .set_attr<FTVMTIRToRuntime>("TIRToRuntime", vta::TIRToRuntime);
 
 }  // namespace tvm

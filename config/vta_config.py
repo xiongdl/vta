@@ -15,10 +15,29 @@
 # specific language governing permissions and limitations
 # under the License.
 """VTA config tool"""
+import argparse
+import hashlib
+import json
 import os
 import sys
-import json
-import argparse
+
+
+ABI_SCHEMA_VERSION = 1
+ABI_DEFINITION_KEYS = (
+    "LOG_INP_WIDTH",
+    "LOG_WGT_WIDTH",
+    "LOG_ACC_WIDTH",
+    "LOG_OUT_WIDTH",
+    "LOG_BATCH",
+    "LOG_BLOCK",
+    "LOG_BLOCK_IN",
+    "LOG_BLOCK_OUT",
+    "LOG_UOP_BUFF_SIZE",
+    "LOG_INP_BUFF_SIZE",
+    "LOG_WGT_BUFF_SIZE",
+    "LOG_ACC_BUFF_SIZE",
+    "LOG_OUT_BUFF_SIZE",
+)
 
 
 def pkg_config(cfg):
@@ -31,6 +50,59 @@ def pkg_config(cfg):
     exec(compile(open(pkg_config_py, "rb").read(), pkg_config_py, "exec"), libpkg, libpkg)
     PkgConfig = libpkg["PkgConfig"]
     return PkgConfig(cfg)
+
+
+def abi_definitions(cfg):
+    """Return the sorted compile definitions that form the VTA ABI."""
+    pkg = pkg_config(dict(cfg))
+    return tuple(
+        sorted("VTA_{}={}".format(key, getattr(pkg, key)) for key in ABI_DEFINITION_KEYS)
+    )
+
+
+def abi_fingerprint(definitions, schema_version=ABI_SCHEMA_VERSION):
+    """Return the canonical 64-bit VTA ABI fingerprint."""
+    normalized_definitions = sorted(
+        definition[2:] if definition.startswith("-D") else definition
+        for definition in definitions
+    )
+    descriptor = {
+        "definitions": normalized_definitions,
+        "schema_version": schema_version,
+    }
+    canonical_json = json.dumps(
+        descriptor,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("ascii")
+    return int.from_bytes(hashlib.sha256(canonical_json).digest()[:8], "big")
+
+
+def gen_abi_header(definitions):
+    """Return a reproducible C/C++ header containing the VTA ABI values."""
+    fingerprint = abi_fingerprint(definitions)
+    return (
+        "#ifndef VTA_ABI_CONFIG_H_\n"
+        "#define VTA_ABI_CONFIG_H_\n"
+        "\n"
+        "#include <stdint.h>\n"
+        "\n"
+        "#define VTA_ABI_SCHEMA_VERSION {}\n"
+        "#define VTA_ABI_FINGERPRINT UINT64_C(0x{:016x})\n"
+        "\n"
+        "#endif  // VTA_ABI_CONFIG_H_\n"
+    ).format(ABI_SCHEMA_VERSION, fingerprint)
+
+
+def write_abi_header(path, definitions):
+    """Write the canonical ABI header, creating its parent directory."""
+    output_path = os.path.abspath(os.path.expanduser(path))
+    output_dir = os.path.dirname(output_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+    with open(output_path, "w", encoding="ascii", newline="\n") as output_file:
+        output_file.write(gen_abi_header(definitions))
 
 def gen_target_name(pkg):
     """Emit target macro from config"""
@@ -120,6 +192,10 @@ def main():
                         help="print the target")
     parser.add_argument("--cfg-str", action="store_true",
                         help="print the configuration string")
+    parser.add_argument("--abi-fingerprint", action="store_true",
+                        help="print the canonical VTA ABI fingerprint")
+    parser.add_argument("--abi-header", type=str, default="",
+                        help="write the canonical VTA ABI header")
     parser.add_argument("--get-inp-mem-banks", action="store_true",
                         help="returns number of input memory banks")
     parser.add_argument("--get-inp-mem-width", action="store_true",
@@ -222,6 +298,15 @@ def main():
 
     if args.cfg_str:
         print(pkg.TARGET + "_" + pkg.bitstream)
+
+    if args.abi_fingerprint or args.abi_header:
+        definitions = abi_definitions(cfg)
+
+        if args.abi_fingerprint:
+            print("{:016x}".format(abi_fingerprint(definitions)))
+
+        if args.abi_header:
+            write_abi_header(args.abi_header, definitions)
 
     if args.get_inp_mem_banks:
         print(pkg.inp_mem_banks)

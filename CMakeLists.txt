@@ -57,6 +57,21 @@ endif()
 separate_arguments(VTA_DEFINITIONS NATIVE_COMMAND "${VTA_DEFINITIONS_RAW}")
 list(TRANSFORM VTA_DEFINITIONS REPLACE "^-D" "")
 
+set(VTA_GENERATED_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/include")
+set(VTA_ABI_HEADER "${VTA_GENERATED_INCLUDE_DIR}/vta/abi_config.h")
+execute_process(
+  COMMAND "${Python3_EXECUTABLE}" "${VTA_PATH}/config/vta_config.py"
+          "--use-cfg=${VTA_CONFIG_FILE}" "--abi-header=${VTA_ABI_HEADER}"
+  RESULT_VARIABLE VTA_ABI_HEADER_RESULT)
+if(NOT VTA_ABI_HEADER_RESULT EQUAL 0)
+  message(FATAL_ERROR "Failed to generate the VTA ABI configuration header")
+endif()
+set_property(
+  DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+  "${VTA_CONFIG_FILE}"
+  "${VTA_PATH}/config/vta_config.py"
+  "${VTA_PATH}/config/pkg_config.py")
+
 set(
   VTA_RUNTIME_SOURCES
   "${VTA_PATH}/src/runtime/device_api.cc"
@@ -73,10 +88,16 @@ function(configure_vta_runtime target)
   target_include_directories(
     ${target}
     PRIVATE
+      "${VTA_GENERATED_INCLUDE_DIR}"
       "${VTA_PATH}/include"
       "${TVM_INCLUDE_DIR}"
       "${TVM_PATH}/3rdparty/dlpack/include"
       "${TVM_PATH}/3rdparty/dmlc-core/include")
+  if(MSVC)
+    target_compile_options(${target} PRIVATE "/FI${VTA_ABI_HEADER}")
+  else()
+    target_compile_options(${target} PRIVATE -include "${VTA_ABI_HEADER}")
+  endif()
   target_link_libraries(${target} PRIVATE "${TVM_LIBRARY}")
   set_target_properties(
     ${target}

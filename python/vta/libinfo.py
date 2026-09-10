@@ -22,6 +22,12 @@ import os
 from .environment import get_vta_hw_path
 
 
+_COMPILER_EXTENSION = "libtvm-vta-ext"
+_COMPILER_EXTENSION_BUILD_COMMAND = (
+    "./scripts/build_vta_lib.sh --target libtvm-vta-ext"
+)
+
+
 def _get_lib_name(lib_name):
     """Get lib name with extension
 
@@ -67,3 +73,16 @@ def find_libvta(lib_vta, optional=False):
             "Cannot find the files.\n" + "List of candidates:\n" + str("\n".join(lib_path))
         )
     return lib_found
+
+
+def _find_compiler_extension():
+    """Return the compiler extension path or raise an actionable import error."""
+    library_name = _get_lib_name(_COMPILER_EXTENSION)
+    library_path = os.path.join(get_vta_hw_path(), "build", library_name)
+    if not os.path.exists(library_path):
+        raise ImportError(
+            "Cannot find the VTA compiler extension.\n"
+            f"Searched: {library_path}\n"
+            f"Build it with: {_COMPILER_EXTENSION_BUILD_COMMAND}"
+        )
+    return library_path

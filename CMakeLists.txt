@@ -85,6 +85,14 @@ function(configure_vta_runtime target)
       BUILD_RPATH "${TVM_PATH}/build")
 endfunction()
 
+add_library(tvm_vta_ext SHARED "${VTA_PATH}/src/compiler/target.cc")
+configure_vta_runtime(tvm_vta_ext)
+set_target_properties(
+  tvm_vta_ext
+  PROPERTIES
+    OUTPUT_NAME "tvm-vta-ext"
+    PREFIX "lib")
+
 add_library(
   vta_fsim SHARED
   ${VTA_RUNTIME_SOURCES}

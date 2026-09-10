@@ -17,10 +17,35 @@
 
 """Shared Relay fixtures for VTA BYOC tests."""
 
+import os
+import subprocess
+import sys
+import textwrap
+from pathlib import Path
+
 import numpy as np
 
 import tvm
 from tvm import relay
+
+
+def run_isolated_python(source, *, env=None):
+    """Run source in a clean Python process with the test helpers importable."""
+    process_env = os.environ.copy()
+    if env is not None:
+        process_env.update(env)
+    test_dir = str(Path(__file__).resolve().parent)
+    return subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            f"import sys; sys.path.insert(0, {test_dir!r})\n{textwrap.dedent(source)}",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=process_env,
+    )
 
 
 def _make_qnn_conv2d_module(

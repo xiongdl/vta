@@ -26,7 +26,11 @@ import vta
 import vta.relay
 from tvm import relay
 
-from byoc_utils import make_qnn_conv2d_module, make_qnn_conv2d_near_miss_module
+from byoc_utils import (
+    make_qnn_conv2d_module,
+    make_qnn_conv2d_near_miss_module,
+    run_isolated_python,
+)
 from vta.relay import COMPILER_NAME, EXTERNAL_COMPILER, VTACompilerConfig, partition_for_vta
 
 
@@ -95,8 +99,18 @@ def test_compiler_config_is_deterministic_for_the_same_environment():
     assert VTACompilerConfig.from_env(env) == VTACompilerConfig.from_env(env)
 
 
-def test_importing_relay_package_does_not_register_external_compiler():
-    assert tvm.get_global_func(EXTERNAL_COMPILER, allow_missing=True) is None
+def test_importing_vta_does_not_register_external_compiler():
+    result = run_isolated_python(
+        f"""
+        import tvm
+
+        assert tvm.get_global_func({EXTERNAL_COMPILER!r}, allow_missing=True) is None
+        import vta
+        assert tvm.get_global_func({EXTERNAL_COMPILER!r}, allow_missing=True) is None
+        """
+    )
+
+    assert result.returncode == 0, result.stderr
 
 
 def test_compiler_config_rejects_invalid_block_factor():

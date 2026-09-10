@@ -19,26 +19,28 @@
 
 #include <tvm/relay/transform.h>
 #include <tvm/runtime/logging.h>
-#include <tvm/target/target.h>
+#include <tvm/runtime/registry.h>
 
 namespace tvm {
-
-using FTVMTIRToRuntime = runtime::TypedPackedFunc<runtime::Module(IRModule, Target)>;
-
 namespace vta {
 
-transform::Pass RelayToTIR();
+namespace {
 
-runtime::Module TIRToRuntime(IRModule, Target) {
-  LOG(FATAL) << "VTA TIRToRuntime is not implemented by the target-extension foundation";
-  return runtime::Module();
+constexpr const char* kRelayToTIRBridge = "vta.relay._relay_to_tir";
+
+}  // namespace
+
+transform::Pass RelayToTIR() {
+  runtime::TypedPackedFunc<IRModule(IRModule, transform::PassContext)> pass_func =
+      [](IRModule mod, transform::PassContext) {
+        const runtime::PackedFunc* relay_to_tir = runtime::Registry::Get(kRelayToTIRBridge);
+        ICHECK(relay_to_tir) << "VTA RelayToTIR bridge is unavailable; import the full vta package "
+                               "before Relay lowering";
+        mod = (*relay_to_tir)(mod);
+        return mod;
+      };
+  return transform::CreateModulePass(pass_func, 0, "vta.RelayToTIR", {});
 }
 
 }  // namespace vta
-
-TVM_REGISTER_TARGET_KIND("vta", kDLExtDev)
-    .set_attr<Bool>("use_device_api", Bool(true))
-    .set_attr<relay::transform::FTVMRelayToTIR>(attr::kRelayToTIR, vta::RelayToTIR())
-    .set_attr<FTVMTIRToRuntime>("TIRToRuntime", vta::TIRToRuntime);
-
 }  // namespace tvm

@@ -498,3 +498,79 @@ def lower_vta_function(func, config=None):
         .with_attr("target", cached.target)
         .with_attr("relay_attrs", func.attrs)
     )
+
+
+def _is_vta_relay_function(func):
+    return (
+        isinstance(func, relay.Function)
+        and func.attrs is not None
+        and "Compiler" in func.attrs
+        and func.attrs.get_str("Compiler") == COMPILER_NAME
+    )
+
+
+def _collect_vta_relay_functions(mod):
+    """Collect unique global and nested VTA Relay functions."""
+    functions = []
+    seen_handles = set()
+
+    def collect(node):
+        if not _is_vta_relay_function(node):
+            return
+        handle = node.handle.value
+        if handle not in seen_handles:
+            seen_handles.add(handle)
+            functions.append(node)
+
+    for function in mod.functions.values():
+        if not isinstance(function, relay.Function):
+            continue
+        collect(function)
+        relay.analysis.post_order_visit(function.body, collect)
+    return functions
+
+
+def _global_vta_relay_functions(mod):
+    return sorted(
+        (
+            (global_var, function)
+            for global_var, function in mod.functions.items()
+            if _is_vta_relay_function(function)
+        ),
+        key=lambda item: item[0].name_hint,
+    )
+
+
+@tvm.register_func("vta.relay._relay_to_tir")
+def _relay_to_tir(mod):
+    """Lower every VTA Relay function in one module transaction."""
+    if not isinstance(mod, tvm.IRModule):
+        raise TypeError("mod must be a tvm.IRModule")
+
+    config = VTACompilerConfig.from_env(get_env())
+    vta_functions = _collect_vta_relay_functions(mod)
+    for function in vta_functions:
+        _validate_vta_function(function, config)
+    if not vta_functions:
+        return mod
+
+    outlined = relay.transform.OutlineCompilerFunctionsWithExistingGlobalSymbols(
+        COMPILER_NAME
+    )(mod)
+    global_functions = _global_vta_relay_functions(outlined)
+    global_handles = {function.handle.value for _, function in global_functions}
+    remaining_nested = [
+        function
+        for function in _collect_vta_relay_functions(outlined)
+        if function.handle.value not in global_handles
+    ]
+    if remaining_nested:
+        raise ValueError("all nested Compiler='vta' functions must be directly outlineable")
+
+    lowered_functions = [
+        (global_var, lower_vta_function(function, config))
+        for global_var, function in global_functions
+    ]
+    for global_var, primfunc in lowered_functions:
+        outlined.update_func(global_var, primfunc)
+    return outlined

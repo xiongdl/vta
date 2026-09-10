@@ -36,9 +36,21 @@ from vta.relay.transform import (
 )
 
 
-def _partitioned_function(bias_kind=None):
+SUPPORTED_LAYOUTS = [
+    pytest.param("NCHW", "OIHW", id="nchw-oihw"),
+    pytest.param("NHWC", "HWIO", id="nhwc-hwio"),
+]
+SUPPORTED_KERNELS = [
+    pytest.param((1, 1), (0, 0), id="1x1"),
+    pytest.param((3, 3), (1, 1), id="3x3"),
+]
+SUPPORTED_STRIDES = [pytest.param((1, 1), id="stride1"), pytest.param((2, 2), id="stride2")]
+
+
+def _partitioned_function(bias_kind=None, **overrides):
     mod = partition_for_vta(
-        make_qnn_conv2d_module(vta.get_env(), bias_kind=bias_kind), mod_name="lowering"
+        make_qnn_conv2d_module(vta.get_env(), bias_kind=bias_kind, **overrides),
+        mod_name="lowering",
     )
     return next(
         function
@@ -158,16 +170,36 @@ def _find_operator_calls(expr, operator_name):
     return calls
 
 
-def test_legalize_vta_function_packs_core_convolution():
+@pytest.mark.parametrize(("data_layout", "kernel_layout"), SUPPORTED_LAYOUTS)
+@pytest.mark.parametrize(("kernel_size", "padding"), SUPPORTED_KERNELS)
+@pytest.mark.parametrize("strides", SUPPORTED_STRIDES)
+def test_legalize_vta_function_packs_full_convolution_matrix(
+    data_layout, kernel_layout, kernel_size, padding, strides
+):
     env = vta.get_env()
-    legalized = legalize_vta_function(_partitioned_function())
+    legalized = legalize_vta_function(
+        _partitioned_function(
+            data_layout=data_layout,
+            kernel_layout=kernel_layout,
+            kernel_size=kernel_size,
+            padding=padding,
+            strides=strides,
+        )
+    )
     conv = _find_operator_calls(legalized.body, "nn.conv2d")[0]
 
     assert str(conv.attrs.data_layout) == f"NCHW{env.BATCH}n{env.BLOCK_IN}c"
     assert str(conv.attrs.kernel_layout) == f"OIHW{env.BLOCK_OUT}o{env.BLOCK_IN}i"
     assert str(conv.attrs.out_layout) == f"NCHW{env.BATCH}n{env.BLOCK_OUT}c"
     assert tuple(int(dim) for dim in conv.args[0].checked_type.shape) == (1, 1, 8, 8, 1, 16)
-    assert tuple(int(dim) for dim in conv.args[1].checked_type.shape) == (1, 1, 3, 3, 16, 16)
+    assert tuple(int(dim) for dim in conv.args[1].checked_type.shape) == (
+        1,
+        1,
+        *kernel_size,
+        16,
+        16,
+    )
+    assert tuple(int(value) for value in conv.attrs.strides) == strides
 
 
 def test_legalize_vta_function_keeps_input_and_output_block_factors_distinct():
@@ -185,23 +217,62 @@ def test_legalize_vta_function_keeps_input_and_output_block_factors_distinct():
     )
 
 
-def test_legalize_vta_function_uses_approved_pack_permutations():
-    legalized = legalize_vta_function(_partitioned_function())
+@pytest.mark.parametrize(
+    ("data_layout", "kernel_layout", "data_axes", "weight_axes", "unpack_axes"),
+    [
+        pytest.param(
+            "NCHW",
+            "OIHW",
+            (0, 2, 4, 5, 1, 3),
+            (0, 2, 4, 5, 1, 3),
+            (0, 4, 1, 5, 2, 3),
+            id="nchw-oihw",
+        ),
+        pytest.param(
+            "NHWC",
+            "HWIO",
+            (0, 4, 2, 3, 1, 5),
+            (4, 2, 0, 1, 5, 3),
+            (0, 4, 2, 3, 1, 5),
+            id="nhwc-hwio",
+        ),
+    ],
+)
+def test_legalize_vta_function_uses_layout_specific_pack_permutations(
+    data_layout, kernel_layout, data_axes, weight_axes, unpack_axes
+):
+    legalized = legalize_vta_function(
+        _partitioned_function(data_layout=data_layout, kernel_layout=kernel_layout)
+    )
     conv = _find_operator_calls(legalized.body, "nn.conv2d")[0]
     data_transpose = conv.args[0]
     weight_transpose = conv.args[1]
 
     assert data_transpose.op.name == "transpose"
-    assert tuple(int(axis) for axis in data_transpose.attrs.axes) == (0, 2, 4, 5, 1, 3)
+    assert tuple(int(axis) for axis in data_transpose.attrs.axes) == data_axes
     assert data_transpose.args[0].op.name == "reshape"
     assert weight_transpose.op.name == "transpose"
-    assert tuple(int(axis) for axis in weight_transpose.attrs.axes) == (0, 2, 4, 5, 1, 3)
+    assert tuple(int(axis) for axis in weight_transpose.attrs.axes) == weight_axes
     assert weight_transpose.args[0].op.name == "reshape"
     assert isinstance(weight_transpose.args[0].args[0], relay.Constant)
+    unpack_transpose = legalized.body.args[0]
+    assert unpack_transpose.op.name == "transpose"
+    assert tuple(int(axis) for axis in unpack_transpose.attrs.axes) == unpack_axes
 
 
-def test_legalize_vta_function_preserves_unpacked_external_abi():
-    external = _partitioned_function()
+@pytest.mark.parametrize(("data_layout", "kernel_layout"), SUPPORTED_LAYOUTS)
+@pytest.mark.parametrize(("kernel_size", "padding"), SUPPORTED_KERNELS)
+@pytest.mark.parametrize("strides", SUPPORTED_STRIDES)
+def test_legalize_vta_function_preserves_original_unpacked_external_abi(
+    data_layout, kernel_layout, kernel_size, padding, strides
+):
+    external = _partitioned_function(
+        data_layout=data_layout,
+        kernel_layout=kernel_layout,
+        kernel_size=kernel_size,
+        padding=padding,
+        strides=strides,
+    )
     legalized = legalize_vta_function(external)
 
     assert tvm.ir.structural_equal(external.params[0].checked_type, legalized.params[0].checked_type)
@@ -209,7 +280,6 @@ def test_legalize_vta_function_preserves_unpacked_external_abi():
     assert legalized.body.op.name == "reshape"
     unpack_transpose = legalized.body.args[0]
     assert unpack_transpose.op.name == "transpose"
-    assert tuple(int(axis) for axis in unpack_transpose.attrs.axes) == (0, 4, 1, 5, 2, 3)
     assert legalized.attrs.get_str("global_symbol") == external.attrs.get_str("global_symbol")
 
 
@@ -304,9 +374,21 @@ def _canonicalize_packed_convolution(func):
     return relay.Function(func.params, body, func.ret_type)
 
 
+@pytest.mark.parametrize(("data_layout", "kernel_layout"), SUPPORTED_LAYOUTS)
+@pytest.mark.parametrize(("kernel_size", "padding"), SUPPORTED_KERNELS)
+@pytest.mark.parametrize("strides", SUPPORTED_STRIDES)
 @pytest.mark.parametrize("bias_kind", [None, "bias_add", "add"])
-def test_legalized_relay_matches_composite_numerically(bias_kind):
-    external = _partitioned_function(bias_kind)
+def test_legalized_relay_matches_every_supported_composite_exactly(
+    data_layout, kernel_layout, kernel_size, padding, strides, bias_kind
+):
+    external = _partitioned_function(
+        bias_kind,
+        data_layout=data_layout,
+        kernel_layout=kernel_layout,
+        kernel_size=kernel_size,
+        padding=padding,
+        strides=strides,
+    )
     legalized = legalize_vta_function(external)
     input_shape = tuple(int(dim) for dim in external.params[0].checked_type.shape)
     input_data = np.arange(np.prod(input_shape), dtype="int8").reshape(input_shape) % 8
@@ -317,16 +399,36 @@ def test_legalized_relay_matches_composite_numerically(bias_kind):
     np.testing.assert_array_equal(actual, expected)
 
 
-@pytest.mark.parametrize("bias_kind", [None, "bias_add", "add"])
-def test_lower_to_scheduled_te_uses_packed_output_and_vta_target(bias_kind):
+@pytest.mark.parametrize(("data_layout", "kernel_layout"), SUPPORTED_LAYOUTS)
+@pytest.mark.parametrize(("kernel_size", "padding"), SUPPORTED_KERNELS)
+@pytest.mark.parametrize("strides", SUPPORTED_STRIDES)
+def test_lower_to_scheduled_te_uses_packed_output_and_vta_target_across_matrix(
+    data_layout, kernel_layout, kernel_size, padding, strides
+):
     env = vta.get_env()
 
-    cached = _lower_to_scheduled_te(_partitioned_function(bias_kind))
+    cached = _lower_to_scheduled_te(
+        _partitioned_function(
+            data_layout=data_layout,
+            kernel_layout=kernel_layout,
+            kernel_size=kernel_size,
+            padding=padding,
+            strides=strides,
+        )
+    )
 
     assert cached.schedule is not None
     assert len(cached.inputs) == 1
     assert len(cached.outputs) == 1
-    assert tuple(int(dim) for dim in cached.outputs[0].shape) == (1, 1, 8, 8, 1, 16)
+    spatial = 8 if strides == (1, 1) else 4
+    assert tuple(int(dim) for dim in cached.outputs[0].shape) == (
+        1,
+        1,
+        spatial,
+        spatial,
+        1,
+        16,
+    )
     assert cached.outputs[0].dtype == env.out_dtype
     assert cached.target.kind.name == "ext_dev"
     assert "vta" in cached.target.keys
@@ -336,8 +438,21 @@ def test_lower_to_scheduled_te_uses_packed_output_and_vta_target(bias_kind):
     assert "elemwise" in stage_tags
 
 
-def test_lower_to_scheduled_te_tensorizes_vta_gemm():
-    cached = _lower_to_scheduled_te(_partitioned_function())
+@pytest.mark.parametrize(("data_layout", "kernel_layout"), SUPPORTED_LAYOUTS)
+@pytest.mark.parametrize(("kernel_size", "padding"), SUPPORTED_KERNELS)
+@pytest.mark.parametrize("strides", SUPPORTED_STRIDES)
+def test_lower_to_scheduled_te_tensorizes_vta_gemm_across_matrix(
+    data_layout, kernel_layout, kernel_size, padding, strides
+):
+    cached = _lower_to_scheduled_te(
+        _partitioned_function(
+            data_layout=data_layout,
+            kernel_layout=kernel_layout,
+            kernel_size=kernel_size,
+            padding=padding,
+            strides=strides,
+        )
+    )
 
     assert _has_vta_gemm_tensorization(cached.schedule)
 
@@ -349,9 +464,19 @@ def test_unscheduled_te_graph_has_no_vta_gemm_tensorization():
     assert not _has_vta_gemm_tensorization(unscheduled)
 
 
-@pytest.mark.parametrize("bias_kind", [None, "bias_add", "add"])
-def test_lower_vta_function_returns_metadata_preserving_primfunc(bias_kind):
-    external = _partitioned_function(bias_kind)
+@pytest.mark.parametrize(("data_layout", "kernel_layout"), SUPPORTED_LAYOUTS)
+@pytest.mark.parametrize(("kernel_size", "padding"), SUPPORTED_KERNELS)
+@pytest.mark.parametrize("strides", SUPPORTED_STRIDES)
+def test_lower_vta_function_returns_metadata_preserving_primfunc_across_matrix(
+    data_layout, kernel_layout, kernel_size, padding, strides
+):
+    external = _partitioned_function(
+        data_layout=data_layout,
+        kernel_layout=kernel_layout,
+        kernel_size=kernel_size,
+        padding=padding,
+        strides=strides,
+    )
 
     primfunc = lower_vta_function(external)
 
@@ -364,8 +489,12 @@ def test_lower_vta_function_returns_metadata_preserving_primfunc(bias_kind):
     assert primfunc.attrs["relay_attrs"].get_str("Compiler") == "vta"
     buffers = [primfunc.buffer_map[param] for param in primfunc.params]
     assert len(buffers) == 2
-    assert tuple(int(dim) for dim in buffers[0].shape) == (1, 16, 8, 8)
-    assert tuple(int(dim) for dim in buffers[1].shape) == (1, 16, 8, 8)
+    assert tuple(int(dim) for dim in buffers[0].shape) == tuple(
+        int(dim) for dim in external.params[0].checked_type.shape
+    )
+    assert tuple(int(dim) for dim in buffers[1].shape) == tuple(
+        int(dim) for dim in external.ret_type.shape
+    )
 
 
 @pytest.mark.parametrize("bias_kind", [None, "bias_add", "add"])

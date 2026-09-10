@@ -82,22 +82,35 @@ def _hardware_domain_is_supported(conv2d, shifted, clipped, config):
         return False
 
     attrs = conv2d.attrs
-    if str(attrs.data_layout) != "NCHW" or str(attrs.kernel_layout) != "OIHW":
+    data_layout = str(attrs.data_layout)
+    kernel_layout = str(attrs.kernel_layout)
+    if (data_layout, kernel_layout) not in (("NCHW", "OIHW"), ("NHWC", "HWIO")):
         return False
-    if str(attrs.out_layout) not in ("", "NCHW"):
+    output_layout = str(attrs.out_layout) or data_layout
+    if output_layout != data_layout:
         return False
-    if tuple(int(value) for value in attrs.kernel_size) != (3, 3):
+    kernel_size = tuple(int(value) for value in attrs.kernel_size)
+    if kernel_size not in ((1, 1), (3, 3)):
         return False
-    if tuple(int(value) for value in attrs.strides) != (1, 1):
+    strides = tuple(int(value) for value in attrs.strides)
+    if strides not in ((1, 1), (2, 2)):
         return False
     if tuple(int(value) for value in attrs.dilation) != (1, 1) or int(attrs.groups) != 1:
         return False
-    if tuple(int(value) for value in attrs.padding) != (1, 1, 1, 1):
+    padding = tuple(int(value) for value in attrs.padding)
+    if len(padding) != 4 or any(value < 0 for value in padding):
         return False
 
-    batch, input_channels, _, _ = data_shape
-    output_channels = output_shape[1]
-    if batch <= 0 or batch % config.batch != 0:
+    if data_layout == "NCHW":
+        batch, input_channels, input_height, input_width = data_shape
+        output_batch, output_channels, output_height, output_width = output_shape
+        expected_weight_shape = (output_channels, input_channels, *kernel_size)
+    else:
+        batch, input_height, input_width, input_channels = data_shape
+        output_batch, output_height, output_width, output_channels = output_shape
+        expected_weight_shape = (*kernel_size, input_channels, output_channels)
+
+    if batch <= 0 or batch != output_batch or batch % config.batch != 0:
         return False
     if input_channels <= 0 or input_channels % config.block_in != 0:
         return False
@@ -105,7 +118,15 @@ def _hardware_domain_is_supported(conv2d, shifted, clipped, config):
         return False
     if int(attrs.channels) != output_channels:
         return False
-    if weight_shape != (output_channels, input_channels, 3, 3):
+    if weight_shape != expected_weight_shape:
+        return False
+    padded_height = input_height + padding[0] + padding[2]
+    padded_width = input_width + padding[1] + padding[3]
+    expected_height = (padded_height - kernel_size[0]) // strides[0] + 1
+    expected_width = (padded_width - kernel_size[1]) // strides[1] + 1
+    if expected_height <= 0 or expected_width <= 0:
+        return False
+    if (output_height, output_width) != (expected_height, expected_width):
         return False
 
     shift = _scalar_integer(shifted.args[1])

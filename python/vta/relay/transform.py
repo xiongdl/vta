@@ -86,42 +86,79 @@ def _static_shape(expr):
     return tuple(int(dim) for dim in expr.checked_type.shape)
 
 
-def _pack_data(data, shape, config):
-    batch, channels, height, width = shape
+def _pack_data(data, shape, data_layout, config):
+    if data_layout == "NCHW":
+        batch, channels, height, width = shape
+        reshaped = relay.reshape(
+            data,
+            (
+                batch // config.batch,
+                config.batch,
+                channels // config.block_in,
+                config.block_in,
+                height,
+                width,
+            ),
+        )
+        return relay.transpose(reshaped, axes=(0, 2, 4, 5, 1, 3))
+
+    batch, height, width, channels = shape
     reshaped = relay.reshape(
         data,
         (
             batch // config.batch,
             config.batch,
-            channels // config.block_in,
-            config.block_in,
             height,
             width,
+            channels // config.block_in,
+            config.block_in,
         ),
     )
-    return relay.transpose(reshaped, axes=(0, 2, 4, 5, 1, 3))
+    return relay.transpose(reshaped, axes=(0, 4, 2, 3, 1, 5))
 
 
-def _pack_weight(weight, shape, config):
-    output_channels, input_channels, height, width = shape
+def _pack_weight(weight, shape, kernel_layout, config):
+    if kernel_layout == "OIHW":
+        output_channels, input_channels, height, width = shape
+        reshaped = relay.reshape(
+            weight,
+            (
+                output_channels // config.block_out,
+                config.block_out,
+                input_channels // config.block_in,
+                config.block_in,
+                height,
+                width,
+            ),
+        )
+        return relay.transpose(reshaped, axes=(0, 2, 4, 5, 1, 3))
+
+    height, width, input_channels, output_channels = shape
     reshaped = relay.reshape(
         weight,
         (
-            output_channels // config.block_out,
-            config.block_out,
-            input_channels // config.block_in,
-            config.block_in,
             height,
             width,
+            input_channels // config.block_in,
+            config.block_in,
+            output_channels // config.block_out,
+            config.block_out,
         ),
     )
-    return relay.transpose(reshaped, axes=(0, 2, 4, 5, 1, 3))
+    return relay.transpose(reshaped, axes=(4, 2, 0, 1, 5, 3))
 
 
-def _pack_output_constant(constant, config):
+def _pack_output_constant(constant, output_layout, config):
     values = constant.data.numpy()
+    channel_vector = values.ndim == 1
     if values.ndim == 1:
         values = values.reshape(values.shape[0], 1, 1)
+    elif values.ndim == 4 and values.shape[0] == 1:
+        values = values[0]
+    if values.ndim != 3:
+        raise ValueError("VTA output constant must be a channel bias")
+    if output_layout == "NHWC" and not channel_vector:
+        values = values.transpose(2, 0, 1)
     channels, height, width = values.shape
     values = values.reshape(
         channels // config.block_out, config.block_out, height, width, 1
@@ -133,8 +170,9 @@ def _pack_output_constant(constant, config):
     return relay.const(values.copy(), dtype=constant.data.dtype)
 
 
-def _unpack_data(data, output_shape):
-    transposed = relay.transpose(data, axes=(0, 4, 1, 5, 2, 3))
+def _unpack_data(data, output_shape, output_layout):
+    axes = (0, 4, 1, 5, 2, 3) if output_layout == "NCHW" else (0, 4, 2, 3, 1, 5)
+    transposed = relay.transpose(data, axes=axes)
     return relay.reshape(transposed, output_shape)
 
 
@@ -163,10 +201,18 @@ def legalize_vta_function(func, config=None):
     if not isinstance(conv2d.op, tvm.ir.Op) or conv2d.op.name != "nn.conv2d":
         raise ValueError("VTA composite does not contain the expected nn.conv2d")
 
+    data_layout = str(conv2d.attrs.data_layout)
+    kernel_layout = str(conv2d.attrs.kernel_layout)
+    output_layout = str(conv2d.attrs.out_layout) or data_layout
     packed_data = _pack_data(
-        composite_call.args[0], _static_shape(composite_call.args[0]), config
+        composite_call.args[0],
+        _static_shape(composite_call.args[0]),
+        data_layout,
+        config,
     )
-    packed_weight = _pack_weight(conv2d.args[1], _static_shape(conv2d.args[1]), config)
+    packed_weight = _pack_weight(
+        conv2d.args[1], _static_shape(conv2d.args[1]), kernel_layout, config
+    )
     packed_data_layout = f"NCHW{config.batch}n{config.block_in}c"
     packed_output_layout = f"NCHW{config.batch}n{config.block_out}c"
     packed_kernel_layout = f"OIHW{config.block_out}o{config.block_in}i"
@@ -187,12 +233,12 @@ def legalize_vta_function(func, config=None):
     packed_accumulator = packed_conv2d
     if bias is not None:
         packed_accumulator = relay.add(
-            packed_accumulator, _pack_output_constant(bias, config)
+            packed_accumulator, _pack_output_constant(bias, output_layout, config)
         )
     packed_shifted = relay.right_shift(packed_accumulator, shifted.args[1])
     packed_clipped = relay.clip(packed_shifted, clipped.attrs.a_min, clipped.attrs.a_max)
     packed_cast = relay.cast(packed_clipped, composite_body.attrs.dtype)
-    unpacked = _unpack_data(packed_cast, _static_shape(composite_body))
+    unpacked = _unpack_data(packed_cast, _static_shape(composite_body), output_layout)
     legalized = relay.Function(
         func.params,
         unpacked,
@@ -211,7 +257,8 @@ def _packed_output(legalized):
     if (
         not isinstance(transpose, relay.Call)
         or transpose.op.name != "transpose"
-        or tuple(int(axis) for axis in transpose.attrs.axes) != (0, 4, 1, 5, 2, 3)
+        or tuple(int(axis) for axis in transpose.attrs.axes)
+        not in ((0, 4, 1, 5, 2, 3), (0, 4, 2, 3, 1, 5))
     ):
         raise ValueError("legalized VTA function must contain the approved output unpack")
     return transpose.args[0]
@@ -357,8 +404,8 @@ def _internalize_constants(primfunc, runtime_param_count, values):
     )
 
 
-def _restore_unpacked_output(primfunc, output_type, config):
-    """Make the packed TE output internal and restore the Relay NCHW ABI."""
+def _restore_unpacked_output(primfunc, output_type, output_layout, config):
+    """Make the packed TE output internal and restore the original Relay ABI."""
     packed_param = primfunc.params[-1]
     packed_buffer = primfunc.buffer_map[packed_param]
     packed_data = tvm.tir.Var(
@@ -390,10 +437,17 @@ def _restore_unpacked_output(primfunc, output_type, config):
         data=output_cpu_data,
     )
     builder = tvm.tir.ir_builder.create()
-    with builder.for_range(0, output_type.shape[0], name="n") as n:
-        with builder.for_range(0, output_type.shape[1], name="c") as c:
-            with builder.for_range(0, output_type.shape[2], name="h") as h:
-                with builder.for_range(0, output_type.shape[3], name="w") as w:
+    if output_layout == "NCHW":
+        batch, channels, height, width = output_type.shape
+    else:
+        batch, height, width, channels = output_type.shape
+    with builder.for_range(0, batch, name="n") as n:
+        with builder.for_range(0, channels, name="c") as c:
+            with builder.for_range(0, height, name="h") as h:
+                with builder.for_range(0, width, name="w") as w:
+                    output_indices = (
+                        [n, c, h, w] if output_layout == "NCHW" else [n, h, w, c]
+                    )
                     builder.emit(
                         tvm.tir.BufferStore(
                             output_cpu_buffer,
@@ -408,7 +462,7 @@ def _restore_unpacked_output(primfunc, output_type, config):
                                     c % config.block_out,
                                 ],
                             ),
-                            [n, c, h, w],
+                            output_indices,
                         )
                     )
     unpack = tvm.tir.LetStmt(
@@ -465,8 +519,8 @@ def lower_vta_function(func, config=None):
     primfunc : tvm.tir.PrimFunc
         A single scheduled VTA PrimFunc with the Relay ``global_symbol``, VTA
         target, and original Relay attributes attached.  Constants and packed
-        tensors are internal; parameters retain the original unpacked NCHW ABI
-        in input-then-output order.
+        tensors are internal; parameters retain the original unpacked NCHW or
+        NHWC ABI in input-then-output order.
 
     Raises
     ------
@@ -482,6 +536,18 @@ def lower_vta_function(func, config=None):
     not exported from :mod:`vta.relay`.
     """
     config = config or VTACompilerConfig.from_env(get_env())
+    composite_call = _validate_vta_function(func, config)
+    composite_body = composite_call.op.body
+    conv_or_bias = composite_body.args[0].args[0].args[0]
+    if isinstance(conv_or_bias.op, tvm.ir.Op) and conv_or_bias.op.name in (
+        "nn.bias_add",
+        "add",
+    ):
+        conv2d = conv_or_bias.args[0]
+    else:
+        conv2d = conv_or_bias
+    output_layout = str(conv2d.attrs.out_layout) or str(conv2d.attrs.data_layout)
+
     packed_core, constants = _lift_constants(_packed_core(func, config))
     cached = _schedule_packed_core(packed_core, config)
     symbol = func.attrs.get_str("global_symbol")
@@ -491,7 +557,7 @@ def lower_vta_function(func, config=None):
     if len(scheduled_primfuncs) != 1:
         raise ValueError("VTA TE lowering must produce exactly one scheduled TIR PrimFunc")
     primfunc = _internalize_constants(scheduled_primfuncs[0], len(func.params), constants)
-    primfunc = _restore_unpacked_output(primfunc, func.ret_type, config)
+    primfunc = _restore_unpacked_output(primfunc, func.ret_type, output_layout, config)
     return (
         primfunc
         .with_attr("global_symbol", symbol)

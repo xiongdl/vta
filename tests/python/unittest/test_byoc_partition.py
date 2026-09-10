@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from dataclasses import replace
+
 import pytest
 import numpy as np
 import tvm
@@ -22,10 +24,25 @@ import vta
 from tvm import relay
 from tvm.relay.op.contrib import get_pattern_table
 
-from byoc_utils import make_qnn_conv2d_module, make_qnn_conv2d_near_miss_module
+from byoc_utils import (
+    make_adjacent_qnn_conv2d_module,
+    make_qnn_conv2d_module,
+    make_qnn_conv2d_near_miss_module,
+)
 from vta.relay.contract import VTACompilerConfig
 from vta.relay.patterns import QNN_CONV2D_COMPOSITE, check_qnn_conv2d, pattern_table
 from vta.relay.partition import _partition_pipeline, partition_for_vta
+
+
+SUPPORTED_LAYOUTS = [
+    pytest.param("NCHW", "OIHW", id="nchw-oihw"),
+    pytest.param("NHWC", "HWIO", id="nhwc-hwio"),
+]
+SUPPORTED_KERNELS = [
+    pytest.param((1, 1), (0, 0), id="1x1"),
+    pytest.param((3, 3), (1, 1), id="3x3"),
+]
+SUPPORTED_STRIDES = [pytest.param((1, 1), id="stride1"), pytest.param((2, 2), id="stride2")]
 
 
 def _merge_composites(mod):
@@ -125,8 +142,23 @@ def test_qnn_conv2d_predicate_rejects_wrong_dtype(overrides):
     )
 
 
-def test_qnn_conv2d_predicate_accepts_approved_hardware_domain():
-    mod = make_qnn_conv2d_module(vta.get_env())
+@pytest.mark.parametrize(("data_layout", "kernel_layout"), SUPPORTED_LAYOUTS)
+@pytest.mark.parametrize(("kernel_size", "padding"), SUPPORTED_KERNELS)
+@pytest.mark.parametrize("strides", SUPPORTED_STRIDES)
+@pytest.mark.parametrize("bias_kind", [None, "bias_add", "add"])
+def test_qnn_conv2d_predicate_accepts_full_approved_hardware_matrix(
+    data_layout, kernel_layout, kernel_size, padding, strides, bias_kind
+):
+    mod = make_qnn_conv2d_module(
+        vta.get_env(),
+        bias_kind=bias_kind,
+        data_layout=data_layout,
+        kernel_layout=kernel_layout,
+        out_layout=data_layout,
+        kernel_size=kernel_size,
+        padding=padding,
+        strides=strides,
+    )
 
     assert check_qnn_conv2d(_root_call(mod))
 
@@ -134,18 +166,19 @@ def test_qnn_conv2d_predicate_accepts_approved_hardware_domain():
 @pytest.mark.parametrize(
     "overrides",
     [
-        {"kernel_size": (1, 1), "padding": (0, 0)},
-        {"strides": (2, 2)},
+        {"kernel_size": (2, 2), "padding": (0, 0)},
+        {"strides": (3, 3)},
+        {"strides": (1, 2)},
         {"dilation": (2, 2)},
-        {"padding": (0, 0)},
         {"shift": -1},
         {"shift": 32},
         {"clip_bounds": (-129, 127)},
         {"clip_bounds": (-128, 128)},
         {"input_channels": 8},
         {"output_channels": 8},
-        {"data_layout": "NHWC", "kernel_layout": "HWIO"},
-        {"out_layout": "NHWC"},
+        {"data_layout": "NCHW", "kernel_layout": "HWIO"},
+        {"data_layout": "NHWC", "kernel_layout": "OIHW"},
+        {"data_layout": "NHWC", "kernel_layout": "HWIO", "out_layout": "NCHW"},
         {"groups": 2},
     ],
 )
@@ -153,6 +186,35 @@ def test_qnn_conv2d_predicate_rejects_unsupported_hardware_boundary(overrides):
     mod = make_qnn_conv2d_module(vta.get_env(), **overrides)
 
     assert not check_qnn_conv2d(_root_call(mod))
+
+
+def test_qnn_conv2d_predicate_rejects_dynamic_shape():
+    mod = make_qnn_conv2d_module(vta.get_env(), input_height=tvm.tir.Any())
+
+    assert not check_qnn_conv2d(_root_call(mod))
+
+
+@pytest.mark.parametrize(
+    ("kernel_size", "padding"),
+    [
+        pytest.param((1, 1), (1, 1), id="padded-1x1"),
+        pytest.param((3, 3), (0, 0), id="valid-3x3"),
+        pytest.param((3, 3), (0, 0, 1, 1), id="asymmetric-3x3"),
+    ],
+)
+def test_qnn_conv2d_predicate_accepts_any_statically_valid_padding(kernel_size, padding):
+    mod = make_qnn_conv2d_module(
+        vta.get_env(), kernel_size=kernel_size, padding=padding
+    )
+
+    assert check_qnn_conv2d(_root_call(mod))
+
+
+def test_qnn_conv2d_predicate_rejects_batch_not_divisible_by_config():
+    mod = make_qnn_conv2d_module(vta.get_env())
+    config = VTACompilerConfig.from_env(vta.get_env())
+
+    assert not check_qnn_conv2d(_root_call(mod), replace(config, batch=config.batch + 1))
 
 
 def _vta_functions(mod):
@@ -183,7 +245,6 @@ def test_partition_for_vta_uses_approved_pass_order():
         "InferType",
         "MergeComposite",
         "AnnotateTarget",
-        "sequential",
         "sequential",
         "InferType",
     ]
@@ -250,6 +311,20 @@ def test_partition_owns_convolution_weight_constant():
     assert isinstance(conv.args[1], relay.Constant)
 
 
+def test_adjacent_candidates_become_separate_single_composite_vta_functions():
+    partitioned = partition_for_vta(
+        make_adjacent_qnn_conv2d_module(vta.get_env()), mod_name="adjacent"
+    )
+    external_functions = _vta_functions(partitioned)
+
+    assert len(external_functions) == 2
+    assert sorted(function.attrs.get_str("global_symbol") for function in external_functions) == [
+        "tvmgen_adjacent_vta_main_0",
+        "tvmgen_adjacent_vta_main_1",
+    ]
+    assert all(len(_composite_functions(function.body)) == 1 for function in external_functions)
+
+
 def test_partition_symbol_is_deterministic():
     first = partition_for_vta(make_qnn_conv2d_module(vta.get_env()), mod_name="fixture")
     second = partition_for_vta(make_qnn_conv2d_module(vta.get_env()), mod_name="fixture")
@@ -257,10 +332,50 @@ def test_partition_symbol_is_deterministic():
     assert tvm.ir.structural_equal(first, second)
 
 
-def test_near_miss_remains_on_host():
-    near_miss, _ = make_qnn_conv2d_near_miss_module(vta.get_env())
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {},
+        {"kernel_size": (2, 2), "padding": (0, 0)},
+        {"strides": (3, 3)},
+        {"input_channels": 8},
+        {"output_channels": 8},
+        {"data_layout": "NCHW", "kernel_layout": "HWIO"},
+        {"data_layout": "NHWC", "kernel_layout": "OIHW"},
+    ],
+)
+def test_near_miss_remains_typed_on_host(overrides):
+    if overrides:
+        near_miss = make_qnn_conv2d_module(vta.get_env(), **overrides)
+    else:
+        near_miss, _ = make_qnn_conv2d_near_miss_module(vta.get_env())
 
-    assert _vta_functions(partition_for_vta(near_miss)) == []
+    partitioned = partition_for_vta(near_miss)
+
+    assert _vta_functions(partitioned) == []
+    assert partitioned["main"].checked_type is not None
+
+
+@pytest.mark.parametrize(("data_layout", "kernel_layout"), SUPPORTED_LAYOUTS)
+@pytest.mark.parametrize(("kernel_size", "padding"), SUPPORTED_KERNELS)
+@pytest.mark.parametrize("strides", SUPPORTED_STRIDES)
+def test_partition_is_deterministic_across_the_supported_matrix(
+    data_layout, kernel_layout, kernel_size, padding, strides
+):
+    mod = make_qnn_conv2d_module(
+        vta.get_env(),
+        data_layout=data_layout,
+        kernel_layout=kernel_layout,
+        kernel_size=kernel_size,
+        padding=padding,
+        strides=strides,
+    )
+
+    first = partition_for_vta(mod, mod_name="matrix")
+    second = partition_for_vta(mod, mod_name="matrix")
+
+    assert tvm.ir.structural_equal(first, second)
+    assert len(_vta_functions(first)) == 1
 
 
 def test_partition_for_vta_is_idempotent():

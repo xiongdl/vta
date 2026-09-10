@@ -69,17 +69,21 @@ def _make_qnn_conv2d_module(
     kernel_layout="OIHW",
     out_layout="",
     groups=1,
+    batch=None,
+    input_height=8,
+    input_width=8,
 ):
     input_dtype = input_dtype or env.inp_dtype
     weight_dtype = weight_dtype or env.wgt_dtype
     accumulator_dtype = accumulator_dtype or env.acc_dtype
     output_dtype = output_dtype or env.out_dtype
     bias_dtype = bias_dtype or accumulator_dtype
-    input_channels = input_channels or env.BLOCK_IN
-    output_channels = output_channels or env.BLOCK_OUT
-    input_shape = (env.BATCH, input_channels, 8, 8)
+    input_channels = env.BLOCK_IN if input_channels is None else input_channels
+    output_channels = env.BLOCK_OUT if output_channels is None else output_channels
+    batch = env.BATCH if batch is None else batch
+    input_shape = (batch, input_channels, input_height, input_width)
     if data_layout == "NHWC":
-        input_shape = (env.BATCH, 8, 8, input_channels)
+        input_shape = (batch, input_height, input_width, input_channels)
     weight_shape = (output_channels, input_channels // groups, *kernel_size)
     if kernel_layout == "HWIO":
         weight_shape = (*kernel_size, input_channels, output_channels)
@@ -109,9 +113,15 @@ def _make_qnn_conv2d_module(
     )
     if bias_kind == "bias_add":
         bias = relay.const(np.ones((output_channels,), dtype=bias_dtype))
-        conv = relay.nn.bias_add(conv, bias, axis=1)
+        axis = 3 if data_layout == "NHWC" else 1
+        conv = relay.nn.bias_add(conv, bias, axis=axis)
     elif bias_kind == "add":
-        bias = relay.const(np.ones((output_channels, 1, 1), dtype=bias_dtype))
+        bias_shape = (1, 1, output_channels) if data_layout == "NHWC" else (
+            output_channels,
+            1,
+            1,
+        )
+        bias = relay.const(np.ones(bias_shape, dtype=bias_dtype))
         conv = relay.add(conv, bias)
     elif bias_kind is not None:
         raise ValueError(f"unsupported bias kind: {bias_kind}")
@@ -119,7 +129,8 @@ def _make_qnn_conv2d_module(
     shifted = relay.right_shift(conv, relay.const(shift, accumulator_dtype))
     clipped = relay.clip(shifted, a_min=clip_bounds[0], a_max=clip_bounds[1])
     narrowed = relay.cast(clipped, output_dtype)
-    host_post = relay.transpose(narrowed, axes=(0, 2, 3, 1))
+    host_post_axes = (0, 3, 1, 2) if data_layout == "NHWC" else (0, 2, 3, 1)
+    host_post = relay.transpose(narrowed, axes=host_post_axes)
 
     mod = tvm.IRModule.from_expr(relay.Function(params, host_post))
     return relay.transform.InferType()(mod)
@@ -132,6 +143,53 @@ def make_qnn_conv2d_module(env, bias_kind=None, **dtype_overrides):
     )
 
 
-def make_qnn_conv2d_near_miss_module(env):
+def make_qnn_conv2d_near_miss_module(env, **overrides):
     """Build a fixture rejected because its convolution weight is not constant."""
-    return _make_qnn_conv2d_module(env, constant_weights=False), "constant_weights"
+    return (
+        _make_qnn_conv2d_module(env, constant_weights=False, **overrides),
+        "constant_weights",
+    )
+
+
+def make_adjacent_qnn_conv2d_module(env, *, count=2, **overrides):
+    """Build directly adjacent supported convolution tails for partition tests."""
+    if count < 2:
+        raise ValueError("count must be at least two")
+
+    data_layout = overrides.pop("data_layout", "NCHW")
+    kernel_layout = overrides.pop("kernel_layout", "OIHW")
+    kernel_size = overrides.pop("kernel_size", (3, 3))
+    strides = overrides.pop("strides", (1, 1))
+    padding = overrides.pop("padding", (1, 1))
+    if overrides:
+        raise ValueError(f"unsupported adjacent fixture options: {sorted(overrides)}")
+
+    input_shape = (env.BATCH, env.BLOCK_IN, 8, 8)
+    if data_layout == "NHWC":
+        input_shape = (env.BATCH, 8, 8, env.BLOCK_IN)
+    data = relay.var("data", shape=input_shape, dtype=env.inp_dtype)
+    value = relay.abs(data)
+    for _ in range(count):
+        weight_shape = (env.BLOCK_OUT, env.BLOCK_IN, *kernel_size)
+        if kernel_layout == "HWIO":
+            weight_shape = (*kernel_size, env.BLOCK_IN, env.BLOCK_OUT)
+        weight = relay.const(np.ones(weight_shape, dtype=env.wgt_dtype))
+        value = relay.nn.conv2d(
+            value,
+            weight,
+            channels=env.BLOCK_OUT,
+            kernel_size=kernel_size,
+            strides=strides,
+            padding=padding,
+            data_layout=data_layout,
+            kernel_layout=kernel_layout,
+            out_dtype=env.acc_dtype,
+        )
+        value = relay.right_shift(value, relay.const(1, env.acc_dtype))
+        value = relay.clip(value, a_min=-128, a_max=127)
+        value = relay.cast(value, env.out_dtype)
+
+    host_post_axes = (0, 3, 1, 2) if data_layout == "NHWC" else (0, 2, 3, 1)
+    value = relay.transpose(value, axes=host_post_axes)
+    mod = tvm.IRModule.from_expr(relay.Function([data], value))
+    return relay.transform.InferType()(mod)

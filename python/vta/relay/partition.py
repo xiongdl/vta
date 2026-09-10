@@ -47,7 +47,6 @@ def _partition_pipeline(config, mod_name):
             relay.transform.InferType(),
             relay.transform.MergeComposite(pattern_table(config)),
             relay.transform.AnnotateTarget(COMPILER_NAME),
-            relay.transform.MergeCompilerRegions(),
             relay.transform.PartitionGraph(mod_name=mod_name),
             relay.transform.InferType(),
         ]

@@ -21,6 +21,8 @@ import shutil
 import sys
 from pathlib import Path
 
+import pytest
+
 from byoc_utils import run_isolated_python
 
 
@@ -77,9 +79,13 @@ def test_full_import_registers_one_native_vta_target_idempotently():
         first = tvm.target.Target("vta")
         assert first.kind.name == "vta"
         assert first.get_target_device_type() == tvm.runtime.Device.kDLExtDev
-        assert first.get_kind_attr("RelayToTIR") is not None
-        assert first.get_kind_attr("TIRToRuntime") is not None
+        first_relay_to_tir = first.get_kind_attr("RelayToTIR")
+        first_tir_to_runtime = first.get_kind_attr("TIRToRuntime")
+        assert isinstance(first_relay_to_tir, tvm.transform.ModulePass)
+        assert isinstance(first_tir_to_runtime, tvm.runtime.PackedFunc)
         first_kind_handle = first.kind.handle.value
+        first_relay_to_tir_handle = first_relay_to_tir.handle.value
+        first_tir_to_runtime_handle = first_tir_to_runtime.handle.value
         assert tvm.get_global_func("relay.ext.vta", allow_missing=True) is None
 
         importlib.reload(vta)
@@ -88,7 +94,113 @@ def test_full_import_registers_one_native_vta_target_idempotently():
         assert tvm.target.Target.list_kinds().count("vta") == 1
         second = tvm.target.Target("vta")
         assert second.kind.handle.value == first_kind_handle
+        second_relay_to_tir = second.get_kind_attr("RelayToTIR")
+        second_tir_to_runtime = second.get_kind_attr("TIRToRuntime")
+        assert isinstance(second_relay_to_tir, tvm.transform.ModulePass)
+        assert isinstance(second_tir_to_runtime, tvm.runtime.PackedFunc)
+        assert second_relay_to_tir.handle.value == first_relay_to_tir_handle
+        assert second_tir_to_runtime.handle.value == first_tir_to_runtime_handle
         assert tvm.get_global_func("relay.ext.vta", allow_missing=True) is None
+        """
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("missing_hook", ["RelayToTIR", "TIRToRuntime"])
+def test_full_import_identifies_each_missing_required_hook(missing_hook):
+    extension_path = VTA_ROOT / "build" / _extension_name()
+    result = run_isolated_python(
+        f"""
+        import ctypes
+        import os
+
+        import tvm
+
+        extension_path = {str(extension_path)!r}
+        missing_hook = {missing_hook!r}
+        real_cdll = ctypes.CDLL
+        real_get_kind_attr = tvm.target.Target.get_kind_attr
+
+        def tracking_cdll(path, *args, **kwargs):
+            extension = real_cdll(path, *args, **kwargs)
+            if os.path.abspath(os.fspath(path)) == extension_path:
+                def incomplete_get_kind_attr(target, name):
+                    if target.kind.name == "vta" and name == missing_hook:
+                        return None
+                    return real_get_kind_attr(target, name)
+
+                tvm.target.Target.get_kind_attr = incomplete_get_kind_attr
+            return extension
+
+        ctypes.CDLL = tracking_cdll
+
+        try:
+            import vta
+        except ImportError as err:
+            message = str(err)
+            assert extension_path in message
+            assert f"missing required {{missing_hook}} hook" in message
+            assert {BUILD_COMMAND!r} in message
+        else:
+            raise AssertionError(f"missing {{missing_hook}} hook did not fail import")
+        """
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize(
+    ("wrong_hook", "replacement_hook", "expected_type"),
+    [
+        ("RelayToTIR", "TIRToRuntime", "tvm.transform.ModulePass"),
+        ("TIRToRuntime", "RelayToTIR", "tvm.runtime.PackedFunc"),
+    ],
+)
+def test_full_import_identifies_each_incompatible_hook_type(
+    wrong_hook, replacement_hook, expected_type
+):
+    extension_path = VTA_ROOT / "build" / _extension_name()
+    result = run_isolated_python(
+        f"""
+        import ctypes
+        import os
+
+        import tvm
+
+        extension_path = {str(extension_path)!r}
+        wrong_hook = {wrong_hook!r}
+        replacement_hook = {replacement_hook!r}
+        expected_type = {expected_type!r}
+        real_cdll = ctypes.CDLL
+        real_get_kind_attr = tvm.target.Target.get_kind_attr
+
+        def tracking_cdll(path, *args, **kwargs):
+            extension = real_cdll(path, *args, **kwargs)
+            if os.path.abspath(os.fspath(path)) == extension_path:
+                target = tvm.target.Target("vta")
+                incompatible_hook = real_get_kind_attr(target, replacement_hook)
+
+                def incompatible_get_kind_attr(candidate, name):
+                    if candidate.kind.name == "vta" and name == wrong_hook:
+                        return incompatible_hook
+                    return real_get_kind_attr(candidate, name)
+
+                tvm.target.Target.get_kind_attr = incompatible_get_kind_attr
+            return extension
+
+        ctypes.CDLL = tracking_cdll
+
+        try:
+            import vta
+        except ImportError as err:
+            message = str(err)
+            assert extension_path in message
+            assert f"{{wrong_hook}} hook has incompatible type" in message
+            assert expected_type in message
+            assert {BUILD_COMMAND!r} in message
+        else:
+            raise AssertionError(f"incompatible {{wrong_hook}} hook did not fail import")
         """
     )
 

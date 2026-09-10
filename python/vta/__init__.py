@@ -64,20 +64,32 @@ def _load_compiler_extension():
             f"Rebuild it with: {_COMPILER_EXTENSION_BUILD_COMMAND}"
         ) from err
 
-    missing_hooks = [
-        name
-        for name in ("RelayToTIR", "TIRToRuntime")
-        if target.get_kind_attr(name) is None
-    ]
-    if target.get_target_device_type() != tvm.runtime.Device.kDLExtDev or missing_hooks:
-        detail = "wrong device type"
-        if missing_hooks:
-            detail = f"missing target hooks: {', '.join(missing_hooks)}"
+    if target.get_target_device_type() != tvm.runtime.Device.kDLExtDev:
         raise ImportError(
             f"VTA compiler extension {extension_path} has an invalid TargetKind 'vta' "
-            f"registration ({detail}).\n"
+            "registration (wrong device type).\n"
             f"Rebuild it with: {_COMPILER_EXTENSION_BUILD_COMMAND}"
         )
+
+    required_hooks = (
+        ("RelayToTIR", tvm.transform.ModulePass, "tvm.transform.ModulePass"),
+        ("TIRToRuntime", tvm.runtime.PackedFunc, "tvm.runtime.PackedFunc"),
+    )
+    for hook_name, expected_type, expected_type_name in required_hooks:
+        hook = target.get_kind_attr(hook_name)
+        if hook is None:
+            raise ImportError(
+                f"VTA compiler extension {extension_path} is missing required "
+                f"{hook_name} hook (expected {expected_type_name}).\n"
+                f"Rebuild it with: {_COMPILER_EXTENSION_BUILD_COMMAND}"
+            )
+        if not isinstance(hook, expected_type):
+            raise ImportError(
+                f"VTA compiler extension {extension_path} {hook_name} hook has "
+                f"incompatible type {type(hook).__name__}; expected "
+                f"{expected_type_name}.\n"
+                f"Rebuild it with: {_COMPILER_EXTENSION_BUILD_COMMAND}"
+            )
 
     _COMPILER_EXTENSION_HANDLE = extension
 

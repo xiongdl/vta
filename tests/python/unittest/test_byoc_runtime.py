@@ -76,11 +76,13 @@ def _require_simulator(env):
     return simulator, clear_name, status_name
 
 
-def _assert_accelerator_activity(env, runtime_stats):
+def _assert_accelerator_activity(env, runtime_stats, expected_out_store_nbytes=None):
     if env.TARGET == "sim":
         assert runtime_stats["gemm_counter"] > 0
         assert runtime_stats["wgt_load_nbytes"] > 0
         assert runtime_stats["out_store_nbytes"] > 0
+        if expected_out_store_nbytes is not None:
+            assert runtime_stats["out_store_nbytes"] == expected_out_store_nbytes
         return
     if env.TARGET == "tsim":
         assert runtime_stats["cycle_count"] > 0
@@ -95,9 +97,9 @@ def _require_runtime_symbol(module, symbol):
         raise RuntimeError(f"loaded VTA artifact does not implement {symbol}")
 
 
-def _test_exported_approved_graph_executes(bias_kind):
+def _test_exported_approved_graph_executes(bias_kind, **fixture_overrides):
     env = vta.get_env()
-    mod = make_qnn_conv2d_module(env, bias_kind=bias_kind)
+    mod = make_qnn_conv2d_module(env, bias_kind=bias_kind, **fixture_overrides)
     input_shape = tuple(int(dim) for dim in mod["main"].params[0].checked_type.shape)
     input_data = ((np.arange(np.prod(input_shape)) % 17) - 8).reshape(input_shape)
     input_data = input_data.astype(env.inp_dtype)
@@ -155,7 +157,9 @@ def _test_exported_approved_graph_executes(bias_kind):
     assert actual.shape == expected.shape
     assert actual.dtype == expected.dtype
     np.testing.assert_array_equal(actual, expected)
-    _assert_accelerator_activity(env, runtime_stats)
+    expected_out_store_nbytes = int(np.prod(expected.shape)) * expected.dtype.itemsize
+    _assert_accelerator_activity(env, runtime_stats, expected_out_store_nbytes)
+    return expected, runtime_stats
 
 
 def test_exported_no_bias_graph_executes_on_simulator():
@@ -168,6 +172,44 @@ def test_exported_bias_add_graph_executes_on_simulator():
 
 def test_exported_broadcast_add_graph_executes_on_simulator():
     _test_exported_approved_graph_executes("add")
+
+
+@pytest.mark.parametrize(
+    ("data_layout", "kernel_layout"),
+    [
+        pytest.param("NCHW", "OIHW", id="nchw-oihw"),
+        pytest.param("NHWC", "HWIO", id="nhwc-hwio"),
+    ],
+)
+@pytest.mark.parametrize(
+    ("input_spatial", "output_spatial"),
+    [pytest.param(32, 16, id="32-to-16"), pytest.param(16, 8, id="16-to-8")],
+)
+def test_exported_asymmetric_stride2_graph_matches_host_and_full_abi_store(
+    data_layout, kernel_layout, input_spatial, output_spatial
+):
+    env = vta.get_env()
+    output, runtime_stats = _test_exported_approved_graph_executes(
+        None,
+        data_layout=data_layout,
+        kernel_layout=kernel_layout,
+        kernel_size=(3, 3),
+        strides=(2, 2),
+        padding=(0, 0, 1, 1),
+        input_height=input_spatial,
+        input_width=input_spatial,
+    )
+
+    expected_shape = (
+        (env.BATCH, env.BLOCK_OUT, output_spatial, output_spatial)
+        if data_layout == "NHWC"
+        else (env.BATCH, output_spatial, output_spatial, env.BLOCK_OUT)
+    )
+    assert output.shape == expected_shape
+    assert output.dtype == np.dtype(env.out_dtype)
+    assert runtime_stats["out_store_nbytes"] == (
+        int(np.prod(expected_shape)) * np.dtype(env.out_dtype).itemsize
+    )
 
 
 def test_near_miss_executes_only_on_host():

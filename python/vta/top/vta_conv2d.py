@@ -34,8 +34,27 @@ def conv2d_packed(cfg, data, kernel, strides, padding, dilation, layout, out_dty
         raise topi.InvalidShapeError()
     assert dilation == (1, 1)
 
-    if padding[0]:
-        pad_data = topi.nn.pad(data, [0, 0, padding[0], padding[1], 0, 0], name="pad_data")
+    try:
+        padding = tuple(topi.utils.get_const_int(value) for value in padding)
+    except TypeError as error:
+        raise ValueError("padding must contain two or four integers") from error
+    if len(padding) == 2:
+        pad_top, pad_left = padding
+        pad_bottom, pad_right = padding
+    elif len(padding) == 4:
+        pad_top, pad_left, pad_bottom, pad_right = padding
+    else:
+        raise ValueError("padding must contain two or four integers")
+    if any(value < 0 for value in (pad_top, pad_left, pad_bottom, pad_right)):
+        raise ValueError("padding values must be non-negative")
+
+    if any((pad_top, pad_left, pad_bottom, pad_right)):
+        pad_data = topi.nn.pad(
+            data,
+            [0, 0, pad_top, pad_left, 0, 0],
+            [0, 0, pad_bottom, pad_right, 0, 0],
+            name="pad_data",
+        )
     else:
         pad_data = data
     assert len(data.shape) == 6

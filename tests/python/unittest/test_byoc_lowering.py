@@ -35,6 +35,7 @@ from vta.relay.transform import (
     legalize_vta_function,
     lower_vta_function,
 )
+from vta.top.vta_conv2d import conv2d_packed
 
 
 SUPPORTED_LAYOUTS = [
@@ -46,6 +47,10 @@ SUPPORTED_KERNELS = [
     pytest.param((3, 3), (1, 1), id="3x3"),
 ]
 SUPPORTED_STRIDES = [pytest.param((1, 1), id="stride1"), pytest.param((2, 2), id="stride2")]
+ASYMMETRIC_STRIDE2_SPATIAL_CASES = [
+    pytest.param(32, 16, id="32-to-16"),
+    pytest.param(16, 8, id="16-to-8"),
+]
 
 
 def _partitioned_function(bias_kind=None, **overrides):
@@ -445,6 +450,44 @@ def test_legalized_relay_matches_every_supported_composite_exactly(
 
 
 @pytest.mark.parametrize(("data_layout", "kernel_layout"), SUPPORTED_LAYOUTS)
+@pytest.mark.parametrize(
+    ("input_spatial", "output_spatial"), ASYMMETRIC_STRIDE2_SPATIAL_CASES
+)
+def test_legalized_asymmetric_stride2_padding_preserves_exact_relay_values(
+    data_layout, kernel_layout, input_spatial, output_spatial
+):
+    env = vta.get_env()
+    external = _partitioned_function(
+        data_layout=data_layout,
+        kernel_layout=kernel_layout,
+        kernel_size=(3, 3),
+        strides=(2, 2),
+        padding=(0, 0, 1, 1),
+        input_height=input_spatial,
+        input_width=input_spatial,
+    )
+    legalized = legalize_vta_function(external)
+    conv = _find_operator_calls(legalized.body, "nn.conv2d")[0]
+
+    assert tuple(int(value) for value in conv.attrs.padding) == (0, 0, 1, 1)
+    assert tuple(int(dim) for dim in conv.checked_type.shape) == (
+        1,
+        1,
+        output_spatial,
+        output_spatial,
+        env.BATCH,
+        env.BLOCK_OUT,
+    )
+
+    input_shape = tuple(int(dim) for dim in external.params[0].checked_type.shape)
+    input_data = ((np.arange(np.prod(input_shape)) % 17) - 8).reshape(input_shape)
+    input_data = input_data.astype(env.inp_dtype)
+    expected = _evaluate_relay_function(external, input_data)
+    actual = _evaluate_relay_function(_canonicalize_packed_convolution(legalized), input_data)
+    np.testing.assert_array_equal(actual, expected)
+
+
+@pytest.mark.parametrize(("data_layout", "kernel_layout"), SUPPORTED_LAYOUTS)
 @pytest.mark.parametrize(("kernel_size", "padding"), SUPPORTED_KERNELS)
 @pytest.mark.parametrize("strides", SUPPORTED_STRIDES)
 def test_lower_to_scheduled_te_uses_packed_output_and_vta_target_across_matrix(
@@ -500,6 +543,74 @@ def test_lower_to_scheduled_te_tensorizes_vta_gemm_across_matrix(
     )
 
     assert _has_vta_gemm_tensorization(cached.schedule)
+
+
+@pytest.mark.parametrize(("data_layout", "kernel_layout"), SUPPORTED_LAYOUTS)
+@pytest.mark.parametrize(
+    ("input_spatial", "output_spatial"), ASYMMETRIC_STRIDE2_SPATIAL_CASES
+)
+def test_lower_to_scheduled_te_honors_distinct_padding_before_and_after(
+    data_layout, kernel_layout, input_spatial, output_spatial
+):
+    env = vta.get_env()
+    cached = _lower_to_scheduled_te(
+        _partitioned_function(
+            data_layout=data_layout,
+            kernel_layout=kernel_layout,
+            kernel_size=(3, 3),
+            strides=(2, 2),
+            padding=(0, 0, 1, 1),
+            input_height=input_spatial,
+            input_width=input_spatial,
+        )
+    )
+
+    assert tuple(int(dim) for dim in cached.outputs[0].shape) == (
+        1,
+        1,
+        output_spatial,
+        output_spatial,
+        env.BATCH,
+        env.BLOCK_OUT,
+    )
+    pad_stages = [stage for stage in cached.schedule.stages if stage.op.name == "pad_data"]
+    assert len(pad_stages) == 1
+    assert tuple(int(dim) for dim in pad_stages[0].op.output(0).shape) == (
+        1,
+        1,
+        input_spatial + 1,
+        input_spatial + 1,
+        env.BATCH,
+        env.BLOCK_IN,
+    )
+    assert _has_vta_gemm_tensorization(cached.schedule)
+
+
+@pytest.mark.parametrize("padding", [(), (0,), (0, 0, 1), (0, 0, 1, 1, 0)])
+def test_packed_conv2d_rejects_malformed_padding_geometry(padding):
+    env = vta.get_env()
+    data = tvm.te.placeholder(
+        (1, 1, 16, 16, env.BATCH, env.BLOCK_IN),
+        dtype=env.inp_dtype,
+        name="data",
+    )
+    weight = tvm.te.placeholder(
+        (1, 1, 3, 3, env.BLOCK_OUT, env.BLOCK_IN),
+        dtype=env.wgt_dtype,
+        name="weight",
+    )
+
+    with tvm.target.Target("vta", host=env.target_host):
+        with pytest.raises(ValueError, match="padding.*two or four"):
+            conv2d_packed(
+                data,
+                weight,
+                (2, 2),
+                padding,
+                (1, 1),
+                f"NCHW{env.BATCH}n{env.BLOCK_IN}c",
+                env.acc_dtype,
+            )
 
 
 @pytest.mark.parametrize(("data_layout", "kernel_layout"), SUPPORTED_LAYOUTS)

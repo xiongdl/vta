@@ -21,6 +21,12 @@ How to Deploy TVM-VTA Modules
 This folder contains an example on how to deploy TVM-VTA modules.
 It also contains an example code to deploy with C++ and Python.
 
+The host-side `resnet_export.py` imports `vta`, explicitly applies
+capability-based partitioning, and builds the outlined regions with the VTA
+target extension via `tvm.target.Target("vta")`. Unsupported Relay operators
+remain on the LLVM host. The preserved low-level `ext_dev` device continues to
+be used when the exported module executes on VTA hardware or a simulator.
+
 1. In host machine tvm project enable vta fsim or FPGA and compile tvm successfully.
 
 2. In target FPGA machine, flash bitstream into FPGA, following are example on pynq board

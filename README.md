@@ -35,9 +35,10 @@ The key features of VTA include:
 Capability-based Relay compilation
 ----------------------------------
 
-VTA can partition supported Relay regions through its explicit BYOC interface.
-Unsupported operators remain on the host, and no graph operator names or
-start/stop indices are required:
+Importing `vta` loads and validates the VTA target extension. Applications then
+invoke capability-based partitioning explicitly before building for the modern
+VTA Relay target. Unsupported operators remain on the LLVM host, and no graph
+operator names or range controls are required:
 
 ```python
 import tvm
@@ -46,18 +47,21 @@ from tvm import relay
 
 env = vta.get_env()
 partitioned = vta.relay.partition_for_vta(mod, params=params)
-vta.register_byoc()
 
 with vta.build_config():
     factory = relay.build(
         partitioned,
-        target=tvm.target.Target(env.target, host=env.target_host),
+        target=tvm.target.Target("vta", host=env.target_host),
     )
 ```
 
-Registration is explicit and idempotent. The outer `vta.build_config()` is
-required so host functions can safely access VTA device buffers; the external
-compiler ensures that outlined VTA functions are lowered exactly once. The
-resulting Relay build artifact uses the existing graph executor and VTA
-`ext_dev` runtime lifecycle and can be exported and loaded through TVM's normal
-runtime module APIs.
+The outer `vta.build_config()` is required so host functions can safely access
+VTA device buffers. The target extension lowers every outlined VTA function
+through its RelayToTIR and TIRToRuntime hooks, and the resulting standard host
+module can be exported and loaded through TVM's normal runtime APIs.
+
+Modern Relay compilation uses `tvm.target.Target("vta")`. This is intentionally
+distinct from the preserved low-level `env.target` and `tvm.target.vta()`
+helpers, which describe an `ext_dev -device=vta` target for direct TE/TIR,
+instruction, and hardware-development workflows. Those low-level APIs remain
+available through `vta.build_config()`, `vta.build()`, and `vta.lower()`.

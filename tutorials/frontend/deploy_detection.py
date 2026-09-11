@@ -23,7 +23,7 @@ This tutorial provides an end-to-end demo, on how to run Darknet YoloV3-tiny
 inference onto the VTA accelerator design to perform Image detection tasks.
 It showcases Relay as a front end compiler that can perform quantization (VTA
 only supports int8/32 inference) and capability-based partitioning for the VTA
-external compiler.
+target extension.
 """
 
 ######################################################################
@@ -119,7 +119,12 @@ env = vta.get_env()
 # Set ``device=arm_cpu`` to run inference on the CPU
 # or ``device=vta`` to run inference on the FPGA.
 device = "vta"
-target = env.target if device == "vta" else env.target_vta_cpu
+if device == "vta":
+    target = env.target
+    relay_target = tvm.target.Target("vta", host=env.target_host)
+else:
+    target = env.target_vta_cpu
+    relay_target = tvm.target.Target(target, host=env.target_host)
 
 # Name of Darknet model to compile
 
@@ -171,7 +176,7 @@ ctx = remote.ext_dev(0) if device == "vta" else remote.cpu(0)
 # 1. Front end translation from Darknet into Relay module.
 # 2. Apply 8-bit quantization: here we skip the first conv layer,
 #    and dense layer which will both be executed in fp32 on the CPU.
-# 3. Partition supported regions for the VTA external compiler.
+# 3. Partition supported regions for the VTA target extension.
 # 4. Perform constant folding to reduce number of operators (e.g. eliminate batch norm multiply).
 # 5. Perform relay build to object file.
 # 6. Load the object file onto remote (FPGA device).
@@ -208,13 +213,10 @@ with autotvm.tophub.context(target):
     else:
         mod = mod["main"]
 
-    if target.device_name == "vta":
-        vta.register_byoc()
-
     with vta.build_config(disabled_pass={"AlterOpLayout", "tir.CommonSubexprElimTIR"}):
         lib = relay.build(
             mod,
-            target=tvm.target.Target(target, host=env.target_host),
+            target=relay_target,
             params=None if target.device_name == "vta" else params,
         )
 

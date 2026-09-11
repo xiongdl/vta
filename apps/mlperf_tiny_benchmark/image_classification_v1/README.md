@@ -7,6 +7,11 @@ reloads both host libraries, compares their output tensors exactly for the ten
 committed PNG samples, and requires positive FSIM GEMM, weight-load, and
 output-store activity.
 
+Importing `vta` loads and validates the compiler target extension. The mixed
+branch explicitly applies `vta.relay.partition_for_vta()` once, then passes
+`tvm.target.Target("vta")` to `relay.build`; unsupported operators remain in the
+LLVM host portion of the same standard runtime module.
+
 The application is an execution-equivalence example. It does not report model
 accuracy, performance, energy, or MLPerf submission results.
 

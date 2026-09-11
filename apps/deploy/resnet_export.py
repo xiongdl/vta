@@ -14,7 +14,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-""" Compile And Export MXNET Resnet18 Model With VTA As Backend """
+"""Compile and export an MXNet ResNet-18 model with the VTA target extension."""
 from __future__ import absolute_import, print_function
 
 import os
@@ -119,11 +119,10 @@ def compile_mxnet_gulon_resnet(_env, _model):
                 mod = relay.quantize.quantize(mod, params=params)
             mod = vta.relay.partition_for_vta(mod, params=params, mod_name=_model)
 
-    vta.register_byoc()
     with relay.build_config(opt_level=3, disabled_pass={"AlterOpLayout"}):
         with vta.build_config(debug_flag=0):
             factory = relay.build(
-                mod, target=tvm.target.Target(_env.target, host=_env.target_host)
+                mod, target=tvm.target.Target("vta", host=_env.target_host)
             )
 
     return factory.get_graph_json(), factory.get_lib(), factory.get_params()

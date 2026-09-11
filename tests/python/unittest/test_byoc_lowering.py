@@ -30,6 +30,7 @@ from vta.relay.transform import (
     _composite_calls,
     _has_vta_gemm_tensorization,
     _lower_to_scheduled_te,
+    _pack_output_constant,
     _validate_vta_function,
     legalize_vta_function,
     lower_vta_function,
@@ -323,6 +324,50 @@ def test_legalize_vta_function_packs_optional_constant_for_broadcast(bias_kind):
     np.testing.assert_array_equal(packed_constant.data.numpy(), 1)
 
 
+@pytest.mark.parametrize(("data_layout", "kernel_layout"), SUPPORTED_LAYOUTS)
+def test_legalize_vta_function_broadcasts_scalar_output_constant_exactly(
+    data_layout, kernel_layout
+):
+    env = vta.get_env()
+    external = _partitioned_function(
+        "scalar_add",
+        data_layout=data_layout,
+        kernel_layout=kernel_layout,
+    )
+    legalized = legalize_vta_function(external)
+    packed_add = _find_operator_calls(legalized.body, "add")[0]
+    packed_constant = packed_add.args[1]
+
+    assert isinstance(packed_constant, relay.Constant)
+    assert tuple(int(dim) for dim in packed_constant.checked_type.shape) == (
+        1,
+        1,
+        1,
+        env.BATCH,
+        env.BLOCK_OUT,
+    )
+    np.testing.assert_array_equal(packed_constant.data.numpy(), 64)
+
+    input_shape = tuple(int(dim) for dim in external.params[0].checked_type.shape)
+    input_data = np.arange(np.prod(input_shape), dtype="int8").reshape(input_shape) % 8
+    expected = _evaluate_relay_function(external, input_data)
+    actual = _evaluate_relay_function(_canonicalize_packed_convolution(legalized), input_data)
+    np.testing.assert_array_equal(actual, expected)
+
+
+@pytest.mark.parametrize("shape", [(2, 2), (1, 2, 3)])
+@pytest.mark.parametrize("output_layout", ["NCHW", "NHWC"])
+def test_pack_output_constant_rejects_non_broadcast_shape(shape, output_layout):
+    malformed = relay.const(np.ones(shape, dtype=vta.get_env().acc_dtype))
+
+    with pytest.raises(ValueError, match="broadcast"):
+        _pack_output_constant(
+            malformed,
+            output_layout,
+            VTACompilerConfig.from_env(vta.get_env()),
+        )
+
+
 @pytest.mark.parametrize("bias_kind", [None, "bias_add", "add"])
 def test_legalize_vta_function_preserves_quantization_tail_attributes(bias_kind):
     legalized = legalize_vta_function(_partitioned_function(bias_kind))
@@ -455,6 +500,25 @@ def test_lower_to_scheduled_te_tensorizes_vta_gemm_across_matrix(
     )
 
     assert _has_vta_gemm_tensorization(cached.schedule)
+
+
+@pytest.mark.parametrize(("data_layout", "kernel_layout"), SUPPORTED_LAYOUTS)
+def test_scalar_output_constant_lowers_to_tensorized_vta_primfunc(
+    data_layout, kernel_layout
+):
+    external = _partitioned_function(
+        "scalar_add",
+        data_layout=data_layout,
+        kernel_layout=kernel_layout,
+    )
+
+    cached = _lower_to_scheduled_te(external)
+    primfunc = lower_vta_function(external)
+
+    assert _has_vta_gemm_tensorization(cached.schedule)
+    assert isinstance(primfunc, tvm.tir.PrimFunc)
+    assert tvm.tir.analysis.verify_well_formed(primfunc)
+    assert str(primfunc.attrs["global_symbol"]) == external.attrs.get_str("global_symbol")
 
 
 def test_unscheduled_te_graph_has_no_vta_gemm_tensorization():

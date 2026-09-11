@@ -150,16 +150,25 @@ def _pack_weight(weight, shape, kernel_layout, config):
 
 def _pack_output_constant(constant, output_layout, config):
     values = constant.data.numpy()
+    if values.ndim == 0:
+        values = np.broadcast_to(
+            values,
+            (1, 1, 1, config.batch, config.block_out),
+        )
+        return relay.const(values.copy(), dtype=constant.data.dtype)
+
     channel_vector = values.ndim == 1
     if values.ndim == 1:
         values = values.reshape(values.shape[0], 1, 1)
     elif values.ndim == 4 and values.shape[0] == 1:
         values = values[0]
     if values.ndim != 3:
-        raise ValueError("VTA output constant must be a channel bias")
+        raise ValueError("VTA output constant must have a broadcast-compatible shape")
     if output_layout == "NHWC" and not channel_vector:
         values = values.transpose(2, 0, 1)
     channels, height, width = values.shape
+    if channels <= 0 or channels % config.block_out != 0:
+        raise ValueError("VTA output constant channels must be broadcast-compatible")
     values = values.reshape(
         channels // config.block_out, config.block_out, height, width, 1
     ).transpose(0, 2, 3, 4, 1)

@@ -123,6 +123,8 @@ def _make_qnn_conv2d_module(
         )
         bias = relay.const(np.ones(bias_shape, dtype=bias_dtype))
         conv = relay.add(conv, bias)
+    elif bias_kind == "scalar_add":
+        conv = relay.add(conv, relay.const(64, dtype=bias_dtype))
     elif bias_kind is not None:
         raise ValueError(f"unsupported bias kind: {bias_kind}")
 

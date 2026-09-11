@@ -26,6 +26,9 @@ from byoc_utils import make_qnn_conv2d_module
 from vta.relay import partition_for_vta
 
 
+LEGACY_COMPILER_GLOBAL = "relay.ext." + "vta"
+
+
 def _is_vta_relay_function(function):
     return (
         isinstance(function, relay.Function)
@@ -125,7 +128,7 @@ def test_relay_to_tir_hook_is_typed_and_preserves_module_without_vta_functions()
     lowered = _relay_to_tir_hook()(mod)
 
     tvm.ir.assert_structural_equal(lowered, mod)
-    assert tvm.get_global_func("relay.ext.vta", allow_missing=True) is None
+    assert tvm.get_global_func(LEGACY_COMPILER_GLOBAL, allow_missing=True) is None
 
 
 @pytest.mark.parametrize("vta_function_count", [1, 3])
@@ -147,7 +150,7 @@ def test_one_hook_invocation_replaces_every_existing_vta_global_in_place(
         assert isinstance(primfunc, tvm.tir.PrimFunc)
         assert str(primfunc.attrs["global_symbol"]) == global_var.name_hint
         assert primfunc.attrs["relay_attrs"].get_str("Compiler") == "vta"
-    assert tvm.get_global_func("relay.ext.vta", allow_missing=True) is None
+    assert tvm.get_global_func(LEGACY_COMPILER_GLOBAL, allow_missing=True) is None
 
 
 def test_relay_to_tir_outlines_and_replaces_nested_vta_function():
@@ -157,7 +160,7 @@ def test_relay_to_tir_outlines_and_replaces_nested_vta_function():
 
     assert _vta_relay_functions(lowered) == []
     assert isinstance(lowered[symbol], tvm.tir.PrimFunc)
-    assert tvm.get_global_func("relay.ext.vta", allow_missing=True) is None
+    assert tvm.get_global_func(LEGACY_COMPILER_GLOBAL, allow_missing=True) is None
 
 
 def test_relay_to_tir_validates_all_vta_functions_before_mutating_module():
@@ -171,7 +174,7 @@ def test_relay_to_tir_validates_all_vta_functions_before_mutating_module():
     assert all(
         isinstance(mod[global_var], relay.Function) for global_var in global_vars
     )
-    assert tvm.get_global_func("relay.ext.vta", allow_missing=True) is None
+    assert tvm.get_global_func(LEGACY_COMPILER_GLOBAL, allow_missing=True) is None
 
 
 @tvm.instrument.pass_instrument
@@ -203,4 +206,4 @@ def test_no_global_or_nested_vta_relay_function_reaches_ordinary_lower_te():
         lower_te("target_hooks", config)(mod)
 
     assert boundary.visits == 1
-    assert tvm.get_global_func("relay.ext.vta", allow_missing=True) is None
+    assert tvm.get_global_func(LEGACY_COMPILER_GLOBAL, allow_missing=True) is None

@@ -15,9 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 
-"""Relay integration for the VTA external compiler."""
+"""Relay integration for the VTA target extension."""
 
-from .contract import COMPILER_NAME, EXTERNAL_COMPILER, VTACompilerConfig
+from .contract import COMPILER_NAME, VTACompilerConfig
 from .partition import partition_for_vta
 
-__all__ = ["COMPILER_NAME", "EXTERNAL_COMPILER", "VTACompilerConfig", "partition_for_vta"]
+__all__ = ["COMPILER_NAME", "VTACompilerConfig", "partition_for_vta"]

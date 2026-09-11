@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-"""Stable compiler and execution-target contract for VTA BYOC."""
+"""Stable compiler and execution-target contract for the VTA target extension."""
 
 from dataclasses import dataclass
 
@@ -23,7 +23,6 @@ import tvm
 
 
 COMPILER_NAME = "vta"
-EXTERNAL_COMPILER = "relay.ext.vta"
 
 
 def _positive_integer(env, name):

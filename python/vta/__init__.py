@@ -98,6 +98,7 @@ def _load_compiler_extension():
 # in lib tvm runtime only mode
 if not tvm._ffi.base._RUNTIME_ONLY:
     _load_compiler_extension()
-    from . import top
+    from . import relay, top
     from .build_module import build_config, lower, build
-    from .relay.backend import register_byoc
+    # Register the private Python bridge consumed by the native RelayToTIR hook.
+    from .relay import transform as _relay_transform

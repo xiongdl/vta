@@ -510,7 +510,7 @@ def _restore_unpacked_output(primfunc, output_type, output_layout, config):
 
 
 def lower_vta_function(func, config=None):
-    """Lower one outlined VTA Relay function for the external-codegen consumer.
+    """Lower one outlined VTA Relay function for the module-level target hook.
 
     Parameters
     ----------
@@ -541,8 +541,8 @@ def lower_vta_function(func, config=None):
 
     Notes
     -----
-    This is an internal boundary for ``relay.ext.vta`` and is intentionally
-    not exported from :mod:`vta.relay`.
+    This is an internal boundary used by the native RelayToTIR hook and is
+    intentionally not exported from :mod:`vta.relay`.
     """
     config = config or VTACompilerConfig.from_env(get_env())
     composite_call = _validate_vta_function(func, config)

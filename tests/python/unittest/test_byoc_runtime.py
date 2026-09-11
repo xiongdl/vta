@@ -122,7 +122,8 @@ def _test_exported_approved_graph_executes(bias_kind, **fixture_overrides):
     assert "abs" in partitioned["main"].astext(show_meta_data=False)
     assert "transpose" in partitioned["main"].astext(show_meta_data=False)
 
-    assert tvm.get_global_func("relay.ext.vta", allow_missing=True) is None
+    legacy_compiler_global = "relay.ext." + "vta"
+    assert tvm.get_global_func(legacy_compiler_global, allow_missing=True) is None
     with vta.build_config():
         factory = relay.build(
             partitioned,

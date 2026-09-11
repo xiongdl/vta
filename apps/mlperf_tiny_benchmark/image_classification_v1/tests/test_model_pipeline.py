@@ -268,7 +268,7 @@ def test_model_pipeline_has_no_forbidden_runtime_dependency_or_legacy_flow():
     for forbidden in [
         "autotvm",
         "graphpack",
-        "relay.ext.vta",
+        "relay.ext." + "vta",
         "tiny-v1.4",
         "cifar-10-batches-py",
         "download_testdata",

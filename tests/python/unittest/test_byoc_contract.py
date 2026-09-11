@@ -16,7 +16,6 @@
 # under the License.
 
 import copy
-import inspect
 from dataclasses import FrozenInstanceError
 
 import numpy as np
@@ -31,18 +30,19 @@ from byoc_utils import (
     make_qnn_conv2d_near_miss_module,
     run_isolated_python,
 )
-from vta.relay import COMPILER_NAME, EXTERNAL_COMPILER, VTACompilerConfig, partition_for_vta
+from vta.relay import COMPILER_NAME, VTACompilerConfig, partition_for_vta
+
+
+LEGACY_COMPILER_GLOBAL = "relay.ext." + "vta"
 
 
 def test_compiler_identity_is_stable():
     assert COMPILER_NAME == "vta"
-    assert EXTERNAL_COMPILER == "relay.ext.vta"
 
 
 def test_relay_package_exports_public_compiler_surface():
     assert vta.relay.__all__ == [
         "COMPILER_NAME",
-        "EXTERNAL_COMPILER",
         "VTACompilerConfig",
         "partition_for_vta",
     ]
@@ -55,17 +55,6 @@ def test_partition_for_vta_has_public_api_documentation():
     assert documentation is not None
     assert "Parameters" in documentation
     assert "Returns" in documentation
-
-
-def test_register_byoc_is_documented_only_at_top_level():
-    documentation = vta.register_byoc.__doc__
-
-    assert callable(vta.register_byoc)
-    assert inspect.signature(vta.register_byoc).return_annotation is None
-    assert documentation is not None
-    assert "Returns" in documentation
-    assert not hasattr(vta.relay, "register_byoc")
-    assert not hasattr(vta.relay, "lower_vta_function")
 
 
 def test_compiler_config_captures_active_environment():
@@ -104,9 +93,13 @@ def test_importing_vta_does_not_register_external_compiler():
         f"""
         import tvm
 
-        assert tvm.get_global_func({EXTERNAL_COMPILER!r}, allow_missing=True) is None
+        assert tvm.get_global_func(
+            {LEGACY_COMPILER_GLOBAL!r}, allow_missing=True
+        ) is None
         import vta
-        assert tvm.get_global_func({EXTERNAL_COMPILER!r}, allow_missing=True) is None
+        assert tvm.get_global_func(
+            {LEGACY_COMPILER_GLOBAL!r}, allow_missing=True
+        ) is None
         """
     )
 

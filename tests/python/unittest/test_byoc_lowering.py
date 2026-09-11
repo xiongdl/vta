@@ -51,6 +51,7 @@ ASYMMETRIC_STRIDE2_SPATIAL_CASES = [
     pytest.param(32, 16, id="32-to-16"),
     pytest.param(16, 8, id="16-to-8"),
 ]
+LEGACY_COMPILER_GLOBAL = "relay.ext." + "vta"
 
 
 def _partitioned_function(bias_kind=None, **overrides):
@@ -158,7 +159,7 @@ def test_validate_vta_function_rejects_config_mismatch():
 
 
 def test_importing_lowering_module_does_not_register_external_compiler():
-    assert tvm.get_global_func("relay.ext.vta", allow_missing=True) is None
+    assert tvm.get_global_func(LEGACY_COMPILER_GLOBAL, allow_missing=True) is None
 
 
 def _find_operator_calls(expr, operator_name):

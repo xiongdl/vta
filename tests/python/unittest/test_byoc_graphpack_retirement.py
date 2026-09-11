@@ -240,6 +240,23 @@ def test_preserved_low_level_vta_interfaces_and_target_identity_remain_available
     assert low_level_target.device_name == "vta"
 
 
+def test_legacy_registration_public_api_is_removed():
+    assert not hasattr(vta, "register_byoc")
+
+
+def test_legacy_external_compiler_constant_is_removed():
+    assert not hasattr(vta.relay, "EXTERNAL_COMPILER")
+
+
+def test_legacy_external_compiler_global_is_absent():
+    assert tvm.get_global_func("relay.ext.vta", allow_missing=True) is None
+
+
+def test_legacy_external_compiler_backend_is_removed():
+    assert importlib.util.find_spec("vta.relay.backend") is None
+    assert not (VTA_ROOT / "python" / "vta" / "relay" / "backend.py").exists()
+
+
 def test_graphpack_public_api_and_implementation_are_removed():
     assert not hasattr(vta.top, "graph_pack")
     assert importlib.util.find_spec("vta.top.graphpack") is None

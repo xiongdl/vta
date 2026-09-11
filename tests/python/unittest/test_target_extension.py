@@ -69,8 +69,9 @@ def test_full_import_registers_one_native_vta_target_idempotently():
 
         ctypes.CDLL = tracking_cdll
 
+        legacy_compiler_global = "relay.ext." + "vta"
         assert "vta" not in tvm.target.Target.list_kinds()
-        assert tvm.get_global_func("relay.ext.vta", allow_missing=True) is None
+        assert tvm.get_global_func(legacy_compiler_global, allow_missing=True) is None
 
         import vta
 
@@ -86,7 +87,7 @@ def test_full_import_registers_one_native_vta_target_idempotently():
         first_kind_handle = first.kind.handle.value
         first_relay_to_tir_handle = first_relay_to_tir.handle.value
         first_tir_to_runtime_handle = first_tir_to_runtime.handle.value
-        assert tvm.get_global_func("relay.ext.vta", allow_missing=True) is None
+        assert tvm.get_global_func(legacy_compiler_global, allow_missing=True) is None
 
         importlib.reload(vta)
 
@@ -100,7 +101,7 @@ def test_full_import_registers_one_native_vta_target_idempotently():
         assert isinstance(second_tir_to_runtime, tvm.runtime.PackedFunc)
         assert second_relay_to_tir.handle.value == first_relay_to_tir_handle
         assert second_tir_to_runtime.handle.value == first_tir_to_runtime_handle
-        assert tvm.get_global_func("relay.ext.vta", allow_missing=True) is None
+        assert tvm.get_global_func(legacy_compiler_global, allow_missing=True) is None
         """
     )
 

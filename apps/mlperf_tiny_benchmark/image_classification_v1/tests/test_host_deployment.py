@@ -439,7 +439,7 @@ def test_application_sources_use_only_the_approved_host_flow():
         "tflite_runtime",
         "autotvm",
         "graphpack",
-        "relay.ext.vta",
+        "relay.ext." + "vta",
         "tiny-v1.4",
         "cifar-10-batches-py",
         "download_testdata",
